@@ -1,5 +1,0 @@
-{
-  "mode": "simulator",
-  "dataDirectory": "<absolute directory outside the source checkout; configure via PIXOO_DATA_DIR>",
-  "deviceIp": null
-}

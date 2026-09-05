@@ -26,8 +26,11 @@ coordinator and preserve the user's requested terminal state.
 
 After workflow or OpenSpec changes, run `npm ci` for setup, then
 `npm run check:workflow` and `npm run test:workflow` from the assigned worktree
-root with Node 24. Both checks must exit zero. An empty spec inventory is allowed
-at bootstrap and must be reported as empty. No application test suite exists yet.
+root with Node 24. Both checks must exit zero. Report the actual specification inventory.
+After TypeScript or application/tooling changes, run `npm run check` from the
+assigned worktree root. After web, HTTP/static serving, or startup changes, also
+run `npm run test:browser` after installing Chromium with Playwright. These checks
+use isolated runtime data and must pass without a device or credentials.
 
 Use `npm run openspec -- <arguments>` with the exact issue-linked change and local
 planning root. Initialize using `init --tools none --profile core --no-animation`.
@@ -45,7 +48,8 @@ Verify all merged-revision main CI jobs before issue closure.
 
 ## Runtime boundaries
 
-The application has not been built. Simulator mode is the future default. Only
+The foundation implements simulator readiness only. Simulator is the sole
+supported mode; no device transport, media rendering, or playback exists yet. Only
 one local backend and one serialized operation queue may write to the configured
 device. Keep private media, credentials, device details, databases, and runtime
 state outside Git. Preserve originals and referenced renditions.

@@ -7,7 +7,8 @@ Use Refs so issue closure waits for main CI and any additional acceptance work.
 ## Validation
 
 Record actual commands and results. Workflow changes require `npm run check:workflow`
-and `npm run test:workflow` after `npm ci`. Add application checks as they are introduced.
+and `npm run test:workflow` after `npm ci`. Application/tooling changes require `npm run check`; web, serving and startup
+changes also require `npm run test:browser`.
 For executable changes, include actual failing and passing evidence or explain a proportionate substitute.
 
 ## Review and CI

@@ -2,29 +2,46 @@
 
 ## Local checkout and worktrees
 
-The canonical source is the WSL checkout. Use Node 24 with npm, then from each
-fresh checkout or assigned worktree root:
+Use Node 24/npm. With nvm, `nvm install` and `nvm use` read .nvmrc. From each
+fresh assigned worktree root:
 
 ```bash
 npm ci
-npm run check:workflow
-npm run test:workflow
+npm run check
+npx playwright install chromium
+npm run test:browser
+npm run simulator
 ```
 
-With nvm, `nvm install` and `nvm use` read .nvmrc. In a sandbox with a read-only npm
-cache, use `npm ci --cache /tmp/pixoo-npm-cache`. On native Windows, run the same
-npm commands in a Node 24 shell. No application startup, media processing, or
-device credentials are required by these checks.
+On Linux, Playwright may require browser system dependencies; hosted CI uses
+`npx playwright install --with-deps chromium`. Native Windows uses the same npm
+commands in a Node 24 shell. Use `npm ci --cache /tmp/pixoo-npm-cache` if the WSL
+npm cache is read-only. In a sandbox, an explicitly set PLAYWRIGHT_BROWSERS_PATH
+can place browser binaries in a writable external cache.
 
-GitHub Actions runs both workflow commands on Ubuntu and Windows for pushes and
-PRs. There are no application lint/typecheck/build/browser commands yet. The M0
-foundation issue adds them with real checks, not placeholder successful scripts.
+| Command | Evidence |
+| --- | --- |
+| `npm run lint` | ESLint checks app, test, and workflow source |
+| `npm run typecheck` | TypeScript checks all packages, tests and tool configs |
+| `npm run build` | Compiles workspace ESM/declarations and Vite production assets |
+| `npm test` | Builds then runs isolated Vitest configuration, API, static and process checks |
+| `npm run test:browser` | Builds then tests the actual page and error/retry at desktop/mobile sizes |
+| `npm run check:workflow` | Validates current specs/changes and archived tasks |
+| `npm run test:workflow` | Exercises workflow CLI safeguards in temporary fixtures |
+| `npm run check` | Lint, typecheck, build/tests and both workflow checks |
+| `npm run simulator` | Builds then starts one loopback backend and UI |
+| `npm start` | Starts a previously built application |
 
-Use the repository root as the Codex project and worktree starting directory.
-AGENTS.md is the project instruction entrypoint. Optional local actions are the
-two workflow commands above, after dependency setup. Do not alter host-managed
-.agents or .codex directories, models, permissions, trust, or hooks. A later task
-can add app actions once the application exists.
+GitHub Actions requires Application checks on Ubuntu and Windows, Workflow
+checks on both hosts, and Simulator browser checks on Ubuntu. The application
+job includes a production build through `npm test`. Browser artifacts are
+ignored under test-results. Emulated phone sizes are not actual LAN verification.
+
+Use the root as the Codex project and worktree starting directory. AGENTS.md is
+the entrypoint. Optional local actions can use the check, browser and simulator
+commands after their prerequisites. Preserve host-managed .agents/.codex, model,
+permission, trust and hook settings. The shell examples are optional environment
+assignments, not configuration files loaded by the app.
 
 ## Shared skills
 
@@ -57,19 +74,19 @@ host. Restart Codex if its skill catalog needs refresh and verify loaded source
 paths in a new task. A link created from WSL must not be assumed readable by a
 native Windows process. Do not generate repository-local copies as a fallback.
 
-Setup-host status: both `/home/jimmie/.agents/skills` and
-`/mnt/c/Users/onesh/.codex/skills` returned `Read-only file system` during manager
-installation, including an escalated attempt. No missing skill was installed.
-The pinned sources can be read for this task, but that is not central discovery.
-The bootstrap issue remains open until installation and fresh-task discovery
-are verified. Preserve the unrelated dirty catalog at
-`/home/jimmie/projects/agent-skills`.
+Installation of the seven missing delivery/OpenSpec skills was verified after
+the user ran the manager from a writable WSL session. All seven are discovered
+in Codex and link to the pinned isolated catalog. Existing required skills remain
+in the original catalog. The manager calls those links foreign because they
+point at a different checkout; that is not a broken-link diagnosis. Keep both
+catalog checkouts available. Setup issue #1 is closed.
 
 ## OpenSpec
 
 Use `npm run openspec -- <arguments>` rather than a global CLI. OpenSpec 1.12.0
 and its lockfile are repository-local. The installed package declares an MIT license.
-Application dependency/license decisions remain in M0. The wrapper preserves the caller's cwd,
+Foundation dependencies and licenses are recorded in dependencies.md; native
+media and persistence dependency choices remain in their implementation issues. The wrapper preserves the caller's cwd,
 disables telemetry and prompts, and isolates the child configuration and Codex
 home in a temporary directory removed after execution. This avoids CLI migration
 changing personal settings or legacy prompts.
@@ -80,17 +97,21 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The bootstrap inventory contains zero specs and changes. Shared integrations
-remain central. `check:workflow` runs strict noninteractive validation for both
+The current inventory includes the reviewed application-foundation capability.
+Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
 independent review. `test:workflow` exercises empty/valid/invalid inventories,
 incomplete archives, CLI errors, and preservation of personal configuration.
 
-## Future runtime
+## Runtime and scope
 
-The application foundation will establish an actual configuration loader and
-startup command. config.example.json is currently illustrative only. Runtime
-state belongs outside source under PIXOO_DATA_DIR; simulator is the default.
-The planned app uses one local backend and a serialized device queue. Review
-handoff sections 6-8 before implementing timing, persistence, or LAN security.
+Read README.md for environment defaults and startup. Paths are resolved relative
+to compiled module locations, so `npm start` does not rely on the shell cwd for
+web assets. Data directory errors or missing build output fail before listening.
+The process handles SIGINT/SIGTERM and preserves external files at shutdown.
+
+The foundation has no renderer, database, fake playback adapter, player or LAN
+mode. The device/media packages establish boundaries without importing transport
+or decoding libraries. Read the handoff and exact issue before extending them.
+Do not claim physical behavior from the readiness API or simulator page.
