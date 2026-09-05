@@ -4,11 +4,11 @@
 .env.*
 config.local.*
 *.local.json
-data/
-uploads/
-media/
-cache/
-backups/
+/data/
+/uploads/
+/media/
+/cache/
+/backups/
 *.sqlite
 *.sqlite-*
 *.sqlite3
@@ -26,3 +26,5 @@ playwright-report/
 .codex/*.local.*
 .DS_Store
 Thumbs.db
+dist-types/
+*.tsbuildinfo

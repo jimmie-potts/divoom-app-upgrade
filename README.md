@@ -1,44 +1,68 @@
-# Pixoo-64 playlist controller
+# Pixoo playlists
 
-A planned local application for named image and GIF playlists on one Divoom
-Pixoo-64. Each image has its own duration; each GIF has a duration or total-play count.
+A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
+The current build serves a responsive simulator status page and a readiness API.
+Media upload, playlists, playback, and device communication follow in later issues.
+No physical display integration has been verified.
 
-This repository currently contains development tooling and the MVP backlog.
-There is no runnable application, device adapter, or verified hardware integration.
-The initial OpenSpec capability inventory is empty.
+## Run the simulator
 
-## Development
-
-Use Node 24 and npm. If using nvm, run `nvm install` and `nvm use` from the root.
+Use Node 24 and npm. With nvm, run `nvm install` and `nvm use` from the root.
 
 ```bash
 npm ci
-npm run check:workflow
-npm run test:workflow
-npm run openspec -- --help
+npm run simulator
 ```
 
-These checks run without a display, private media, or credentials. GitHub Actions
-runs both workflow commands on Ubuntu and Windows. Application lint, typecheck,
-test, build, and startup commands will be introduced by the foundation issue.
+Open the printed URL, normally [http://127.0.0.1:8787](http://127.0.0.1:8787).
+This command builds the workspaces and browser assets, then starts one Fastify
+process serving both the page and `GET /api/health`. After a build, `npm start`
+starts without rebuilding. Stop with Ctrl+C. Closing the page does not stop
+the server. There is no hot reload in this foundation.
 
-Open this repository root as a WSL project in Codex. See [development setup](docs/development.md)
-for fresh worktrees and shared skills, and [the SDLC](docs/sdlc.md) for delivery.
-The canonical checkout is `/home/jimmie/projects/divoom-app-upgrade`.
+Simulator is the only supported mode. The listener is fixed to IPv4 loopback;
+LAN/phone access is not enabled. Phone viewport tests do not establish actual
+phone connectivity. No artwork or device command is sent.
 
-## Product and work tracking
+## Runtime data
 
-[Product direction](docs/product.md) identifies accepted defaults, evidence limits,
-and the preserved [September 5 handoff](docs/reference/2026-09-05-agent-handoff.md).
-[GitHub issues](https://github.com/jimmie-potts/divoom-app-upgrade/issues) own work
-status and acceptance criteria; [milestones](https://github.com/jimmie-potts/divoom-app-upgrade/milestones)
-organize M0-M6. [Decisions](docs/decisions.md) records lasting choices.
+The default directory is `~/.local/share/pixoo-playlist-controller` on Linux/WSL
+and `%LOCALAPPDATA%\PixooPlaylistController` on Windows. Override with an absolute
+`PIXOO_DATA_DIR` outside source control. Startup creates missing directories,
+checks writability, and preserves existing files. It rejects relative/blank paths,
+paths within this checkout or another Git checkout, and symlink aliases into them.
+Runtime data is never served by the web server or included in health responses.
 
-Normal source delivery uses an issue, an isolated worktree, tests, a PR, independent
-reviews, and a verified merge. Application installation and physical testing stay
-separate. The playback service will run on a LAN-connected host; a cloud agent or
-browser alone cannot control the home display.
+`PIXOO_PORT` defaults to `8787`; `0` requests an available port. `PIXOO_MODE`
+defaults to `simulator` and rejects other values. See [shell](examples/config.sh)
+and [PowerShell](examples/config.ps1) examples. Configuration is environment-only;
+no JSON or .env loader is used. Existing app data is never deleted at shutdown.
 
-`PIXOO_DATA_DIR` will hold runtime data outside source. [Example configuration](config.example.json)
-uses placeholders and is illustrative until the foundation establishes its loader.
-Private media, credentials, device details, and databases must never be committed.
+## Validate and develop
+
+```bash
+npm run check
+npx playwright install chromium
+npm run test:browser
+```
+
+`check` runs lint, typecheck, a full build, unit/integration tests, and workflow
+checks. Browser tests cover the built page at desktop/mobile sizes and readiness
+failure/retry. All tests use isolated data without a device. See
+[development](docs/development.md) for individual commands and platform details,
+[dependency licenses](docs/dependencies.md), and [the SDLC](docs/sdlc.md) for delivery.
+
+The five npm workspaces are web and server applications plus core, device, and
+media packages. Core owns readiness validation; device/media currently export
+only the disconnected simulator descriptor and canvas dimensions. The adapter
+and renderer will grow through their own issues.
+
+Open the repository root as a WSL project in Codex. The canonical checkout is
+`/home/jimmie/projects/divoom-app-upgrade`; work on issue branches in isolated
+worktrees. Root [AGENTS.md](AGENTS.md) defines instruction routing and validation.
+
+[GitHub issues](https://github.com/jimmie-potts/divoom-app-upgrade/issues) own scope
+and status. [Product direction](docs/product.md) links the preserved handoff,
+[reviewed foundation requirements](openspec/specs/application-foundation/spec.md),
+and future work. [Decisions](docs/decisions.md) records accepted architecture.
+Source delivery, app installation, and physical acceptance remain separate.

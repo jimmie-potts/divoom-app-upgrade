@@ -9,9 +9,31 @@
   "scripts": {
     "openspec": "node scripts/openspec.cjs",
     "check:workflow": "node scripts/check-workflow.cjs",
-    "test:workflow": "node --test tests/workflow_checks.cjs"
+    "test:workflow": "node --test tests/workflow_checks.cjs",
+    "lint": "eslint .",
+    "build:types": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.tests.json --noEmit",
+    "build": "npm run build:types && npm run build --workspace @pixoo/web",
+    "test": "npm run build && vitest run",
+    "test:browser": "npm run build && playwright test",
+    "start": "node apps/server/dist/main.js",
+    "simulator": "npm run build && npm start",
+    "check": "npm run lint && npm run typecheck && npm test && npm run check:workflow && npm run test:workflow"
   },
   "devDependencies": {
-    "@fission-ai/openspec": "1.12.0"
-  }
+    "@fission-ai/openspec": "1.12.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@playwright/test": "1.63.0",
+    "eslint": "10.10.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.69.0",
+    "globals": "16.5.0",
+    "@types/node": "24.13.3"
+  },
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

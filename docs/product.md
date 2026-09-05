@@ -10,8 +10,9 @@ Accept the handoff's MVP direction: one local backend, responsive browser UI,
 explicitly configured Pixoo, original media preservation, and simulator support.
 Use TypeScript, React/Vite, Fastify, SQLite, sharp plus a tested GIF decoder,
 framework-independent playback, SSE, Vitest, and Playwright as the stack direction.
-Application versions, licenses, GIF decoder, and deployment details remain future
-issue decisions. Node 24 and OpenSpec 1.12.0 are the bootstrap tooling selections.
+Foundation versions and licenses are recorded in [dependencies](dependencies.md).
+GIF decoding, persistence and deployment remain future issue decisions. Node 24
+and OpenSpec 1.12.0 remain the tooling selections.
 
 Start with 30 seconds per image, three total plays per GIF, repeat enabled,
 shuffle disabled, fit with black padding, and nearest-neighbor scaling. Handoff
@@ -26,10 +27,12 @@ GitHub issues own delivery acceptance criteria and dependencies. Translate their
 outcomes into observable OpenSpec scenarios as each feature becomes ready, linking
 each scenario to its issue criterion. The handoff remains immutable historical
 context; reviewed capability specs take precedence for delivered requirements.
-Do not create a competing status table here. Until capability specs exist, the
-handoff is a proposal baseline, not evidence of implemented behavior.
+Do not create a competing status table here. The [application-foundation spec](../openspec/specs/application-foundation/spec.md)
+is authoritative for delivered startup, storage configuration and readiness. The
+remaining handoff capabilities are proposed behavior, not implementation evidence.
 
-M0 foundation starts after bootstrap. M1 separates simulator/adapter source work
+The M0 foundation serves a simulator status page and health API; it does not
+implement media or playback. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;
