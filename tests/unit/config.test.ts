@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../../apps/server/src/config.js';
 
 const temporary: string[] = [];
 async function fixture() {
-  const base = await mkdtemp(join(tmpdir(), 'pixoo-config-'));
+  // Windows temporary paths may use an 8.3 alias; compare canonical locations.
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'pixoo-config-')));
   temporary.push(base);
   const root = join(base, 'source');
   await mkdir(root);
