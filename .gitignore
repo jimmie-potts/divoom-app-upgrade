@@ -1,2 +1,28 @@
+# Private runtime state and local tooling
 .local/
+.env
+.env.*
+config.local.*
+*.local.json
+data/
+uploads/
+media/
+cache/
+backups/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+# Development output
 node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.codex-log/
+.codex/*.local.*
+.DS_Store
+Thumbs.db

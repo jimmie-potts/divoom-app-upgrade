@@ -1,0 +1,30 @@
+schema: spec-driven
+context: |
+  Pixoo-64 playlist controller is a planned local-first TypeScript application.
+  GitHub issues in jimmie-potts/divoom-app-upgrade own delivery scope, acceptance
+  criteria, dependencies, status, and delivery target. Read AGENTS.md, docs/sdlc.md,
+  and docs/product.md. The preserved handoff is a proposal baseline; reviewed
+  specs become normative for delivered capabilities. Bootstrap has zero specs.
+  Use this worktree's planning root and npm run openspec -- <arguments>.
+  Default to simulator. Preserve originals/private state and one serialized
+  device writer. Hardware tests need an explicit IP and display permission.
+  Reuse central skills; generate no repository skill integrations.
+rules:
+  proposal:
+    - Link the exact GitHub issue and criteria; describe the delta without copying issue status or acceptance criteria.
+    - Reuse the linked change or use gh-<issue-number>-<slug>; check active and archived identities.
+  specs:
+    - Write observable scenarios linked to issue criteria; preserve accepted playback and evidence semantics from the handoff.
+  design:
+    - Evaluate conditional design criteria; document timing, concurrency, persistence, failure and recovery decisions when affected.
+  tasks:
+    - Every task names observable completion evidence; use focused red-green-refactor for meaningful executable behavior.
+    - Keep revision-specific reviews and CI evidence in the PR, not the commit they describe.
+operations:
+  apply:
+    guidance:
+      - Preserve the user's authorized terminal state and compose the shared tdd method proportionately.
+  archive:
+    guidance:
+      - Require successful current lookups, complete applicable artifacts/tasks, and acceptance evidence.
+      - Synchronize and verify every affected main spec on the delivery branch before final review.
