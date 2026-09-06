@@ -85,8 +85,7 @@ catalog checkouts available. Setup issue #1 is closed.
 
 Use `npm run openspec -- <arguments>` rather than a global CLI. OpenSpec 1.12.0
 and its lockfile are repository-local. The installed package declares an MIT license.
-Foundation dependencies and licenses are recorded in dependencies.md; native
-media and persistence dependency choices remain in their implementation issues. The wrapper preserves the caller's cwd,
+Foundation dependencies and licenses are recorded in dependencies.md; media dependencies are pinned there; persistence choices remain in their issue. The wrapper preserves the caller's cwd,
 disables telemetry and prompts, and isolates the child configuration and Codex
 home in a temporary directory removed after execution. This avoids CLI migration
 changing personal settings or legacy prompts.
@@ -97,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter and device-http-spike.
+The current inventory includes application-foundation, device-adapter, device-http-spike and media-rendering.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -111,9 +110,9 @@ to compiled module locations, so `npm start` does not rely on the shell cwd for
 web assets. Data directory errors or missing build output fail before listening.
 The process handles SIGINT/SIGTERM and preserves external files at shutdown.
 
-The foundation has no renderer, database, player or LAN mode. The device package
+The application has no database, player or LAN mode. The media package supplies
+[bounded decoding, immutable frames and previews](media-rendering.md). The device package
 provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
 failure and cancellation tests. The independently written [HTTP spike](protocol-spike.md) uses Node HTTP and
-separate opt-in commands; application startup still uses simulator mode. Media
-decoding remains separate. Read the handoff and exact issue before extending them.
+separate opt-in commands; application startup still uses simulator mode. Media ingestion is a library operation; upload HTTP routes remain separate. Read the handoff and exact issue before extending them.
 Do not claim physical behavior from the readiness API or simulator page.

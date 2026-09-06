@@ -11,7 +11,8 @@ explicitly configured Pixoo, original media preservation, and simulator support.
 Use TypeScript, React/Vite, Fastify, SQLite, sharp plus a tested GIF decoder,
 framework-independent playback, SSE, Vitest, and Playwright as the stack direction.
 Foundation versions and licenses are recorded in [dependencies](dependencies.md).
-GIF decoding, persistence and deployment remain future issue decisions. Node 24
+GIF decoding is specified in [media-rendering](../openspec/specs/media-rendering/spec.md);
+persistence and deployment remain future issue decisions. Node 24
 and OpenSpec 1.12.0 remain the tooling selections.
 
 Start with 30 seconds per image, three total plays per GIF, repeat enabled,
@@ -34,14 +35,14 @@ The [device-http-spike spec](../openspec/specs/device-http-spike/spec.md) covers
 opt-in transport experiments, with physical acceptance still separate. The
 remaining handoff capabilities are proposed behavior, not implementation evidence.
 
-The M0 foundation serves a simulator status page and health API; it does not
-implement media or playback. M1 separates simulator/adapter source work
+The application serves a simulator status page and health API. The media
+package renders files, while media-library UI and playback remain future work. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;
 software completion never closes its hardware acceptance issue.
 
-No firmware behavior, model variant, frame limit, loading delay, precise play
-count, actual phone access, or hardware compatibility has been verified here.
-[Hardware evidence](hardware-validation.md) will record dated observations.
+The [hardware evidence](hardware-validation.md) records a bounded Pixoo64 smoke
+test with unknown firmware and early loading screens. Broader limits, precise
+play counts and phone access remain unverified.
 The handoff's six follow-on areas remain deferred GitHub issues.

@@ -2,8 +2,9 @@
 
 A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
 The current build serves a responsive simulator status page and a readiness API.
-Media upload, playlists, playback, and device communication follow in later issues.
-No physical display integration has been verified.
+The media package renders bounded PNG/JPEG/GIF uploads into immutable frames and
+previews. Upload routes, playlists and playback follow in later issues. The
+[Pixoo64 smoke test](docs/hardware-validation.md) passed its narrow profile.
 [Opt-in protocol tools](docs/protocol-spike.md) are separate from normal startup.
 
 ## Run the simulator
@@ -56,8 +57,7 @@ failure/retry. All tests use isolated data without a device. See
 The five npm workspaces are web and server applications plus core, device, and
 media packages. Core owns readiness validation. The device package includes a
 [deterministic fake adapter](docs/device-adapter.md) for complete RGB uploads,
-serialized controls, cancellation and failure tests. The media package currently
-exports canvas dimensions; rendering follows in its own issue. The fake is a
+serialized controls, cancellation and failure tests. The media package provides [bounded rendering and immutable previews](docs/media-rendering.md). The fake is a
 library for tests and future playback integration, not a browser player.
 
 Open the repository root as a WSL project in Codex. The canonical checkout is
