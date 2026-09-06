@@ -19,8 +19,10 @@ adapter was independently implemented against the command descriptions below.
 
 The pinned community implementations use JSON POST to `/post`, numeric
 `error_code`, complete row-major RGB bytes encoded as base64, and sequential
-frame offsets. Their frame payload uses `PicID`; the ID-query response uses
-`PicId`. This capitalization is deliberate. See the linked client and contracts.
+frame offsets. They disagree on frame ID capitalization: the toolkit sends
+`PicID`, while the Rust contracts serialize `PicId`. This spike follows the
+toolkit's frame spelling and reads `PicId` from the ID-query response. Device
+acceptance of these fields remains unverified.
 
 The toolkit resets animation IDs before a push. The Rust contracts provide an
 ID query and a separate reset command. This spike queries the ID and performs no
