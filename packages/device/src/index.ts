@@ -1,2 +1,4 @@
-// Foundation status only. The fake adapter and transport interface belong to issue #3.
+// Physical connection remains false when exercising the in-memory adapter.
 export const simulatorDevice = { connected: false } as const;
+export * from './contracts.js';
+export * from './fake.js';

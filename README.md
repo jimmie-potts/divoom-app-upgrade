@@ -53,9 +53,11 @@ failure/retry. All tests use isolated data without a device. See
 [dependency licenses](docs/dependencies.md), and [the SDLC](docs/sdlc.md) for delivery.
 
 The five npm workspaces are web and server applications plus core, device, and
-media packages. Core owns readiness validation; device/media currently export
-only the disconnected simulator descriptor and canvas dimensions. The adapter
-and renderer will grow through their own issues.
+media packages. Core owns readiness validation. The device package includes a
+[deterministic fake adapter](docs/device-adapter.md) for complete RGB uploads,
+serialized controls, cancellation and failure tests. The media package currently
+exports canvas dimensions; rendering follows in its own issue. The fake is a
+library for tests and future playback integration, not a browser player.
 
 Open the repository root as a WSL project in Codex. The canonical checkout is
 `/home/jimmie/projects/divoom-app-upgrade`; work on issue branches in isolated
