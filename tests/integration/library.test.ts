@@ -3,6 +3,7 @@ import { mkdtemp, rm, readFile, writeFile, readdir, mkdir } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 import { once } from 'node:events';
 import { pathToFileURL } from 'node:url';
 import { Library } from '../../packages/library/src/index.js';
@@ -156,11 +157,13 @@ async function* bytes(value:Buffer) {yield value;}
 it('releases ownership after abrupt process exit and retains committed metadata',async()=>{
   const {directory,library}=await setup();await library.close();
   const entry=pathToFileURL(resolve('packages/library/dist/index.js')).href;
-  const child=spawn(process.execPath,['--input-type=module','-e',`
+  const child=spawn(process.execPath,['--expose-gc','--input-type=module','-e',`
     import {Library} from ${JSON.stringify(entry)};
     const library=await Library.open({directory:${JSON.stringify(directory)}});
     const playlist=await library.createPlaylist('Committed before crash');
-    process.send(playlist);
+    // Model a backend that retains its library for the whole process lifetime.
+    globalThis.liveLibrary=library;
+    setImmediate(()=>{global.gc();process.send(playlist);});
     setInterval(()=>{},1000);
   `],{stdio:['ignore','ignore','pipe','ipc']});
   try {
@@ -168,9 +171,34 @@ it('releases ownership after abrupt process exit and retains committed metadata'
       child.once('message',value=>resolve(value as {id:string}));child.once('error',reject);
       child.once('exit',code=>reject(new Error(`Owner exited before readiness: ${code}`)));
     });
-    await expect(Library.open({directory})).rejects.toMatchObject({code:'busy'});
+    const contention=await Library.open({directory}).then(async unexpected=>{
+      await unexpected.close();return {code:'unexpected-open'};
+    },(error:unknown)=>error);
+    expect(contention).toMatchObject({code:'busy'});
     const exited=once(child,'exit');child.kill('SIGKILL');await exited;
     const reopened=await Library.open({directory});libraries.push(reopened);
     expect(await reopened.getPlaylist(playlist.id)).toMatchObject({name:'Committed before crash',revision:1});
   } finally {if(child.exitCode===null && child.signalCode===null) {const exited=once(child,'exit');child.kill('SIGKILL');await exited;}}
 },15000);
+
+it('keeps an orphan rendition reusable after another transform is registered and deleted',async()=>{
+  const {directory,library}=await setup();
+  const db=new DatabaseSync(join(directory,'catalog.sqlite'));
+  try {
+    db.exec("CREATE TRIGGER fail_registration BEFORE INSERT ON assets BEGIN SELECT RAISE(ABORT,'injected failure'); END");
+    await expect(library.importMedia(upload(),'failed.gif')).rejects.toMatchObject({code:'database-error'});
+    db.exec('DROP TRIGGER fail_registration');
+  } finally {db.close();}
+  const [orphan]=await readdir(join(directory,'media','renditions'));
+  expect(orphan).toBeDefined();
+  const different=await library.importMedia(upload(),'other.gif',{transform:{fit:'crop',scaling:'smooth',background:[1,2,3]}});
+  await library.deleteAsset(different.asset.id);
+  await library.close();
+  const reopened=await Library.open({directory});libraries.push(reopened);
+  const retried=await reopened.importMedia(upload(),'recovered.gif');
+  expect(retried.rendition.id).toBe(orphan);
+  expect(await reopened.getRendition(retried.rendition.id)).toEqual(retried.rendition);
+  await reopened.deleteAsset(retried.asset.id);
+  expect(await readdir(join(directory,'media','originals'))).toEqual([]);
+  expect(await readdir(join(directory,'media','renditions'))).toEqual([]);
+});

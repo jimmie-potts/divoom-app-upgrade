@@ -1,4 +1,4 @@
-import { lstat, open, readdir, rm } from 'node:fs/promises';
+import { lstat, open, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { hashSchema, idSchema, LibraryError, validate } from './contracts.js';
@@ -24,6 +24,22 @@ export async function recoverStaging(mediaDirectory:string):Promise<void> {
   for(const entry of await readdir(root,{withFileTypes:true}))
     if(entry.isDirectory() && /^request-[a-zA-Z0-9]{6}$/.test(entry.name)) await rm(join(root,entry.name),{recursive:true,force:true});
 }
+async function orphanNeedsOriginal(db:DatabaseSync,mediaDirectory:string,contentHash:string):Promise<boolean> {
+  const root = join(mediaDirectory,'renditions');
+  for(const entry of await readdir(root,{withFileTypes:true})) {
+    if(!hashSchema.safeParse(entry.name).success || db.prepare('SELECT id FROM renditions WHERE id=?').get(entry.name)) continue;
+    // An unregistered renderer output can still own this original. Unknown or damaged
+    // manifests cannot prove otherwise, so retain rather than destroy their source.
+    if(!entry.isDirectory()) return true;
+    try {
+      const path = join(root,entry.name,'manifest.json'), info = await lstat(path);
+      if(!info.isFile() || info.size>1024*1024) return true;
+      const manifest = JSON.parse(await readFile(path,'utf8')) as {sourceHash?:unknown};
+      if(!hashSchema.safeParse(manifest.sourceHash).success || manifest.sourceHash===contentHash) return true;
+    } catch {return true;}
+  }
+  return false;
+}
 export async function cleanup(db:DatabaseSync,mediaDirectory:string):Promise<void> {
   for(const row of db.prepare('SELECT * FROM cleanup_jobs ORDER BY asset_id').all()) {
     const assetId=String(row.asset_id);
@@ -40,8 +56,10 @@ export async function cleanup(db:DatabaseSync,mediaDirectory:string):Promise<voi
         catch(e) {if(errno(e)!=='ENOENT')throw e;}
       }
       const original=join(mediaDirectory,'originals',contentHash);
-      try {if(!(await lstat(original)).isFile())throw new Error();await rm(original);}
-      catch(e) {if(errno(e)!=='ENOENT')throw e;}
+      if(!await orphanNeedsOriginal(db,mediaDirectory,contentHash)) {
+        try {if(!(await lstat(original)).isFile())throw new Error();await rm(original);}
+        catch(e) {if(errno(e)!=='ENOENT')throw e;}
+      }
       db.prepare('DELETE FROM cleanup_jobs WHERE asset_id=?').run(assetId);
     } catch {throw new LibraryError('cleanup-pending',{assetId});}
   }

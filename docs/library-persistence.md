@@ -126,7 +126,10 @@ Normal failed imports clean their staging. After acquiring ownership, reopen
 removes abandoned staging directories matching the renderer's request naming
 pattern. It preserves unknown names, symlinks and complete outputs. A crash or
 metadata failure after renderer publication may leave complete unregistered
-files. They remain available for reuse; no broad garbage collection runs.
+files. Cleanup retains any original they still need. If an unregistered
+manifest cannot be interpreted safely, cleanup conservatively retains the
+original. Reimport can catalog complete outputs again; no broad garbage
+collection runs.
 
 ## Migrations, errors and evidence
 

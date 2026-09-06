@@ -33,7 +33,9 @@ media paths. Never infer that a crashed session expired.
 
 SQLite and filesystem changes cannot share a transaction. The journal permits
 idempotent deletion retry; complete unregistered renderer output is retained
-for reuse. Startup recovery removes only owned staging directories. Backup and
+for reuse together with originals it may still need. An unreadable unregistered
+manifest causes conservative original retention. Startup recovery removes only
+owned staging directories. Backup and
 general garbage collection need separate designs.
 
 Synchronous metadata work and serialized media operations can delay callers.
