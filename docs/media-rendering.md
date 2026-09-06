@@ -64,6 +64,8 @@ consumption, asks the iterator to return, and kills/reaps an active decoder befo
 releasing its slot. Existing originals and renditions are never swept. Normal
 failures remove only that request's staging directory. An abrupt parent crash
 can leave staging or an unreferenced original; database-aware cleanup is #6.
+Cancellation racing atomic publication can leave a complete cached result, which
+is preserved. The cancelled request still returns a cancellation error.
 
 `MediaError.code` distinguishes `invalid-input`, `unsupported`, `upload-limit`,
 `pixel-limit`, `profile-limit`, `busy`, `timeout`, `cancelled`, `decode-failed`,
@@ -127,6 +129,8 @@ normalizes zero internally, so this renderer reads raw control-extension delays
 instead. Original generated fixtures checked patch pixels, transparency, offsets,
 disposal metadata and raw variable/zero/missing delays before dependency adoption.
 Strict container/LZW validation and composition are application-owned.
+Control metadata comes from the strict inspector because intervening comment
+extensions can separate a control block from its image in the dependency parser.
 
 [sharp constructor documentation](https://sharp.pixelplumbing.com/api-constructor/)
 describes pixel limits; its [orientation](https://sharp.pixelplumbing.com/api-operation/)

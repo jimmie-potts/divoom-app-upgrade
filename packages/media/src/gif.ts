@@ -82,12 +82,17 @@ export function* compositeGif(bytes: Buffer, info: GifInfo): Generator<Buffer> {
   fill({ x:0, y:0, width:info.width, height:info.height }, background(info.patches[0]!.transparent !== undefined));
   for (let index = 0; index < frames.length; index++) {
     const p = info.patches[index]!, frame = frames[index]!;
-    const decoded = decompressFrame(frame, parsed.gct, true);
+    const decoded = decompressFrame(frame, parsed.gct, false);
     if (!decoded.colorTable?.length || decoded.pixels.some(n => n >= decoded.colorTable.length)) invalid();
     const previous = p.disposal === 3 ? Buffer.from(canvas) : undefined;
     for (let y = 0; y < p.height; y++) for (let x = 0; x < p.width; x++) {
-      const from = (y * p.width + x) * 4, to = ((y + p.y) * info.width + x + p.x) * 4;
-      if (decoded.patch[from + 3]) canvas.set(decoded.patch.subarray(from, from + 4), to);
+      const colorIndex = decoded.pixels[y * p.width + x]!, to = ((y + p.y) * info.width + x + p.x) * 4;
+      // Control extensions can be separated from images by comments in the dependency parser.
+      // The strict inspector preserves their scope, so it owns transparency and disposal.
+      if (colorIndex !== p.transparent) {
+        const color = decoded.colorTable[colorIndex]!;
+        canvas[to]=color[0]; canvas[to+1]=color[1]; canvas[to+2]=color[2]; canvas[to+3]=255;
+      }
     }
     yield Buffer.from(canvas);
     if (p.disposal === 2) fill(p, background(p.transparent !== undefined));

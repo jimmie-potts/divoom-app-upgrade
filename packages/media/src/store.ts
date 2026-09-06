@@ -85,12 +85,15 @@ export class MediaStore {
           const chunk=Buffer.from(next.value); digest.update(chunk); await file.writeFile(chunk);
         }
       } finally { await file.close(); void iterator.return?.().catch(()=>{}); }
+      if(signal.aborted) throw signalError(signal);
       if(!total) throw new MediaError('invalid-input');
       const sourceHash=digest.digest('hex'), id=renditionId(sourceHash,transform,profile);
       const existing=await this.load(root,id,true);
       if(existing) {
         if(existing.source.width * existing.source.height * existing.source.frameCount > this.limits.maxSourcePixels) throw new MediaError('pixel-limit');
-        await this.verifyOriginal(root,sourceHash); return existing;
+        await this.verifyOriginal(root,sourceHash);
+        if(signal.aborted) throw signalError(signal);
+        return existing;
       }
       await runWorker({input:inputPath,output,sourceHash,id,transform,profile,limits:this.limits},signal);
       if(signal.aborted) throw signalError(signal);
@@ -98,7 +101,9 @@ export class MediaStore {
       catch(e) { if(code(e)!=='EEXIST') throw e; await this.verifyOriginal(root,sourceHash); }
       try { await rename(output,join(root,'renditions',id)); }
       catch(e) { if(!['EEXIST','ENOTEMPTY','EPERM'].includes(code(e) ?? '')) throw e; }
-      return (await this.load(root,id,false))!;
+      const published=(await this.load(root,id,false))!;
+      if(signal.aborted) throw signalError(signal);
+      return published;
     } catch(error) { if(error instanceof MediaError) throw error; throw new MediaError('storage-error'); }
     finally { try { if(staging) await rm(staging,{recursive:true,force:true}); } finally { this.release(); } }
   }

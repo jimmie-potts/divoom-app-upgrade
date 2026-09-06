@@ -8,6 +8,17 @@ import { PIXOO64_SMOKE_PROFILE } from '../../packages/media/src/contracts.js';
 const render = (b: Buffer) => renderMedia(b, DEFAULT_TRANSFORM, SIMULATOR_PROFILE, DEFAULT_LIMITS);
 const pixel = (b: Uint8Array, x: number, y: number) => [...b.slice((y * 64 + x) * 3, (y * 64 + x) * 3 + 3)];
 describe('GIF source composition', () => {
+  it('retains control metadata across multiple comment extensions before an image', async () => {
+    const original=gifFixture(1,1,[{width:1,height:1,pixels:[1],delay:4},{width:1,height:1,pixels:[0],transparent:true,delay:20}]);
+    const lastImage=original.lastIndexOf(0x2c);
+    const bytes=Buffer.concat([original.subarray(0,lastImage),Buffer.from([0x21,0xfe,1,65,0,0x21,0xfe,1,66,0]),original.subarray(lastImage)]);
+    const r=await render(bytes);
+    expect(r.source.delaysMs).toEqual([40,200]);
+    expect(pixel(r.frames[0]!.rgb,0,0)).toEqual([255,0,0]);
+    expect(pixel(r.frames[1]!.rgb,0,0)).toEqual([255,0,0]);
+    const oracle=await sharp(bytes,{animated:true}).removeAlpha().raw().toBuffer();
+    expect([...oracle]).toEqual([255,0,0,255,0,0]);
+  });
   it('composites transparent patches, disposal background and previous with distinct timing', async () => {
     const bytes = gifFixture(2, 2, [
       { width: 2, height: 2, pixels: [1,1,1,1], delay: 4, transparent: true },

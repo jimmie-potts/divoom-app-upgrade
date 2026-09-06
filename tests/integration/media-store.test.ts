@@ -22,6 +22,17 @@ it('preserves streamed originals and deduplicates complete immutable renditions'
   expect(await readdir(join(root,'staging'))).toEqual([]);
   expect(await readdir(join(root,'renditions'))).toEqual([a.id]);
 });
+it('rejects a cached request cancelled as its producer finishes', async () => {
+  const {store,root}=await setup(); const b=gif(); const original=await store.render(upload(b));
+  const controller=new AbortController(); let sent=false;
+  const stream:AsyncIterable<Uint8Array>={ [Symbol.asyncIterator]:()=>({
+    next:async()=>sent ? {done:true,value:undefined} : (sent=true,{done:false,value:b}),
+    return:async()=>{controller.abort();return {done:true,value:undefined};},
+  }) };
+  await expect(store.render(stream,{signal:controller.signal})).rejects.toMatchObject({code:'cancelled'});
+  expect(await readdir(join(root,'staging'))).toEqual([]);
+  expect((await store.render(upload(b))).id).toBe(original.id);
+});
 it('separates identities by transform and complete profile and preserves existing files on rejection', async () => {
   const {store,root}=await setup(); const b=gif();
   const a=await store.render(upload(b));
