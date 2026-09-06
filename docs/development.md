@@ -97,7 +97,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes the reviewed application-foundation capability.
+The current inventory includes application-foundation and device-adapter.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -111,7 +111,8 @@ to compiled module locations, so `npm start` does not rely on the shell cwd for
 web assets. Data directory errors or missing build output fail before listening.
 The process handles SIGINT/SIGTERM and preserves external files at shutdown.
 
-The foundation has no renderer, database, fake playback adapter, player or LAN
-mode. The device/media packages establish boundaries without importing transport
-or decoding libraries. Read the handoff and exact issue before extending them.
+The foundation has no renderer, database, player or LAN mode. The device package
+provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
+failure and cancellation tests. It imports no physical transport library. Media
+decoding remains separate. Read the handoff and exact issue before extending them.
 Do not claim physical behavior from the readiness API or simulator page.

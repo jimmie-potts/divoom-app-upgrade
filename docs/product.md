@@ -29,7 +29,8 @@ each scenario to its issue criterion. The handoff remains immutable historical
 context; reviewed capability specs take precedence for delivered requirements.
 Do not create a competing status table here. The [application-foundation spec](../openspec/specs/application-foundation/spec.md)
 is authoritative for delivered startup, storage configuration and readiness. The
-remaining handoff capabilities are proposed behavior, not implementation evidence.
+device-adapter spec is authoritative for the [fake operation boundary](../openspec/specs/device-adapter/spec.md).
+The remaining handoff capabilities are proposed behavior, not implementation evidence.
 
 The M0 foundation serves a simulator status page and health API; it does not
 implement media or playback. M1 separates simulator/adapter source work
