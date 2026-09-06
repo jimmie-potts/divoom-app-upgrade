@@ -18,7 +18,9 @@
     "test:browser": "npm run build && playwright test",
     "start": "node apps/server/dist/main.js",
     "simulator": "npm run build && npm start",
-    "check": "npm run lint && npm run typecheck && npm test && npm run check:workflow && npm run test:workflow"
+    "check": "npm run lint && npm run typecheck && npm test && npm run check:workflow && npm run test:workflow",
+    "device:probe": "node scripts/device-spike.mjs probe",
+    "device:smoke": "node scripts/device-spike.mjs"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.12.0",

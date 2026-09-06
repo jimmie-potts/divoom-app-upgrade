@@ -5,7 +5,8 @@ context: |
   criteria, dependencies, status, and delivery target. Read AGENTS.md, docs/sdlc.md,
   and docs/product.md. The preserved handoff is a proposal baseline; reviewed
   specs are normative for delivered capabilities. Application-foundation covers
-  local startup and readiness; media, playback and device transport are future work.
+  local startup and readiness. Device-adapter covers the fake; the HTTP spike is
+  separately invoked. Media/playback and physical validation remain future work.
   Use this worktree's planning root and npm run openspec -- <arguments>.
   Default to simulator. Preserve originals/private state and one serialized
   device writer. Hardware tests need an explicit IP and display permission.

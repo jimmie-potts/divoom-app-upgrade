@@ -1,3 +1,4 @@
+import { snapshotAnimation } from './frames.js';
 import {
   systemClock, type Animation, type Clock, type DeviceAdapter, type FailureCode, type OperationOptions,
   type OperationResult, type ProbeResult, type RgbFrame, type Timing, type UploadResult,
@@ -19,11 +20,7 @@ export type DeviceEffect = EffectData & { operationId: number; generation: numbe
 interface Work { start(): void; cancel(code: FailureCode): void }
 
 function nonnegative(value: number) { return Number.isFinite(value) && value >= 0; }
-function validAnimation(animation: Animation): boolean {
-  return Array.isArray(animation?.frames) && animation.frames.length > 0 && Array.from(animation.frames).every(frame =>
-    frame?.rgb instanceof Uint8Array && frame.rgb.length === 64 * 64 * 3 &&
-    Number.isSafeInteger(frame.delayMs) && frame.delayMs > 0);
-}
+
 
 /** In-memory simulator only. One instance owns one serialized writer. */
 export class FakeDeviceAdapter implements DeviceAdapter {
@@ -70,8 +67,9 @@ export class FakeDeviceAdapter implements DeviceAdapter {
     return this.submit('probe', [], options, () => ({ mode: 'simulator', available: true, connected: false }));
   }
   uploadAnimation(animation: Animation, options: OperationOptions): Promise<OperationResult<UploadResult>> {
-    const valid = validAnimation(animation);
-    const effects: EffectData[] = valid ? animation.frames.map((frame, frameIndex) => ({
+    const snapshot = snapshotAnimation(animation);
+    const valid = !!snapshot;
+    const effects: EffectData[] = snapshot ? snapshot.frames.map((frame, frameIndex) => ({
       kind: 'frame', frameIndex, frame: { rgb: new Uint8Array(frame.rgb), delayMs: frame.delayMs },
     })) : [];
     const failureAt = valid ? this.nextUploadFailure : undefined;
