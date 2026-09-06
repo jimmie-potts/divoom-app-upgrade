@@ -11,3 +11,5 @@
 Future issues must record timing estimation, renderer/profile limits, dependency
 licensing, and LAN security choices here through linked ADRs. Those application
 decisions have not been finalized by the repository bootstrap.
+
+- [ADR 0005: Bounded media rendering and immutable outputs](decisions/0005-media-rendering.md)

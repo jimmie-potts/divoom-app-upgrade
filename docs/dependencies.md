@@ -2,8 +2,8 @@
 
 Versions below are pinned in workspace manifests and the lockfile. Licenses were
 read from installed package metadata on September 5, 2026. Transitive packages
-and their recorded metadata are in package-lock.json. No community Pixoo code,
-GIF decoder, sharp or SQLite driver is included in this foundation.
+and their recorded metadata are in package-lock.json. No community Pixoo SDK or SQLite driver is included. Media dependencies were
+added and their installed license files/metadata checked September 6, 2026.
 
 | Package | Version | License | Used by |
 | --- | --- | --- | --- |
@@ -34,3 +34,22 @@ that is a point-in-time result, not a guarantee of future advisory status.
 
 References: [Fastify static compatibility](https://github.com/fastify/fastify-static),
 [Vite requirements](https://vite.dev/guide/), [Vitest guide](https://vitest.dev/guide/).
+
+## Media dependencies
+
+| Package | Version | Installed license metadata | Role |
+| --- | --- | --- | --- |
+| sharp | 0.35.4 | Apache-2.0 | PNG/JPEG decoding, orientation, transforms and effective PNG previews |
+| gifuct-js | 2.1.2 | MIT | GIF patch decompression and interlacing |
+| js-binary-schema-parser | 2.0.3 | MIT | Pinned transitive GIF parser |
+| @img/sharp-linux-x64 | 0.35.4 | Apache-2.0 | Linux native binding; platform variants are locked |
+| @img/sharp-libvips-linux-x64 | 1.3.3 | LGPL-3.0-or-later | Prebuilt libvips and bundled dependencies; retain bundled notices |
+
+The direct dependencies are exact pins; the lockfile pins native/platform and
+transitive packages. The libvips package carries third-party license notices.
+Source-only validation does not produce a redistributed application bundle;
+packaging in M5 must preserve these notices and review its distribution format.
+
+[sharp 0.35.4 source](https://github.com/lovell/sharp/tree/7f1a0a22cc285fe180766f4935d50b55af6e8432)
+and [gifuct-js 2.1.2 source](https://github.com/matt-way/gifuct-js/tree/c497192922d79acc537ec9f4796dfa2d89aaa13a)
+identify the evaluated revisions. See [decoder fixture evidence](media-rendering.md#decoder-evidence-and-licenses).
