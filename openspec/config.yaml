@@ -6,7 +6,8 @@ context: |
   and docs/product.md. The preserved handoff is a proposal baseline; reviewed
   specs are normative for delivered capabilities. Application-foundation covers
   local startup and readiness. Device-adapter covers the fake; the HTTP spike is
-  separately invoked. Media rendering is available as a bounded library; playback remains future work.
+  separately invoked. Media rendering and SQLite media/playlist persistence are backend libraries;
+  playback remains future work.
   Physical evidence is scoped to the dated hardware-validation record.
   Use this worktree's planning root and npm run openspec -- <arguments>.
   Default to simulator. Preserve originals/private state and one serialized

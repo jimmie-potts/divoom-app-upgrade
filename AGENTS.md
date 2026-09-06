@@ -52,7 +52,9 @@ Normal application startup remains simulator-only. The device package also has
 a separately invoked HTTP spike; it is not enabled by startup. Before protocol or
 hardware work, read docs/protocol-spike.md for command stages and evidence gates.
 Before media ingestion, rendering, or cache work, read docs/media-rendering.md
-for the library contract, limits and profile evidence. Rendering is implemented;
+for the library contract, limits and profile evidence. Before catalog, playlist,
+migration or media deletion work, read docs/library-persistence.md for revision,
+reference and storage-ownership rules. Rendering and persistence are implemented;
 playback is not. Only
 one local backend and one serialized operation queue may write to the configured
 device. Keep private media, credentials, device details, databases, and runtime

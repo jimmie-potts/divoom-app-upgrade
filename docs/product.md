@@ -12,7 +12,8 @@ Use TypeScript, React/Vite, Fastify, SQLite, sharp plus a tested GIF decoder,
 framework-independent playback, SSE, Vitest, and Playwright as the stack direction.
 Foundation versions and licenses are recorded in [dependencies](dependencies.md).
 GIF decoding is specified in [media-rendering](../openspec/specs/media-rendering/spec.md);
-persistence and deployment remain future issue decisions. Node 24
+persistence is specified in [library-persistence](../openspec/specs/library-persistence/spec.md).
+Deployment remains future work. Node 24
 and OpenSpec 1.12.0 remain the tooling selections.
 
 Start with 30 seconds per image, three total plays per GIF, repeat enabled,
@@ -36,7 +37,8 @@ opt-in transport experiments, with physical acceptance still separate. The
 remaining handoff capabilities are proposed behavior, not implementation evidence.
 
 The application serves a simulator status page and health API. The media
-package renders files, while media-library UI and playback remain future work. M1 separates simulator/adapter source work
+package renders files, and the library package persists metadata and playlists.
+Media-library UI and playback remain future work. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;

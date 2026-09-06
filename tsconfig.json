@@ -11,6 +11,9 @@
       "path": "packages/media"
     },
     {
+      "path": "packages/library"
+    },
+    {
       "path": "apps/server"
     },
     {

@@ -2,7 +2,7 @@
 
 Versions below are pinned in workspace manifests and the lockfile. Licenses were
 read from installed package metadata on September 5, 2026. Transitive packages
-and their recorded metadata are in package-lock.json. No community Pixoo SDK or SQLite driver is included. Media dependencies were
+and their recorded metadata are in package-lock.json. No community Pixoo SDK or external SQLite npm driver is included. Media dependencies were
 added and their installed license files/metadata checked September 6, 2026.
 
 | Package | Version | License | Used by |
@@ -24,7 +24,7 @@ added and their installed license files/metadata checked September 6, 2026.
 | `typescript-eslint` | 8.69.0 | MIT | divoom-app-upgrade |
 | `vite` | 7.3.6 | MIT | @pixoo/web |
 | `vitest` | 3.2.7 | MIT | divoom-app-upgrade |
-| `zod` | 4.5.4 | MIT | @pixoo/core |
+| `zod` | 4.5.4 | MIT | @pixoo/core, @pixoo/library |
 
 Node 24 satisfies the selected runtime/tooling engine requirements. Fastify 5
 and its static plugin are validated together through injection, process and
@@ -53,3 +53,11 @@ packaging in M5 must preserve these notices and review its distribution format.
 [sharp 0.35.4 source](https://github.com/lovell/sharp/tree/7f1a0a22cc285fe180766f4935d50b55af6e8432)
 and [gifuct-js 2.1.2 source](https://github.com/matt-way/gifuct-js/tree/c497192922d79acc537ec9f4796dfa2d89aaa13a)
 identify the evaluated revisions. See [decoder fixture evidence](media-rendering.md#decoder-evidence-and-licenses).
+
+## Persistence runtime
+
+`@pixoo/library` uses Node 24 bundled `node:sqlite`; no additional driver is
+installed. [Node 24 documentation](https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html)
+labels the API release candidate. This choice and its locking assumptions are
+recorded in [ADR 0006](decisions/0006-library-persistence.md). Runtime packaging
+must retain Node's bundled notices alongside the media dependency notices.

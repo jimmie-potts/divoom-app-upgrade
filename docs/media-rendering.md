@@ -1,8 +1,9 @@
 # Media rendering
 
 `@pixoo/media` accepts streamed PNG, JPEG and GIF bytes and returns immutable
-64x64 renditions. It is a backend library. HTTP upload routes, the media library,
-database metadata, playback and deletion policies belong to later issues.
+64x64 renditions. It is a backend library. [The library package](library-persistence.md)
+owns database metadata, playlists and deletion policies. HTTP upload routes,
+UI and playback belong to later issues.
 No renderer call contacts a device.
 
 ## Use the library
@@ -32,7 +33,9 @@ cannot keep the media job or its partial files alive after the job deadline.
 
 `render` returns a manifest with source metadata, normalized transform, selected
 profile, renderer version, ordered frame hashes/delays and timing warnings.
-`readFrame` returns a fresh buffer. PNG previews encode the exact effective RGB
+`initialize` prepares private storage without rendering. `getRendition` reads
+and verifies an existing manifest, its original and cached frames. `readFrame`
+returns a fresh buffer. PNG previews encode the exact effective RGB
 bytes; consumers use the manifest's ordered delays to animate them. No separate
 preview resampling or source-GIF replay is involved. Originals stay byte-identical.
 
@@ -63,7 +66,8 @@ A timeout includes queueing, input streaming and decoding. Cancellation stops
 consumption, asks the iterator to return, and kills/reaps an active decoder before
 releasing its slot. Existing originals and renditions are never swept. Normal
 failures remove only that request's staging directory. An abrupt parent crash
-can leave staging or an unreferenced original; database-aware cleanup is #6.
+can leave staging or an unreferenced original. The library package recovers
+owned staging under its exclusive owner; standalone MediaStore does not sweep it.
 Cancellation racing atomic publication can leave a complete cached result, which
 is preserved. The cancelled request still returns a cancellation error.
 
