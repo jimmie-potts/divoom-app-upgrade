@@ -85,7 +85,7 @@ catalog checkouts available. Setup issue #1 is closed.
 
 Use `npm run openspec -- <arguments>` rather than a global CLI. OpenSpec 1.12.0
 and its lockfile are repository-local. The installed package declares an MIT license.
-Foundation dependencies and licenses are recorded in dependencies.md; media dependencies are pinned there; persistence choices remain in their issue. The wrapper preserves the caller's cwd,
+Foundation dependencies and licenses are recorded in dependencies.md; media dependencies are pinned there; the library uses Node 24 bundled SQLite. The wrapper preserves the caller's cwd,
 disables telemetry and prompts, and isolates the child configuration and Codex
 home in a temporary directory removed after execution. This avoids CLI migration
 changing personal settings or legacy prompts.
@@ -96,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter, device-http-spike and media-rendering.
+The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering and library-persistence.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -110,7 +110,9 @@ to compiled module locations, so `npm start` does not rely on the shell cwd for
 web assets. Data directory errors or missing build output fail before listening.
 The process handles SIGINT/SIGTERM and preserves external files at shutdown.
 
-The application has no database, player or LAN mode. The media package supplies
+The library package supplies [SQLite persistence](library-persistence.md) for
+media, playlists and session retention. Startup does not open this library yet;
+the application has no player or LAN mode. The media package supplies
 [bounded decoding, immutable frames and previews](media-rendering.md). The device package
 provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
 failure and cancellation tests. The independently written [HTTP spike](protocol-spike.md) uses Node HTTP and

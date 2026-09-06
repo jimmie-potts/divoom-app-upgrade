@@ -51,6 +51,12 @@ export class MediaStore {
   private readonly queue: Waiting[] = [];
   constructor(options: {directory:string;limits?:Partial<MediaLimits>}) { this.directory=options.directory; this.limits=canonicalLimits(options.limits); }
   private getRoot() { return this.root ??= storageRoot(this.directory); }
+  async initialize(): Promise<void> { await this.getRoot(); }
+  async getRendition(id:string): Promise<Rendition> {
+    const root=await this.getRoot(), rendition=(await this.load(root,id,false))!;
+    await this.verifyOriginal(root,rendition.sourceHash);
+    return rendition;
+  }
   private acquire(signal: AbortSignal): Promise<void> {
     if (signal.aborted) return Promise.reject(signalError(signal));
     if (this.active < this.limits.concurrency) { this.active++; return Promise.resolve(); }

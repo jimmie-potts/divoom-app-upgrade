@@ -13,3 +13,5 @@ licensing, and LAN security choices here through linked ADRs. Those application
 decisions have not been finalized by the repository bootstrap.
 
 - [ADR 0005: Bounded media rendering and immutable outputs](decisions/0005-media-rendering.md)
+
+- [ADR 0006: SQLite catalog and reference-safe media lifecycle](decisions/0006-library-persistence.md)
