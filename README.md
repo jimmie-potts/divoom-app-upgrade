@@ -4,6 +4,7 @@ A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
 The current build serves a responsive simulator status page and a readiness API.
 Media upload, playlists, playback, and device communication follow in later issues.
 No physical display integration has been verified.
+[Opt-in protocol tools](docs/protocol-spike.md) are separate from normal startup.
 
 ## Run the simulator
 

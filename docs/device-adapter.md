@@ -90,5 +90,6 @@ for each test/session rather than using it as a persistent event store. The
 synthetic fixtures in tests/helpers/rgb-fixtures.ts encode row, column and frame
 identity without external artwork.
 
-Physical transport, response parsing, device timing and display acceptance remain
-unverified under issue #4. The fake tests establish software behavior only.
+The separate [HTTP spike](protocol-spike.md) implements source-level transport and
+response parsing checks. Device timing and display acceptance remain unverified
+under issue #4. The fake tests establish software behavior only.

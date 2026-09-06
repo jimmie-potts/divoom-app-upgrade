@@ -17,14 +17,15 @@ export interface Timing {
   queueMs: number;
   serviceMs: number;
 }
-export type FailureCode = 'invalid-input' | 'offline' | 'upload-failed' | 'cancelled' | 'timeout' | 'stale-generation';
+export type FailureCode = 'invalid-input' | 'offline' | 'upload-failed' | 'cancelled' | 'timeout' | 'stale-generation' | 'http-error' | 'device-error' | 'protocol-error';
 export type OperationResult<T> = { generation: number; timing: Timing } & (
   | { ok: true; value: T }
-  | { ok: false; code: FailureCode; priorEffects: 'none' | 'possible' }
+  | { ok: false; code: FailureCode; priorEffects: 'none' | 'possible'; details?: { httpStatus?: number; deviceCode?: number } }
 );
 export interface RgbFrame { readonly rgb: Uint8Array; readonly delayMs: number }
 export interface Animation { readonly frames: readonly RgbFrame[] }
-export interface ProbeResult { mode: 'simulator'; available: true; connected: false }
+export type ProbeResult = { mode: 'simulator'; available: true; connected: false }
+  | { mode: 'device'; available: true; connected: true; channel: number; brightness?: number; screenOn?: boolean };
 export interface UploadResult { estimatedReadyAtMs: number }
 export interface DeviceAdapter {
   readonly generation: number;

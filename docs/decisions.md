@@ -6,6 +6,8 @@
 
 - [ADR 0003: Serialized simulator adapter](decisions/0003-device-adapter.md) records writer ownership, cancellation and timing estimates.
 
+- [ADR 0004: Opt-in HTTP protocol experiments](decisions/0004-http-protocol-spike.md) records the source/physical acceptance boundary.
+
 Future issues must record timing estimation, renderer/profile limits, dependency
 licensing, and LAN security choices here through linked ADRs. Those application
 decisions have not been finalized by the repository bootstrap.

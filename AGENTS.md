@@ -48,8 +48,10 @@ Verify all merged-revision main CI jobs before issue closure.
 
 ## Runtime boundaries
 
-The foundation implements simulator readiness only. Simulator is the sole
-supported mode; no device transport, media rendering, or playback exists yet. Only
+Normal application startup remains simulator-only. The device package also has
+a separately invoked HTTP spike; it is not enabled by startup. Before protocol or
+hardware work, read docs/protocol-spike.md for command stages and evidence gates.
+Media rendering and playback are not implemented. Only
 one local backend and one serialized operation queue may write to the configured
 device. Keep private media, credentials, device details, databases, and runtime
 state outside Git. Preserve originals and referenced renditions.
