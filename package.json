@@ -20,7 +20,10 @@
     "simulator": "npm run build && npm start",
     "check": "npm run lint && npm run typecheck && npm test && npm run check:workflow && npm run test:workflow",
     "device:probe": "node scripts/device-spike.mjs probe",
-    "device:smoke": "node scripts/device-spike.mjs"
+    "device:smoke": "node scripts/device-spike.mjs",
+    "backup": "node apps/server/dist/operations-cli.js backup",
+    "restore": "node apps/server/dist/operations-cli.js restore",
+    "diagnostics": "node apps/server/dist/operations-cli.js diagnostics"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.12.0",

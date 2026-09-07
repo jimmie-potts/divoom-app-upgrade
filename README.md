@@ -38,8 +38,11 @@ Private directories are never served directly or included in health responses. V
 
 `PIXOO_PORT` defaults to `8787`; `0` requests an available port. `PIXOO_MODE`
 defaults to `simulator` and rejects other values. See [shell](examples/config.sh)
-and [PowerShell](examples/config.ps1) examples. Configuration is environment-only;
-no JSON or .env loader is used. Existing app data is never deleted at shutdown.
+and [PowerShell](examples/config.ps1) examples. Startup configuration is environment-only; no .env loader is used.
+The settings API separately persists validated device.json. Existing app data is never deleted at shutdown.
+
+See [local operations](docs/local-operations.md) for persistent native startup,
+diagnostics, offline backup/restore, host wakefulness and Windows/WSL checks.
 
 ## Validate and develop
 

@@ -10,6 +10,7 @@ import { LibraryError, hashSchema, idSchema, itemsSchema, nameSchema, revisionSc
 import { acquireOwner, cleanup, databaseFile, recoverStaging } from './files.js';
 import {checkpointSchema,createCheckpoint,readCheckpoint,saveCheckpoint,clearCheckpoint,type PlaybackCheckpoint} from './checkpoint.js';
 import { migrate, transaction } from './migrations.js';
+import {snapshotFiles} from './snapshot.js';
 
 type RenderOptions = NonNullable<Parameters<MediaStore['render']>[1]>;
 type Row = Record<string, unknown>;
@@ -60,6 +61,12 @@ export class Library {
   close():Promise<void> {
     this.closing = true;
     return this.closed ??= this.tail.then(()=>{try {this.db.close();} finally {this.owner.close();}});
+  }
+
+  /** Offline tooling keeps this owner open across inventory, snapshot and copying. */
+  verifyStorage():Promise<string[]> {return this.run(()=>snapshotFiles(this.db,this.media));}
+  snapshotDatabase(destination:string):Promise<void> {
+    return this.run(()=>{this.db.prepare('VACUUM INTO ?').run(destination);});
   }
 
   private asset(row:Row|undefined):Asset {

@@ -96,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence, playlist-playback and controller-api and controller-ui.
+The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence, playlist-playback and controller-api and controller-ui and local-operations.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -117,3 +117,7 @@ provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
 failure and cancellation tests. The independently written [HTTP spike](protocol-spike.md) uses Node HTTP and
 separate opt-in commands; application startup still uses simulator mode. The API admits bounded multipart uploads to the library. Read the handoff and exact issue before extending them.
 Do not claim physical behavior from the readiness API or simulator page.
+
+[Local operations](local-operations.md) documents the built backup, restore and
+diagnostics commands. Run application checks and browser checks sequentially in
+one worktree because both rebuild the production web assets.

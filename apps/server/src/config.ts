@@ -12,7 +12,7 @@ export interface RuntimeConfig {
 }
 interface ConfigContext { root?: string; home?: string; platform?: string }
 
-function within(parent: string, child: string): boolean {
+export function within(parent: string, child: string): boolean {
   const delta = relative(parent, child);
   return delta === '' || (!delta.startsWith(`..${sep}`) && delta !== '..' && !isAbsolute(delta));
 }
@@ -43,6 +43,13 @@ async function insideGit(path: string): Promise<boolean> {
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     if (dirname(current) === current) return false;
   }
+}
+
+export async function privatePath(requested:string,root=sourceRoot):Promise<string> {
+  if(!requested.trim() || !isAbsolute(requested))throw new Error('Use an absolute directory outside source control');
+  const path=await canonicalPath(requested);
+  if(within(await canonicalPath(root),path) || await insideGit(path))throw new Error('Directory must be outside source control');
+  return path;
 }
 
 export async function loadConfig(
