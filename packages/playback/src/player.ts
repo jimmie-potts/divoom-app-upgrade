@@ -75,7 +75,7 @@ export class Player {
     return this.queue(async()=>{
       const proceed=await action();
       if(token!==this.epoch)return;
-      if(proceed===false && this.intent==='active')this.intent='stopped';
+      if((proceed===false || !this.record) && this.intent==='active')this.intent='stopped';
       if(!this.requestedScreenOn && this.intent==='active')this.intent='paused';
       this.state=this.intent==='active'?'loading':this.intent==='paused'?'paused':'idle';
       await this.persist();
