@@ -34,6 +34,9 @@ it('starts the built process from another cwd and shuts down without deleting da
     const health = await fetch(`${address}/api/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toMatchObject({ mode: 'simulator', device: { connected: false } });
+    const player = await fetch(`${address}/api/player`);
+    expect(player.status).toBe(200);
+    expect(await player.json()).toMatchObject({player:{state:'idle',sessionId:null}});
     const page = await fetch(address);
     expect(page.status).toBe(200);
     expect(await page.text()).toContain('<div id="root">');

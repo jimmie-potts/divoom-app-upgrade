@@ -18,6 +18,12 @@
     },
     {
       "path": "../../packages/media"
+    },
+    {
+      "path": "../../packages/library"
+    },
+    {
+      "path": "../../packages/playback"
     }
   ]
 }

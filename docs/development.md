@@ -96,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence and playlist-playback.
+The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence, playlist-playback and controller-api.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -111,11 +111,9 @@ web assets. Data directory errors or missing build output fail before listening.
 The process handles SIGINT/SIGTERM and preserves external files at shutdown.
 
 The library package supplies [SQLite persistence](library-persistence.md) for
-media, playlists and session retention. Startup does not open this library yet;
-the player is a [separate backend library](playback.md), and LAN mode remains
-future work. The media package supplies
+media, playlists and session retention. Startup opens the private library and [player](playback.md), restoring saved context paused. The [HTTP API](api.md) integrates both; LAN mode remains future work. The media package supplies
 [bounded decoding, immutable frames and previews](media-rendering.md). The device package
 provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
 failure and cancellation tests. The independently written [HTTP spike](protocol-spike.md) uses Node HTTP and
-separate opt-in commands; application startup still uses simulator mode. Media ingestion is a library operation; upload HTTP routes remain separate. Read the handoff and exact issue before extending them.
+separate opt-in commands; application startup still uses simulator mode. The API admits bounded multipart uploads to the library. Read the handoff and exact issue before extending them.
 Do not claim physical behavior from the readiness API or simulator page.

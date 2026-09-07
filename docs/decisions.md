@@ -17,3 +17,5 @@ decisions have not been finalized by the repository bootstrap.
 - [ADR 0006: SQLite catalog and reference-safe media lifecycle](decisions/0006-library-persistence.md)
 
 - [ADR 0007: Deterministic playback and durable paused recovery](decisions/0007-playback.md)
+
+- [ADR 0008: Local controller API and replay identity](decisions/0008-controller-api.md)

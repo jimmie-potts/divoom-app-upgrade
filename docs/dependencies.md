@@ -61,3 +61,9 @@ installed. [Node 24 documentation](https://nodejs.org/download/release/latest-v2
 labels the API release candidate. This choice and its locking assumptions are
 recorded in [ADR 0006](decisions/0006-library-persistence.md). Runtime packaging
 must retain Node's bundled notices alongside the media dependency notices.
+
+## API multipart parsing
+
+`@fastify/multipart` 10.1.1 is pinned for the server, with MIT license metadata.
+Its lockfile-pinned parser is `@fastify/busboy`. The API tests exercise part and
+byte limits before publication. [Official plugin documentation](https://github.com/fastify/fastify-multipart) describes stream consumption and file-size errors.

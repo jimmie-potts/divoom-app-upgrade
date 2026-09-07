@@ -4,7 +4,7 @@
 records in SQLite. It uses `@pixoo/media` for original files and immutable frames.
 This is a backend library. Startup still serves the simulator status page;
 the [playback package](playback.md) integrates through its library store.
-Upload routes and library/player UI follow in separate issues.
+The [HTTP API](api.md) exposes uploads and revisioned edits. Library/player UI follows in separate issues.
 
 ## Open and close
 
