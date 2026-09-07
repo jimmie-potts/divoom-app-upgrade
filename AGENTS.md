@@ -56,7 +56,9 @@ for the library contract, limits and profile evidence. Before catalog, playlist,
 migration or media deletion work, read docs/library-persistence.md for revision,
 reference and storage-ownership rules. Before playback, timing, player controls
 or checkpoint changes, read docs/playback.md for cancellation, history and recovery
-contracts. Rendering, persistence and backend playback are implemented. Only
+contracts. Before HTTP routes, request authentication, SSE or API startup changes,
+read docs/api.md for replay identity, admission limits and simulator boundaries.
+Rendering, persistence and backend playback are implemented. Only
 one local backend and one serialized operation queue may write to the configured
 device. Keep private media, credentials, device details, databases, and runtime
 state outside Git. Preserve originals and referenced renditions.

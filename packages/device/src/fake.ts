@@ -4,7 +4,7 @@ import {
   type OperationResult, type ProbeResult, type RgbFrame, type Timing, type UploadResult,
 } from './contracts.js';
 
-export interface FakeDeviceOptions { clock?: Clock; latencyMs?: number; readyDelayMs?: number }
+export interface FakeDeviceOptions { clock?: Clock; latencyMs?: number; readyDelayMs?: number; recordHistory?: boolean }
 type OperationKind = 'probe' | 'uploadAnimation' | 'setBrightness' | 'setScreen';
 export interface OperationRecord {
   id: number;
@@ -27,6 +27,7 @@ export class FakeDeviceAdapter implements DeviceAdapter {
   private readonly clock: Clock;
   private readonly latencyMs: number;
   private readonly readyDelayMs: number;
+  private readonly recordHistory: boolean;
   private nextId = 0;
   private online = true;
   private nextUploadFailure: number | undefined;
@@ -41,6 +42,8 @@ export class FakeDeviceAdapter implements DeviceAdapter {
     this.clock = options.clock ?? systemClock;
     this.latencyMs = options.latencyMs ?? 0;
     this.readyDelayMs = options.readyDelayMs ?? 0;
+    this.recordHistory = options.recordHistory ?? true;
+    if(typeof this.recordHistory !== 'boolean')throw new TypeError('Recording choice must be boolean');
     if (!nonnegative(this.latencyMs) || !nonnegative(this.readyDelayMs)) throw new RangeError('Fake delays must be finite and nonnegative');
   }
   get operations(): readonly OperationRecord[] { return structuredClone(this.records); }
@@ -118,7 +121,7 @@ export class FakeDeviceAdapter implements DeviceAdapter {
           queueMs: (startedAtMs ?? completedAtMs) - submittedAtMs,
           serviceMs: startedAtMs === null ? 0 : completedAtMs - startedAtMs };
         const priorEffects = count ? 'possible' : 'none';
-        this.records.push({ id, kind, generation, timing: { ...timing }, outcome: code ?? 'success', priorEffects });
+        if(this.recordHistory)this.records.push({ id, kind, generation, timing: { ...timing }, outcome: code ?? 'success', priorEffects });
         resolve(code ? { ok: false, code, priorEffects, generation, timing } : { ok: true, value: value(), generation, timing });
         this.waiting = this.waiting.filter(item => item !== work);
         if (this.active === work) this.active = undefined;
@@ -139,7 +142,7 @@ export class FakeDeviceAdapter implements DeviceAdapter {
           if (kind === 'uploadAnimation' && count === failureAt) { finish('upload-failed'); return; }
           const effect = effects[count];
           if (effect) {
-            this.recordedEffects.push({ ...effect, operationId: id, generation, atMs: this.clock.now() });
+            if(this.recordHistory)this.recordedEffects.push({ ...effect, operationId: id, generation, atMs: this.clock.now() });
             count++;
           }
           if (count < effects.length) step();

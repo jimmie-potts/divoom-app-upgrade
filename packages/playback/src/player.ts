@@ -8,6 +8,13 @@ const codeOf=(error:unknown)=>typeof (error as {code?:unknown})?.code==='string'
 interface Options {store:PlaybackStore;device:DeviceAdapter;clock?:Clock;random?:()=>number;retryBaseMs?:number;maxRetries?:number;operationTimeoutMs?:number}
 
 export class Player {
+  private listeners=new Set<()=>void>();
+  private published='';
+  subscribe(listener:()=>void):()=>void {this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};}
+  private notify():void {
+    const state=JSON.stringify(this.getState());if(state===this.published)return;this.published=state;
+    for(const listener of this.listeners){try{listener();}catch{/* Observers cannot interrupt the player. */}}
+  }
   private record:PlaybackCheckpoint|undefined;
   private state:PlaybackCheckpoint['state']='idle';
   private intent:PlaybackCheckpoint['intent']='stopped';
@@ -47,6 +54,7 @@ export class Player {
       return player;
     }catch{player.release();throw new PlaybackError('storage-error');}
   }
+  getSession(){return this.record?structuredClone({id:this.record.sessionId,playlist:this.record.snapshot}):null;}
   getState():PlayerState {
     return structuredClone({state:this.state,intent:this.intent,availability:this.availability,generation:this.epoch,
       sessionId:this.record?.sessionId??null,playlistId:this.record?.snapshot.id??null,playlistRevision:this.record?.snapshot.revision??null,
@@ -60,18 +68,18 @@ export class Player {
   private valid(token:number):boolean {return token===this.epoch && !this.closing && this.intent==='active';}
   private queue(action:()=>Promise<void>):Promise<void> {const work=this.tail.then(action);this.tail=work.catch(()=>{});return work;}
   private async persist():Promise<void> {
-    if(!this.record)return;
+    if(!this.record){this.notify();return;}
     Object.assign(this.record,{state:this.state,intent:this.intent,requestedScreenOn:this.requestedScreenOn,lastError:this.lastError});
-    await this.store.save(structuredClone(this.record));
+    await this.store.save(structuredClone(this.record));this.notify();
   }
-  private fatal(code:string):void {this.retire();this.intent='paused';this.state='error';this.lastError={code};}
+  private fatal(code:string):void {this.retire();this.intent='paused';this.state='error';this.lastError={code};this.notify();}
   private background(token:number,action:()=>Promise<void>):void {
     void this.queue(async()=>{if(this.valid(token))await action();}).catch(()=>{if(token===this.epoch&&!this.closing)this.fatal('storage-error');});
   }
   private dispatch(action:()=>Promise<boolean|void>,intent?:PlaybackCheckpoint['intent'],cancelDevice=true):Promise<void> {
     if(this.closing)return Promise.reject(new PlaybackError('closed'));
     const token=this.retire(cancelDevice);if(intent)this.intent=intent;
-    this.state=this.intent==='active'?'loading':this.intent==='paused'?'paused':'idle';
+    this.state=this.intent==='active'?'loading':this.intent==='paused'?'paused':'idle';this.notify();
     return this.queue(async()=>{
       const proceed=await action();
       if(token!==this.epoch)return;
@@ -82,7 +90,7 @@ export class Player {
       if(this.valid(token)&&this.record)this.launch(token);
     }).catch(error=>{
       if(token===this.epoch&&!this.closing){
-        if(error instanceof PlaybackError && error.code==='no-context' && !this.record){this.intent='stopped';this.state='idle';}
+        if(error instanceof PlaybackError && error.code==='no-context' && !this.record){this.intent='stopped';this.state='idle';this.notify();}
         else this.fatal(codeOf(error));
       }
       throw error;
@@ -112,13 +120,19 @@ export class Player {
   clear():Promise<void> {return this.dispatch(async()=>{await this.store.clear();this.record=undefined;this.cache.clear();this.lastError=null;},'stopped');}
   takeover():Promise<void> {return this.dispatch(async()=>{this.lastError={code:'external-control'};},'paused');}
 
-  private async observedControl(result:OperationResult<void>,generation:number):Promise<void> {
+  private async observedControl<T>(result:OperationResult<T>,generation:number):Promise<void> {
     if(generation!==this.adapterGeneration||this.closing)return;
-    if(result.ok){this.availability='available';return;}
+    if(result.ok){this.availability='available';this.notify();return;}
     this.lastError={code:result.code};
     if(connectivityErrors.has(result.code))await this.offline();
     else if(result.code==='stale-generation'||result.code==='cancelled')await this.takeover();
     if(generation===this.adapterGeneration)await this.queue(()=>this.persist());
+  }
+  async probe(){
+    if(this.closing)throw new PlaybackError('closed');
+    const generation=this.adapterGeneration;
+    const result=await this.device.probe({generation,timeoutMs:this.operationTimeoutMs});
+    await this.observedControl(result,generation);return result;
   }
   async setBrightness(percent:number):Promise<OperationResult<void>> {
     if(this.closing)throw new PlaybackError('closed');
@@ -142,7 +156,7 @@ export class Player {
   }
   offline():Promise<void> {
     if(this.closing)return Promise.reject(new PlaybackError('closed'));
-    this.availability='offline';
+    this.availability='offline';this.notify();
     if(this.intent!=='active'||this.state==='reconnecting')return Promise.resolve();
     const token=this.retire();
     return this.queue(()=>this.recover(token,'offline'));
@@ -193,7 +207,7 @@ export class Player {
     }
     const ready=Math.max(this.clock.now(),result.value.estimatedReadyAtMs);
     if(!Number.isFinite(ready)||ready<0||ready+duration>Number.MAX_SAFE_INTEGER){await this.failedItem(token,'invalid-timing');return;}
-    this.availability='available';this.readyAt=ready;
+    this.availability='available';this.readyAt=ready;this.notify();
     this.cancelTimer=this.clock.schedule(Math.max(0,ready-this.clock.now()),()=>this.background(token,async()=>{
       this.state='playing';this.readyAt=this.clock.now();this.deadline=this.clock.now()+duration;
       started(this.record!);this.retries=0;this.failed.clear();await this.persist();

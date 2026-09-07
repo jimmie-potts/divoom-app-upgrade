@@ -93,3 +93,8 @@ identity without external artwork.
 The separate [HTTP spike](protocol-spike.md) implements source-level transport and
 response parsing checks. Device timing and display acceptance remain unverified
 under issue #4. The fake tests establish software behavior only.
+
+For long-lived simulator use, construct `FakeDeviceAdapter({recordHistory:false})`.
+Operations still execute through the same queue, but `effects` and `operations`
+remain empty. Recording defaults to true for test fixtures. Normal server startup
+disables it so repeated playback does not retain frame buffers indefinitely.

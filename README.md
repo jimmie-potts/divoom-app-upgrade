@@ -4,7 +4,7 @@ A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
 The current build serves a responsive simulator status page and a readiness API.
 The media package renders bounded PNG/JPEG/GIF uploads into immutable frames and
 previews. The library package persists media metadata and revisioned playlists
-with reference-safe deletion. The playback package runs playlists and restores paused sessions. Upload routes and player UI follow in later issues. The
+with reference-safe deletion. The playback package runs playlists and restores paused sessions. The [HTTP API](docs/api.md) exposes media, playlists, player commands and SSE. Player UI follows in later issues. The
 [Pixoo64 smoke test](docs/hardware-validation.md) passed its narrow profile.
 [Opt-in protocol tools](docs/protocol-spike.md) are separate from normal startup.
 
@@ -19,13 +19,13 @@ npm run simulator
 
 Open the printed URL, normally [http://127.0.0.1:8787](http://127.0.0.1:8787).
 This command builds the workspaces and browser assets, then starts one Fastify
-process serving both the page and `GET /api/health`. After a build, `npm start`
+process serving the page and controller API, including `GET /api/health`. After a build, `npm start`
 starts without rebuilding. Stop with Ctrl+C. Closing the page does not stop
 the server. There is no hot reload in this foundation.
 
 Simulator is the only supported mode. The listener is fixed to IPv4 loopback;
 LAN/phone access is not enabled. Phone viewport tests do not establish actual
-phone connectivity. No artwork or device command is sent.
+phone connectivity. API playback and display commands affect only the simulator; no physical device request is sent.
 
 ## Runtime data
 
@@ -34,7 +34,7 @@ and `%LOCALAPPDATA%\PixooPlaylistController` on Windows. Override with an absolu
 `PIXOO_DATA_DIR` outside source control. Startup creates missing directories,
 checks writability, and preserves existing files. It rejects relative/blank paths,
 paths within this checkout or another Git checkout, and symlink aliases into them.
-Runtime data is never served by the web server or included in health responses.
+Private directories are never served directly or included in health responses. Validated preview routes serve effective PNG frames by rendition ID.
 
 `PIXOO_PORT` defaults to `8787`; `0` requests an available port. `PIXOO_MODE`
 defaults to `simulator` and rejects other values. See [shell](examples/config.sh)

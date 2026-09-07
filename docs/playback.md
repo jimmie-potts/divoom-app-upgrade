@@ -2,9 +2,8 @@
 
 `@pixoo/playback` orchestrates immutable playlist sessions through one device
 adapter. `LibraryPlaybackStore` persists context and retains media in the existing
-private SQLite catalog. This is a backend library. The simulator status page and
-startup command are unchanged; HTTP commands, events and player UI belong to #8
-and later issues.
+private SQLite catalog. This is a backend library. Startup connects it through the [HTTP API](api.md).
+The simulator status page is unchanged; player UI belongs to later issues.
 
 ## Create a player
 
@@ -58,6 +57,7 @@ available fake does not mean a connected physical display.
 | `resume()` | Reupload current context and restart its full policy |
 | `stop()` | Cancel future transitions and leave content; retain context |
 | `next()` / `previous()` | Retire pending work before navigation; paused/stopped navigation sends no artwork |
+| `probe()` | Check adapter availability through the writer and publish observed state |
 | `setBrightness(percent)` | Submit a 0-100 integer control through the adapter FIFO |
 | `setScreen(on)` | Off pauses and cancels transitions; on does not resume |
 | `offline()` | Report observed connectivity loss and suspend active orchestration |
@@ -161,3 +161,8 @@ cover immutable snapshots, stale writes, corrupt ownership, rollback and recover
 after killing a child process. No test contacts hardware. The
 [playback specification](../openspec/specs/playlist-playback/spec.md) and
 [ADR 0007](decisions/0007-playback.md) record the behavior and design.
+
+`getSession()` returns a defensive copy of session ID and captured playlist.
+`subscribe(listener)` returns an unsubscribe function; listeners read state on
+notifications. Observer failures do not interrupt playback. The HTTP layer uses
+these notifications for SSE and keeps command/event sequences separate.

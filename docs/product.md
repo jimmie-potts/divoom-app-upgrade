@@ -39,7 +39,7 @@ remaining handoff capabilities are proposed behavior, not implementation evidenc
 The application serves a simulator status page and health API. The media
 package renders files, and the library package persists metadata and playlists.
 The playback package orchestrates immutable sessions and paused recovery.
-Media-library/player UI and HTTP integration remain future work. M1 separates simulator/adapter source work
+The [controller API](api.md) exposes simulator-backed media, playlist and player operations with SSE. Media-library/player UI remains future work. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;
