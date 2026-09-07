@@ -19,3 +19,5 @@ decisions have not been finalized by the repository bootstrap.
 - [ADR 0007: Deterministic playback and durable paused recovery](decisions/0007-playback.md)
 
 - [ADR 0008: Local controller API and replay identity](decisions/0008-controller-api.md)
+
+- [ADR 0009: Browser state and command recovery](decisions/0009-controller-ui.md) records draft ownership, reconnect and command identity handling.

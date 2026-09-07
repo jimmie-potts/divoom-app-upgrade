@@ -3,7 +3,7 @@
 `@pixoo/playback` orchestrates immutable playlist sessions through one device
 adapter. `LibraryPlaybackStore` persists context and retains media in the existing
 private SQLite catalog. This is a backend library. Startup connects it through the [HTTP API](api.md).
-The simulator status page is unchanged; player UI belongs to later issues.
+The [browser UI](controller-ui.md) exposes the controls and labels timing as estimated.
 
 ## Create a player
 

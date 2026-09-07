@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { healthSchema } from '@pixoo/core';
 import './style.css';
+import {Workspace} from './workspace';
 
 type Phase = 'loading' | 'ready' | 'error';
 
@@ -38,29 +39,16 @@ function App() {
         <h1>Pixoo playlists</h1>
         <p className="lede">A local home for your images, GIFs, and playlists.</p>
       </section>
-      <section className="foundation" aria-label="Simulator connection">
-        <div className="display" aria-label="Empty display preview">
-          <div className="pixel-grid" aria-hidden="true"><span className="pixel-cross" /></div>
-          <p>No media loaded</p><span className="dimensions">64 × 64</span>
+      {phase === 'ready' && <Workspace/>}
+      <section className="connection compact" aria-label="Simulator connection">
+        <div className={`status-box ${phase}`}><span className="status-dot" aria-hidden="true" />
+          <p role={phase === 'error' ? 'alert' : 'status'}>{phase === 'ready' ? 'Server ready' : phase === 'loading' ? 'Checking server…' : 'Could not reach the local server or validate its response. Confirm it is running, then retry.'}</p>
         </div>
-        <div className="connection">
-          <p className="eyebrow">Local connection</p>
-          <h2>Connection status</h2>
-          <div className={`status-box ${phase}`}>
-            <span className="status-dot" aria-hidden="true" />
-            <p role={phase === 'error' ? 'alert' : 'status'}>
-              {phase === 'ready' ? 'Server ready' : phase === 'loading' ? 'Checking server…' : 'Could not reach the local server or validate its response. Confirm it is running, then retry.'}
-            </p>
-          </div>
-          <p className="device-note">No physical display connected.</p>
-          <button type="button" disabled={phase === 'loading'} onClick={() => setAttempt(value => value + 1)}>
-            {phase === 'error' ? 'Retry connection' : 'Refresh status'}<span aria-hidden="true"> ↗</span>
-          </button>
-          <p className="availability">Media and playback controls are not available in this build.</p>
-        </div>
+        <p className="device-note">No physical display connected.</p>
+        <button type="button" className="quiet" disabled={phase === 'loading'} onClick={() => setAttempt(value => value + 1)}>{phase === 'error' ? 'Retry connection' : 'Refresh status'}</button>
       </section>
     </main>
-    <footer><span>Made for your Pixoo-64</span><span>Local server · Simulator foundation</span></footer>
+    <footer><span>Made for your Pixoo-64</span><span>Local server · Simulator controller</span></footer>
   </div>;
 }
 

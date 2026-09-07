@@ -8,9 +8,10 @@ export class Events {
  private history:Event[]=[];private clients=new Set<Client>();private last:string;
  private heartbeat:ReturnType<typeof setInterval>;
  constructor(private snapshot:()=>unknown){
-  this.last=JSON.stringify(snapshot());
+  this.last=this.signature(snapshot());
   this.heartbeat=setInterval(()=>{for(const client of this.clients)this.write(client,': heartbeat\n\n');},15000);this.heartbeat.unref();
  }
+ private signature(value:unknown):string {return JSON.stringify(value,(key,value)=>key==='sampledAtMs'?undefined:value);}
  private message(event:string,data:string,sequence=this.sequence):string{return `id: ${this.epoch}:${sequence}\nevent: ${event}\ndata: ${data}\n\n`;}
  private remove(client:Client):void {this.clients.delete(client);if(client.timer)clearTimeout(client.timer);}
  private write(client:Client,body:string):void {
@@ -21,7 +22,8 @@ export class Events {
   }
  }
  publish():void {
-  const state=JSON.stringify(this.snapshot());if(state===this.last)return;this.last=state;this.sequence++;
+  const snapshot=this.snapshot(),signature=this.signature(snapshot);if(signature===this.last)return;this.last=signature;this.sequence++;
+  const state=JSON.stringify(snapshot);
   const event={sequence:this.sequence,body:this.message('state',state)};this.history.push(event);if(this.history.length>32)this.history.shift();
   for(const client of this.clients)this.write(client,event.body);
  }

@@ -7,7 +7,7 @@ context: |
   specs are normative for delivered capabilities. Application-foundation covers
   local startup and readiness. Device-adapter covers the fake; the HTTP spike is
   separately invoked. Media rendering and SQLite media/playlist persistence are backend libraries;
-  playback has paused recovery; simulator HTTP/SSE routes integrate the backend. Player UI and secure LAN deployment remain future work.
+  playback has paused recovery; simulator HTTP/SSE routes integrate the backend. The controller UI exposes those routes. Secure LAN deployment remains future work.
   Physical evidence is scoped to the dated hardware-validation record.
   Use this worktree's planning root and npm run openspec -- <arguments>.
   Default to simulator. Preserve originals/private state and one serialized
