@@ -6,6 +6,9 @@ Read `README.md` for the current implementation state and commands. For planning
 implementation, or delivery, read `docs/sdlc.md`. Before changing application
 behavior, read `docs/product.md` and the exact issue-linked requirements.
 
+Before agent monitoring, MCP, controller interoperability or collector migration,
+read docs/hub-integration.md for shared ownership and the canonical hub contracts.
+
 GitHub issues own outcomes, scope, acceptance criteria, dependencies, status, and
 delivery targets. Reuse existing issues. Planning-only and review-only requests
 remain read-only, including GitHub. Explicit planning-document requests authorize
