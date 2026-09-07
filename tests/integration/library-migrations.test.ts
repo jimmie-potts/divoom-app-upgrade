@@ -16,11 +16,11 @@ it('creates the current schema and upgrades a populated catalog without rewritin
   db.prepare('INSERT INTO assets VALUES (?,?,?,?,?)').run('legacy','hash','legacy.gif','{}','earlier');
   const before=db.prepare('SELECT * FROM assets').all();
   migrate(db);
-  expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(2);
+  expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(3);
   expect(db.prepare('SELECT * FROM assets').all()).toEqual(before);
   expect(db.prepare('SELECT * FROM playlists').all()).toEqual([]);
   migrate(db);
-  expect(db.prepare('SELECT * FROM schema_migrations').all()).toHaveLength(2);
+  expect(db.prepare('SELECT * FROM schema_migrations').all()).toHaveLength(3);
   expect(()=>db.prepare('INSERT INTO renditions VALUES (?,?,?,?)').run('id','missing','{}','now')).toThrow();
   db.prepare('INSERT INTO renditions VALUES (?,?,?,?)').run('id','legacy','{}','now');
   expect(()=>db.exec("UPDATE renditions SET manifest_json='different'")).toThrow('immutable rendition');
@@ -33,7 +33,7 @@ it('rolls back the failing migration and retains earlier data and version',async
   expect(db.prepare('SELECT id FROM assets').all()).toEqual([{id:'asset'}]);
   expect(db.prepare("SELECT name FROM sqlite_master WHERE name='partial'").all()).toEqual([]);
   migrate(db);
-  expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(2);
+  expect(db.prepare('PRAGMA user_version').get()!.user_version).toBe(3);
 });
 it('rejects foreign, newer, changed-checksum and inconsistent catalogs without resetting them',async()=>{
   for(const preparation of [

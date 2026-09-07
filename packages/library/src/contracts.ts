@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { MediaSource, Rendition } from '@pixoo/media';
-export type LibraryErrorCode='invalid-input'|'not-found'|'revision-conflict'|'asset-referenced'|'busy'|'closed'|'migration-error'|'database-error'|'cleanup-pending'|'storage-error'|'catalog-corrupt';
+export type LibraryErrorCode='invalid-input'|'not-found'|'revision-conflict'|'asset-referenced'|'busy'|'closed'|'migration-error'|'database-error'|'cleanup-pending'|'storage-error'|'catalog-corrupt'|'checkpoint-owned';
 const messages:Record<LibraryErrorCode,string>={
   'invalid-input':'Check the supplied name, IDs, revision and playback policy.', 'not-found':'The requested catalog entry does not exist.',
   'revision-conflict':'Reload the playlist and apply edits to its current revision.', 'asset-referenced':'Remove playlist entries and release retained sessions before deleting this asset.',
   busy:'Close the other library owner before opening this storage directory.', closed:'Open a library before making requests.',
   'migration-error':'The database schema is incompatible or a migration failed; preserve the database for inspection.', 'database-error':'The metadata transaction failed.',
   'cleanup-pending':'File cleanup is pending; resolve the storage error and retry cleanup.', 'storage-error':'Use writable private storage outside source control.',
+  'checkpoint-owned':'Clear or replace the playback checkpoint before releasing its session.',
   'catalog-corrupt':'Stored metadata and immutable media disagree; preserve the files for inspection.',
 };
 export class LibraryError extends Error {

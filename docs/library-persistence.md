@@ -3,7 +3,8 @@
 `@pixoo/library` stores a media catalog, revisioned playlists and session retention
 records in SQLite. It uses `@pixoo/media` for original files and immutable frames.
 This is a backend library. Startup still serves the simulator status page;
-upload routes, library UI and playback integration follow in separate issues.
+the [playback package](playback.md) integrates through its library store.
+Upload routes and library/player UI follow in separate issues.
 
 ## Open and close
 
@@ -59,7 +60,8 @@ version. Existing playlist/session references keep their exact rendition ID.
 There is no mutable current-rendition pointer. `listRenditions(assetId)` lists
 cataloged manifests, including after restart. `getRendition(id)` verifies the
 stored manifest, original and cached output. `readFrame(id, index, 'rgb'|'png')`
-returns a fresh validated frame buffer. Read failures do not repair or replace
+returns a fresh validated frame buffer. `readRendition(id, signal?)` loads all
+RGB frames and the verified manifest together for bounded player preparation. Read failures do not repair or replace
 media. See [rendering](media-rendering.md) for decoding and timing behavior.
 
 Storage contains `catalog.sqlite` and its SQLite sidecars, `owner.sqlite`, and:
@@ -100,16 +102,18 @@ Duration policies use `{ mode: 'duration', durationMs }`. Plays policies use
 `{ mode: 'plays', totalPlays }`. Values must be finite positive safe integers.
 Default still duration is 30000 ms; animations default to three total plays.
 Only renditions with more than one effective frame accept plays. Single-frame
-GIFs use still-item policy validation. These are persisted policies; no playback
-clock or physical play-count claim is introduced here.
+GIFs use still-item policy validation. The playback package executes these policies; this persistence package has no
+clock or physical play-count claim.
 
 ## Retention and deletion
 
 `retainSession(renditionIds)` creates a persisted UUID and unique rendition set.
 `listSessions()` returns these records after restart. `releaseSession(id)` removes
 a session's references and is idempotent. Sessions do not expire automatically.
-The future playback/recovery owner must release them deliberately. They are
-retention records, not playback snapshots or checkpoints.
+The playback/recovery owner must release them deliberately. Standalone session
+records remain retention records; the playback package uses a separate checkpoint
+tied to a retained session. Direct release of that session fails with
+`checkpoint-owned` until its checkpoint is replaced or cleared.
 
 `deleteAsset(id)` checks every rendition for playlist and session references.
 An `asset-referenced` error includes `assetId`, `playlistIds` and `sessionIds` so
@@ -134,7 +138,8 @@ collection runs.
 ## Migrations, errors and evidence
 
 Migration 1 creates assets, immutable renditions and cleanup jobs. Migration 2
-adds playlists, items and session references. Each migration has a SHA-256 ledger
+adds playlists, items and session references. Migration 3 adds the versioned
+[playback checkpoint](playback.md#checkpoint-storage-and-verification). Each migration has a SHA-256 ledger
 entry and commits atomically. Failure rolls back that migration while preserving
 previous versions and data. Unknown application IDs, newer versions, altered
 checksums and inconsistent unversioned catalogs fail without resetting data.
