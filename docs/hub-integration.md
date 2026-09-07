@@ -48,8 +48,13 @@ shared monitoring. Prompts, transcripts, tools, automatically copied titles,
 credentials and private paths remain excluded.
 
 Keep one active agent-state owner. First it can run inside Pixoo; later
-standalone hosting requires an explicit quiesced export/import, producer
-endpoint switch and rollback. Never run both against one live state store.
+standalone hosting requires an explicit quiesced export/import, producer and
+consumer endpoint switch, and rollback. Issue #31 owns the embedded/remote
+session-source facade used by the renderer, browser feed and shared
+label/acknowledgment operations. Remote mode does not start a local reducer;
+stale feeds remain visibly stale until recovery or explicit rollback. Hub #5
+depends on that boundary and verifies the route switch. Issue #33 consumes the
+facade in either mode. Never run both owners against one live state store.
 Device databases remain private, including across Windows/WSL.
 
 Keep collection independent of display mode and device availability. Media
