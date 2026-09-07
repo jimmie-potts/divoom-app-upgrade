@@ -8,6 +8,8 @@ behavior, read `docs/product.md` and the exact issue-linked requirements.
 
 Before agent monitoring, MCP, controller interoperability or collector migration,
 read docs/hub-integration.md for shared ownership and the canonical hub contracts.
+Before MCP bindings, machine credentials or local client setup, read
+docs/local-mcp.md for the shared command boundary, evidence and setup limits.
 
 GitHub issues own outcomes, scope, acceptance criteria, dependencies, status, and
 delivery targets. Reuse existing issues. Planning-only and review-only requests

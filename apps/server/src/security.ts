@@ -6,12 +6,14 @@ export class ApiError extends Error {
  constructor(readonly code:string,readonly status=400,readonly details?:Record<string,unknown>){super(code);this.name='ApiError';}
 }
 export type Authenticate=(request:FastifyRequest)=>boolean|Promise<boolean>;
-export function security(app:FastifyInstance,authenticate?:Authenticate):void {
+export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabled=false):void {
  const requests=new Set<FastifyRequest>();
  app.addHook('onResponse',async request=>{requests.delete(request);});
  app.addHook('onRequestAbort',async request=>{requests.delete(request);});
- app.addHook('onRequest',async request=>{
+ app.addHook('onRequest',async(request,reply)=>{
   if(requests.size>=32)throw new ApiError('busy',503);requests.add(request);
+  const release=()=>{requests.delete(request);reply.raw.off('finish',release);reply.raw.off('close',release);};
+  reply.raw.once('finish',release);reply.raw.once('close',release);
   const address=app.server.address(),port=typeof address==='object'&&address?address.port:80;
   const host=request.headers.host;
   const authorities=['localhost','127.0.0.1'].map(name=>port===80?name:`${name}:${port}`);
@@ -20,7 +22,7 @@ export function security(app:FastifyInstance,authenticate?:Authenticate):void {
   const origin=request.headers.origin;
   if(origin!==undefined&&origin!==new URL(`http://${host}`).origin)throw new ApiError('forbidden',403);
   if(request.headers['sec-fetch-site']==='cross-site')throw new ApiError('forbidden',403);
-  if(!['GET','HEAD','OPTIONS'].includes(request.method)&&origin===undefined&&request.headers['x-pixoo-request']!=='1')throw new ApiError('forbidden',403);
+  if(!(mcpEnabled&&request.url==='/mcp')&&!['GET','HEAD','OPTIONS'].includes(request.method)&&origin===undefined&&request.headers['x-pixoo-request']!=='1')throw new ApiError('forbidden',403);
   if((request.routeOptions.url?.startsWith('/api/')||request.url.split('?')[0]!.startsWith('/api/'))&&authenticate&&!(await authenticate(request)))throw new ApiError('unauthorized',401);
  });
  app.addHook('onSend',async(_request,reply,payload)=>{reply.header('x-content-type-options','nosniff');reply.header('cache-control','no-store');return payload;});

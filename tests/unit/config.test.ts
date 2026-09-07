@@ -67,3 +67,8 @@ describe('runtime configuration', () => {
     expect(await readFile(file, 'utf8')).toBe('retain');
   });
 });
+it('requires exact explicit MCP activation without changing simulator selection',async()=>{
+ const context=await fixture();
+ expect(await loadConfig({PIXOO_MCP_ENABLED:'1'},context)).toMatchObject({mcpEnabled:true,mode:'simulator',host:'127.0.0.1'});
+ for(const value of ['0','true','', ' 1'])await expect(loadConfig({PIXOO_MCP_ENABLED:value},context)).rejects.toThrow('PIXOO_MCP_ENABLED');
+});

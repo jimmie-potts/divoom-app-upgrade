@@ -67,3 +67,14 @@ must retain Node's bundled notices alongside the media dependency notices.
 `@fastify/multipart` 10.1.1 is pinned for the server, with MIT license metadata.
 Its lockfile-pinned parser is `@fastify/busboy`. The API tests exercise part and
 byte limits before publication. [Official plugin documentation](https://github.com/fastify/fastify-multipart) describes stream consumption and file-size errors.
+
+## Shared MCP consumer
+
+The server pins the vendored `@jimmie-potts/device-mcp` 1.0.0 archive from the
+[immutable hub release](https://github.com/jimmie-potts/agent-device-hub/releases/tag/device-mcp-v1.0.0).
+Its SHA-256 is `03f1ec51ffe5aa576799ea756dc65c0d47285e1e321fce20dc9241029196eb62`.
+The adjacent vendor receipt records source revision, qualified protocol versions
+and `@modelcontextprotocol/sdk` 1.30.0 under the MIT license. The archive contains
+the SDK notice, package manifest and bundled controller contracts. The consumer
+package test verifies archive bytes and the installed inventory. The SDK is also
+a pinned development dependency for real protocol-client integration tests.

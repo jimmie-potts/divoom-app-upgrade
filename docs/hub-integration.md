@@ -14,8 +14,9 @@ dependencies and status.
 Pixoo retains media ingestion/renditions, catalog/playlists, player, 64x64 status
 rendering, explicit Monitor/Media policy and its existing serialized writer.
 Startup defaults to the simulator; explicit validated device activation uses
-the dated smoke profile through the same controller API and writer. Shared
-monitoring, hub integration, MCP and installed hooks remain planned.
+the dated smoke profile through the same controller API and writer. The optional
+local MCP bindings reuse the shared gateway and existing writer. Shared monitoring,
+native hub controller integration and installed hooks remain planned.
 
 ## Adoption sequence
 
