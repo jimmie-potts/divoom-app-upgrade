@@ -92,3 +92,16 @@ it('keeps the upload transaction intact when an MCP control is queued',async()=>
   expect(data(await control).ok).toBe(true);expect(commands.slice(0,4)).toEqual(['Draw/GetHttpGifId','Draw/SendHttpGif','Draw/SendHttpGif','Channel/SetBrightness']);
  }finally{release();await f.close();}
 },20000);
+
+it('initializes native MCP with canonical default-port authorities',async()=>{
+ const dataDir=await mkdtemp(join(tmpdir(),'pixoo-mcp-default-port-'));
+ const token=await provisionCredential(dataDir,'codex',['read']);
+ const app=createApp({dataDir,mcpEnabled:true});
+ try{
+  for(const host of ['localhost','127.0.0.1']){
+   const response=await app.inject({method:'POST',url:'/mcp',headers:{host,authorization:`Bearer ${token}`,accept:'application/json, text/event-stream','content-type':'application/json'},payload:{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'default-port-test',version:'1.0.0'}}}});
+   expect(response.statusCode,response.body).toBe(200);
+  }
+  const denied=await app.inject({method:'POST',url:'/mcp',headers:{host:'localhost:81',authorization:`Bearer ${token}`},payload:{}});expect(denied.statusCode).toBe(403);
+ }finally{await app.close();await rm(dataDir,{recursive:true,force:true});}
+});

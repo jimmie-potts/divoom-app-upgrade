@@ -12,7 +12,6 @@ export async function registerMcp(app:FastifyInstance,directory:string,service:C
   if(!handler){
    const address=app.server.address(),port=typeof address==='object'&&address?address.port:80;
    const hosts=['127.0.0.1','localhost'].map(host=>port===80?host:`${host}:${port}`);
-   if(port===80)hosts.push('127.0.0.1:80','localhost:80');
    handler=createMcpHandler({enabled:true,registry,tools,allowedHosts:hosts,allowedOrigins:[...new Set(hosts.map(host=>new URL(`http://${host}`).origin))],authenticate:async bearer=>authenticateCredential(directory,bearer)});
   }
   reply.hijack();
