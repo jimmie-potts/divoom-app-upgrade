@@ -46,3 +46,10 @@ click and a shutdown HTTP 503 permanently closing Chromium EventSource. Separate
 action reads preserve the explicit command; bounded stream recreation restores
 readiness after the backend returns. Focused tests reproduced both failures and
 passed after the fixes.
+
+Native Windows validation exposed an invalid-link fixture that required file
+symlink privilege before reaching the application. It now retains that file
+symlink on capable hosts and uses a junction when Windows rejects its creation
+with EPERM. The fixture verifies that the link exists before checking startup
+rejection, zero transport requests and no ownership or library creation. The
+same focused regression passes on Linux and Windows without elevated privileges.

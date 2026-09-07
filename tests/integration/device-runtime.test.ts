@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-import {mkdtemp,writeFile,rm,mkdir,symlink,readdir} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,mkdir,symlink,readdir,lstat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawn} from 'node:child_process';
@@ -150,7 +150,17 @@ it.each(['missing','malformed','oversized','symlink','public-target','unsupporte
  if(invalid==='oversized')await writeFile(join(dataDir,'device.json'),' '.repeat(4097));
  if(invalid==='public-target')await settings(dataDir,{...configuration,ip:'8.8.8.8'});
  if(invalid==='unsupported-profile')await settings(dataDir,{...configuration,profile:'simulator-v1'});
- if(invalid==='symlink'){const target=join(dataDir,'actual.json');await writeFile(target,JSON.stringify({version:1,configuration}));await symlink(target,join(dataDir,'device.json'));}
+ if(invalid==='symlink'){
+  const target=join(dataDir,'actual.json'),link=join(dataDir,'device.json');
+  await writeFile(target,JSON.stringify({version:1,configuration}));
+  try{await symlink(target,link);}
+  catch(error){
+   if(process.platform!=='win32'||(error as NodeJS.ErrnoException).code!=='EPERM')throw error;
+   // Junctions exercise invalid-link rejection without Windows file-symlink privilege.
+   const directory=join(dataDir,'link-target');await mkdir(directory);await symlink(directory,link,'junction');
+  }
+  expect((await lstat(link)).isSymbolicLink()).toBe(true);
+ }
  let requests=0;
  const app=createApp({dataDir,mode:'device',deviceLockDirectoryForTests,transportForTests:async()=>{requests++;return {error_code:0};}});cleanup.push(()=>app.close());
  expect(await app.ready().then(()=>true,()=>false)).toBe(false);expect(requests).toBe(0);expect(await readdir(deviceLockDirectoryForTests)).toEqual([]);expect(await readdir(dataDir)).not.toContain('library');
