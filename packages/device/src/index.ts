@@ -3,3 +3,4 @@ export const simulatorDevice = { connected: false } as const;
 export * from './contracts.js';
 export * from './fake.js';
 export * from './http-adapter.js';
+export type {DeviceTransport} from './http-transport.js';

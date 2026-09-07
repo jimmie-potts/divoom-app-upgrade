@@ -1,10 +1,4 @@
-# Application foundation
-
-## Purpose
-
-Provide reproducible local startup with default simulator mode and explicit device selection, keeping source validation independent of private media and hardware.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Local simulator startup
 The application SHALL start one backend serving its browser page and API on IPv4 loopback, defaulting to simulator mode and port 8787. Simulator mode and ordinary startup/status reads SHALL perform no device requests. Trace: issue #2 criteria 1, 3 and 4.
@@ -45,13 +39,7 @@ The application SHALL use PIXOO_DATA_DIR for an absolute runtime directory outsi
 - **WHEN** the data directory is relative or blank, mode is neither simulator nor device, or port is not an integer from 0 through 65535
 - **THEN** startup reports a configuration error and exits unsuccessfully
 
-### Requirement: Reproducible developer checks
-The repository SHALL provide executable lint, typecheck, unit/integration test, browser test, build and startup commands using pinned dependencies and Node 24. Trace: issue #2 criteria 1-3.
-
-#### Scenario: Fresh checkout validation
-- **WHEN** dependencies are installed from the lockfile and documented checks run
-- **THEN** all five workspaces compile, regression checks run without hardware, and the built UI passes its simulator/browser smoke checks
-- **AND** dependency versions and licenses are documented while GIF decoder selection remains deferred
+## ADDED Requirements
 
 ### Requirement: Explicit physical startup
 Device mode SHALL require explicit PIXOO_MODE=device and a valid version-1 private device configuration containing a canonical private IPv4 target and pixoo64-smoke-2026-09-06 profile. Missing or invalid device settings SHALL fail before listening or any device request. Default startup SHALL remain simulator-only even with saved hardware settings. Startup SHALL capture immutable target/profile settings; saving settings or connecting a client SHALL NOT activate or retarget hardware. Startup SHALL restore context paused without sending a device request. Trace: issue #42 criteria 1-3.

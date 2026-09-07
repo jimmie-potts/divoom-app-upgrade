@@ -28,8 +28,8 @@ export const apiErrorSchema=z.object({error:z.object({code:z.string(),message:z.
 export const emptyRequest=z.object({}).strict();
 
 export const diagnosticsSchema=z.object({
- status:z.literal('ready'),mode:z.literal('simulator'),uptimeMs:z.number().int().nonnegative(),library:z.literal('ready'),
- device:z.object({connected:z.literal(false),availability:z.enum(['unknown','available','offline'])}).strict(),
+ status:z.literal('ready'),mode:z.enum(['simulator','device']),uptimeMs:z.number().int().nonnegative(),library:z.literal('ready'),
+ device:z.object({connected:z.boolean().nullable(),availability:z.enum(['unknown','available','offline'])}).strict(),
  player:z.object({state:z.enum(['idle','loading','playing','paused','reconnecting','error']),intent:z.enum(['active','paused','stopped'])}).strict(),
  logging:z.object({persistent:z.literal(false)}).strict(),
  limits:z.object({requests:z.literal(32),eventClients:z.literal(16),eventHistory:z.literal(32),commandReceipts:z.literal(256),playbackRenditions:z.literal(2)}).strict(),

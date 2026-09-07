@@ -1,8 +1,9 @@
 # Local startup and recovery
 
 These commands use Node 24 and a local filesystem. They serve the production UI
-and API through one native simulator process. No shared hub, hook installer or
-physical device is needed. Source delivery does not install a service or change
+and API through one native backend process. Simulator mode requires no device.
+[Device startup](device-application.md) documents explicit physical activation
+and separately authorized acceptance. No shared hub or hook installer is needed. Source delivery does not install a service or change
 host settings.
 
 ## Start and stop
@@ -19,6 +20,7 @@ Choose a persistent directory outside every Git checkout. For Linux/WSL:
 ```bash
 export PIXOO_DATA_DIR="$HOME/.local/share/pixoo-playlist-controller"
 export PIXOO_PORT=8787
+export PIXOO_MODE=simulator
 npm start
 ```
 
@@ -27,13 +29,17 @@ For a native Windows Node 24 PowerShell session:
 ```powershell
 $env:PIXOO_DATA_DIR = Join-Path $env:LOCALAPPDATA 'PixooPlaylistController'
 $env:PIXOO_PORT = '8787'
+$env:PIXOO_MODE = 'simulator'
 npm start
 ```
 
 Open the printed loopback URL. `npm run simulator` builds and starts the same
 process. `npm start` works after a build; it does not rebuild stale output.
-Environment variables select the directory, port and simulator mode. Saved
-`device.json` settings remain private and do not enable hardware transport.
+Environment variables select the directory, port and mode. Saved `device.json`
+settings remain private and do not enable hardware by themselves. Device mode
+requires explicit startup selection and a valid immutable settings snapshot.
+`npm run simulator` inherits the selected environment; set simulator mode explicitly
+when returning from a device session.
 
 Keep the terminal, backend process and host awake while playing. Closing a browser
 page leaves playback running. Closing the terminal, ending the WSL instance,
@@ -43,7 +49,9 @@ startup or restart service is installed. Use the same directory on the next
 manual start to recover saved context paused.
 
 Stop with Ctrl+C and wait for the process to exit before backup or moving data.
-SIGINT/SIGTERM handling drains the player and closes the catalog. On Windows,
+SIGINT/SIGTERM handling drains the player and in-flight adapter transport before
+releasing ownership and closing the catalog. Shutdown sends no display restoration
+command; last content may remain visible. On Windows,
 use Ctrl+C in its console; forced process termination is not graceful shutdown.
 Keep one backend per data directory. A `busy` error means another owner holds it;
 stop that owner rather than deleting owner.sqlite or SQLite sidecars.
@@ -64,9 +72,12 @@ Diagnostics have a five-second CLI deadline. A nonzero exit means configuration,
 reachability or response validation failed; the CLI never prints an unexpected
 server response.
 
-Health reports server readiness and `connected: false`. Diagnostics add uptime,
-library readiness, player state/intent and simulator availability. `available`
-means the fake adapter accepted an operation, not that a physical Pixoo is online.
+Health reports server readiness, selected mode and device connectivity. Simulator
+connectivity is always false. Device connectivity starts null and changes only
+with observed transport availability. Health and diagnostic reads issue no probes.
+Diagnostics add uptime, library readiness and player state/intent. Simulator
+`available` means the fake accepted an operation. Device transport success does
+not establish visible output.
 These responses exclude private paths, device IPs, media names and raw errors.
 Readiness confirms successful opening, not a full disk integrity scan. Offline
 backup and restore perform that verification.

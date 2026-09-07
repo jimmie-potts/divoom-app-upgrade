@@ -10,7 +10,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env) {
   // Missing build output must not produce a misleading ready listener.
   await access(join(webRoot, 'index.html'));
   const config = await loadConfig(env);
-  const app = createApp({ webRoot, dataDir:config.dataDir });
+  const app = createApp({ webRoot, dataDir:config.dataDir, runtime:config });
   try {
     const address = await app.listen({ host: config.host, port: config.port });
     return { app, address };

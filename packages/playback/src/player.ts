@@ -5,7 +5,7 @@ import {cycle,next,previous,started,upcoming} from './traversal.js';
 const owners=new WeakSet<DeviceAdapter>();
 const connectivityErrors=new Set(['offline','timeout','http-error']);
 const codeOf=(error:unknown)=>typeof (error as {code?:unknown})?.code==='string'?String((error as {code:string}).code):'operation-failed';
-interface Options {store:PlaybackStore;device:DeviceAdapter;clock?:Clock;random?:()=>number;retryBaseMs?:number;maxRetries?:number;operationTimeoutMs?:number}
+interface Options {store:PlaybackStore;device:DeviceAdapter;clock?:Clock;random?:()=>number;retryBaseMs?:number;maxRetries?:number;operationTimeoutMs?:number;pauseOnUncertain?:boolean}
 
 export class Player {
   private listeners=new Set<()=>void>();
@@ -36,18 +36,18 @@ export class Player {
   private cache=new Map<string,Animation>();
   private preparing=new Map<string,Promise<Animation>>();
   private constructor(private store:PlaybackStore,private device:DeviceAdapter,private clock:Clock,private random:()=>number,
-    private retryBaseMs:number,private maxRetries:number,private operationTimeoutMs:number,private release:()=>void){this.adapterGeneration=device.generation;}
+    private retryBaseMs:number,private maxRetries:number,private operationTimeoutMs:number,private release:()=>void,private pauseOnUncertain=false){this.adapterGeneration=device.generation;}
 
   static async open(options:Options):Promise<Player> {
     const {store,device}=options,clock=options.clock??systemClock;
     const retryBase=options.retryBaseMs??250,maxRetries=options.maxRetries??3,timeout=options.operationTimeoutMs??5000;
     if(!Number.isSafeInteger(retryBase)||retryBase<1||retryBase>1000 || !Number.isSafeInteger(maxRetries)||maxRetries<1||maxRetries>8 ||
-      !Number.isSafeInteger(timeout)||timeout<1||timeout>120000 || !Number.isFinite(clock.now())||clock.now()<0)throw new PlaybackError('invalid-input');
+      !Number.isSafeInteger(timeout)||timeout<1||timeout>120000 || (options.pauseOnUncertain!==undefined && typeof options.pauseOnUncertain!=='boolean') || !Number.isFinite(clock.now())||clock.now()<0)throw new PlaybackError('invalid-input');
     if(owners.has(device))throw new PlaybackError('busy');
     let release:()=>void;
     try{release=store.claim();}catch{throw new PlaybackError('busy');}
     owners.add(device);
-    const player=new Player(store,device,clock,options.random??Math.random,retryBase,maxRetries,timeout,()=>{release();owners.delete(device);});
+    const player=new Player(store,device,clock,options.random??Math.random,retryBase,maxRetries,timeout,()=>{release();owners.delete(device);},options.pauseOnUncertain??false);
     try{
       const saved=await store.read();
       if(saved){player.record=checkpointSchema.parse(saved);player.intent='paused';player.state='paused';player.requestedScreenOn=saved.requestedScreenOn;player.lastError=saved.lastError;await player.persist();}
@@ -120,9 +120,16 @@ export class Player {
   clear():Promise<void> {return this.dispatch(async()=>{await this.store.clear();this.record=undefined;this.cache.clear();this.lastError=null;},'stopped');}
   takeover():Promise<void> {return this.dispatch(async()=>{this.lastError={code:'external-control'};},'paused');}
 
+  private pauseUncertain(code:string):void {
+    this.retire();this.intent='paused';this.state='paused';
+    this.lastError={code,priorEffects:'possible',...(this.record?{itemId:this.record.currentItemId}:{})};
+    if(connectivityErrors.has(code))this.availability='offline';
+    this.notify();
+  }
   private async observedControl<T>(result:OperationResult<T>,generation:number):Promise<void> {
     if(generation!==this.adapterGeneration||this.closing)return;
     if(result.ok){this.availability='available';this.notify();return;}
+    if(this.pauseOnUncertain && result.priorEffects==='possible'){this.pauseUncertain(result.code);await this.queue(()=>this.persist());return;}
     this.lastError={code:result.code};
     if(connectivityErrors.has(result.code))await this.offline();
     else if(result.code==='stale-generation'||result.code==='cancelled')await this.takeover();
@@ -201,6 +208,7 @@ export class Player {
   private async uploaded(token:number,result:OperationResult<UploadResult>,duration:number):Promise<void> {
     if(!this.valid(token))return;
     if(!result.ok){
+      if(this.pauseOnUncertain && result.priorEffects==='possible'){this.pauseUncertain(result.code);await this.persist();return;}
       if(connectivityErrors.has(result.code)){await this.recover(token,result.code);return;}
       if(result.code==='stale-generation'||result.code==='cancelled'){this.intent='paused';this.state='paused';this.lastError={code:'external-control'};await this.persist();return;}
       await this.failedItem(token,result.code);return;

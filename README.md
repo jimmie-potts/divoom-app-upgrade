@@ -1,7 +1,9 @@
 # Pixoo playlists
 
 A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
-The current build serves a responsive media library, playlist editor, player and settings UI backed by the simulator.
+The current build serves a responsive media library, playlist editor, player and
+settings UI. It defaults to the simulator and supports explicit device startup
+with a validated private configuration and the dated Pixoo64 smoke profile.
 The media package renders bounded PNG/JPEG/GIF uploads into immutable frames and
 previews. The library package persists media metadata and revisioned playlists
 with reference-safe deletion. The playback package runs playlists and restores paused sessions. The [HTTP API](docs/api.md) exposes media, playlists, player commands and SSE. See [UI usage](docs/controller-ui.md) for uploads, editing, playback and recovery. The
@@ -23,9 +25,12 @@ process serving the page and controller API, including `GET /api/health`. After 
 starts without rebuilding. Stop with Ctrl+C. Closing the page does not stop
 the server. There is no hot reload in this foundation.
 
-Simulator is the only supported mode. The listener is fixed to IPv4 loopback;
+Set `PIXOO_MODE=simulator` explicitly if your shell previously selected device
+mode. The listener is fixed to IPv4 loopback;
 LAN/phone access is not enabled. Phone viewport tests do not establish actual
-phone connectivity. API playback and display commands affect only the simulator; no physical device request is sent.
+phone connectivity. In simulator mode, playback and display commands send no
+physical requests. See [device startup and acceptance](docs/device-application.md)
+for private configuration, explicit activation, smoke limits and simulator rollback.
 
 ## Runtime data
 
@@ -37,9 +42,11 @@ paths within this checkout or another Git checkout, and symlink aliases into the
 Private directories are never served directly or included in health responses. Validated preview routes serve effective PNG frames by rendition ID.
 
 `PIXOO_PORT` defaults to `8787`; `0` requests an available port. `PIXOO_MODE`
-defaults to `simulator` and rejects other values. See [shell](examples/config.sh)
+defaults to `simulator`; `device` requires valid private settings at startup. See [shell](examples/config.sh)
 and [PowerShell](examples/config.ps1) examples. Startup configuration is environment-only; no .env loader is used.
-The settings API separately persists validated device.json. Existing app data is never deleted at shutdown.
+The settings API persists validated `device.json`. The backend captures settings
+once at startup; later saves require restart to affect the active device. Existing
+app data is never deleted at shutdown.
 
 See [local operations](docs/local-operations.md) for persistent native startup,
 diagnostics, offline backup/restore, host wakefulness and Windows/WSL checks.
@@ -62,7 +69,8 @@ media, library and playback packages. Core owns readiness validation. The device
 [deterministic fake adapter](docs/device-adapter.md) for complete RGB uploads,
 serialized controls, cancellation and failure tests. The media package provides [bounded rendering and immutable previews](docs/media-rendering.md). The library package provides [SQLite playlists and media retention](docs/library-persistence.md);
 [playback](docs/playback.md) adds the backend player and recovery contract. The fake is a
-test adapter used by the backend player; browser controls use the same simulator-backed API.
+test adapter used by the backend player. Device mode uses the existing HTTP
+adapter through the same player, API command identities and serialized writer.
 
 Open the repository root as a WSL project in Codex. The canonical checkout is
 `/home/jimmie/projects/divoom-app-upgrade`; work on issue branches in isolated

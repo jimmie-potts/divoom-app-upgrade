@@ -1,8 +1,9 @@
 # Using the controller UI
 
 Build and start with `npm run simulator`, then open the printed loopback URL.
-This source build controls the simulator. It does not connect to a physical Pixoo,
-even after saving an IP address. Phone viewport tests do not enable phone access.
+The default mode controls the simulator. Explicit device startup is described in
+[device operations](device-application.md). Saving an IP address never enables
+hardware or retargets a running backend. Phone viewport tests do not enable phone access.
 
 ## Media and playlists
 
@@ -42,10 +43,21 @@ uses the original identity. Reconcile and discard reads current state before
 letting you choose a new action. Neither option silently repeats a command with
 a new identity.
 
+A device operation with possible prior effects pauses playback and retains the
+error. The UI explains that explicit resume restarts the current item from its
+beginning. Check the outcome before resuming. This device pause is distinct from
+a lost browser response, which keeps its original command identity.
+
 ## Settings
 
 Save an explicit private IPv4 address, supported profile and optional model or
-firmware observations. The active renderer remains the simulator profile.
-Probe simulator checks fake-adapter availability. Brightness and screen controls
+firmware observations. Settings shows the active profile and, in device mode,
+the active target separately from the saved fields. A changed device configuration
+shows that restart is required. The active device limits are one or two complete
+64×64 frames with exactly 500 ms animation delays; incompatible GIFs are rejected.
+
+Probe simulator checks fake-adapter availability. Probe device makes an explicit
+transport request through the player. Device transport starts unknown and reports
+observed availability; visible output remains unverified. Brightness and screen controls
 share the backend's serialized writer with playback. Requested values are not
 physical telemetry. Authenticated HTTPS LAN deployment is separate work.
