@@ -116,7 +116,7 @@ export async function backupData(source:string,destination:string):Promise<void>
  const [from,to]=await paths(source,destination);await assertRuntimeDirectory(from);
  // Require a real existing catalog; a typo must not initialize a new library.
  if(await regular(from,'library/catalog.sqlite')<100)fail('invalid-catalog');
- const library=await Library.open({directory:join(from,'library')});
+ const library=await Library.open({directory:join(from,'library'),requireExisting:true});
  try{
   const inventory=(await library.verifyStorage()).map(path=>`library/${path}`);
   if(await settings(from))inventory.push('device.json');
@@ -144,7 +144,7 @@ export async function restoreData(source:string,destination:string):Promise<void
  await reserve(to);
  for(const entry of m.files)await copyEntry(from,to,entry);
  await settings(to);
- const library=await Library.open({directory:join(to,'library')});
+ const library=await Library.open({directory:join(to,'library'),requireExisting:true});
  try{
   const expected=(await library.verifyStorage()).map(path=>`library/${path}`);
   expected.push('library/catalog.sqlite');if(await settings(to))expected.push('device.json');

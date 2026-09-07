@@ -118,3 +118,32 @@ it.each(['foreign-key','settings','empty-catalog'])('verifies %s contents beyond
  await expect(restoreData(f.bundle,f.target)).rejects.toThrow();
  if(mode!=='empty-catalog')expect(await readFile(join(f.target,INCOMPLETE),'utf8')).toContain('Incomplete');
 });
+
+it('rejects nonzero uninitialized SQLite catalogs without initializing the source',async()=>{
+ const f=await fixture();await backupData(f.source,f.bundle);
+ const empty=join(f.root,'uninitialized');await mkdir(join(empty,'library'),{recursive:true});
+ const catalog=join(empty,'library','catalog.sqlite'),db=new DatabaseSync(catalog);
+ db.exec('VACUUM');db.close();const original=await readFile(catalog);expect(original.length).toBeGreaterThan(100);
+ await expect(backupData(empty,join(f.root,'wrong-backup'))).rejects.toThrow();
+ expect(await readFile(catalog)).toEqual(original);
+ await writeFile(join(f.bundle,'library','catalog.sqlite'),original);
+ const manifestPath=join(f.bundle,'manifest.json'),m=JSON.parse(await readFile(manifestPath,'utf8')) as {files:{path:string;size:number;sha256:string}[]};
+ const file=m.files.find(entry=>entry.path==='library/catalog.sqlite')!;file.size=original.length;file.sha256=createHash('sha256').update(original).digest('hex');
+ await writeFile(manifestPath,JSON.stringify(m));
+ await expect(restoreData(f.bundle,f.target)).rejects.toThrow();
+ expect(await readFile(join(f.target,INCOMPLETE),'utf8')).toContain('Incomplete');
+});
+
+it.each(['created_at','updated_at'])('rejects invalid playlist %s during backup and restore',async column=>{
+ const f=await fixture();await backupData(f.source,f.bundle);
+ for(const root of [f.source,f.bundle]){
+  const path=join(root,'library','catalog.sqlite'),db=new DatabaseSync(path);
+  try{db.exec(`UPDATE playlists SET ${column}='damaged-date'`);}finally{db.close();}
+ }
+ await expect(backupData(f.source,join(f.root,'invalid-dates'))).rejects.toThrow();
+ const bytes=await readFile(join(f.bundle,'library','catalog.sqlite')),manifestPath=join(f.bundle,'manifest.json');
+ const m=JSON.parse(await readFile(manifestPath,'utf8')) as {files:{path:string;size:number;sha256:string}[]};
+ const file=m.files.find(entry=>entry.path==='library/catalog.sqlite')!;file.size=bytes.length;file.sha256=createHash('sha256').update(bytes).digest('hex');
+ await writeFile(manifestPath,JSON.stringify(m));
+ await expect(restoreData(f.bundle,f.target)).rejects.toThrow();
+});
