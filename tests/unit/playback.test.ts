@@ -193,12 +193,13 @@ it('restores paused without old deadlines and rejects duplicate owners',async()=
 it('stop wins while initial checkpoint capture is pending',async()=>{
  const clock=new ManualClock(),store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter({clock});
  let release!:()=>void;const wait=new Promise<void>(resolve=>{release=resolve;});const capture=store.capture.bind(store);
- store.capture=async id=>{await wait;return capture(id);};
+ store.capture=async(id,hooks)=>{await wait;return capture(id,hooks);};
  const player=await Player.open({store,device,clock});
  try{
   const start=player.start(store.playlist.id);await flush(clock);const stop=player.stop();
-  expect(player.getState().intent).toBe('stopped');release();await Promise.all([start,stop]);await flush(clock);
-  expect(device.effects).toEqual([]);expect(store.record!.intent).toBe('stopped');expect(player.getState().state).toBe('idle');
+  const rejected=expect(start).rejects.toMatchObject({code:'cancelled'});
+  expect(player.getState().intent).toBe('stopped');release();await rejected;await stop;await flush(clock);
+  expect(device.effects).toEqual([]);expect(store.record).toBeUndefined();expect(player.getState().state).toBe('idle');
  }finally{await player.close();}
 });
 

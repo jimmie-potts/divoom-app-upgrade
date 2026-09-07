@@ -198,3 +198,29 @@ test('readiness refresh preserves uncertain identity until exact retry',async({p
  await page.unroute('**/api/player/commands');await page.route('**/api/player/commands',async route=>{bodies.push(route.request().postDataJSON());await route.continue();});
  await page.getByRole('button',{name:'Retry command',exact:true}).click();await expect(page.getByRole('button',{name:'Stop',exact:true})).toBeEnabled();expect(bodies).toHaveLength(2);expect(bodies[1]).toEqual(bodies[0]);
 });
+
+test('temporary media shows its source and disables saved revision restart',async({page},testInfo)=>{
+ const buffer=await sharp({create:{width:4,height:4,channels:3,background:'blue'}}).png().toBuffer();
+ const upload=await page.request.post('/api/assets',{headers:{'x-pixoo-request':'1'},multipart:{file:{name:'Temporary blue.png',mimeType:'image/png',buffer}}});
+ expect(upload.status()).toBe(201);const {rendition}=await upload.json();
+ const headers={'x-pixoo-request':'1'};
+ const command=async(body:Record<string,unknown>)=>{
+  const snapshot=await (await page.request.get('/api/player')).json();
+  const response=await page.request.post('/api/player/commands',{headers,data:{requestId:snapshot.nextRequestId,...body}});expect(response.status()).toBe(200);
+ };
+ await command({command:'show-media',renditionId:rendition.id});
+ await page.goto('/');await page.getByRole('button',{name:'Player',exact:true}).click();
+ await expect(page.getByText('Temporary media session',{exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Temporary blue.png',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Restart with changes',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Resume',exact:true})).toBeEnabled();
+ await page.screenshot({path:testInfo.outputPath('temporary-media.png'),fullPage:true});
+ const saved=await (await page.request.post('/api/playlists',{headers,data:{name:'Saved blue'}})).json();
+ const edited=await (await page.request.put(`/api/playlists/${saved.id}/items`,{headers,data:{revision:saved.revision,items:[{renditionId:rendition.id}]}})).json();
+ await command({command:'start',playlistId:saved.id,revision:edited.revision});
+ await expect(page.getByText(/Session revision/)).toBeVisible();
+ await expect(page.getByText('Temporary media session',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Restart with changes',exact:true})).toBeEnabled();
+ await page.screenshot({path:testInfo.outputPath('saved-playlist.png'),fullPage:true});
+ await command({command:'clear'});
+});

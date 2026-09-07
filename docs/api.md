@@ -80,7 +80,8 @@ request timeout is 30 seconds; renderer timeout and queue timing remain separate
   serverId: string,
   nextRequestId: string,
   player: PlayerState,
-  session: null | { id: string, playlist: Playlist }
+  session: null | { id: string, playlist: Playlist, source?:
+    {kind: 'playlist'} | {kind: 'media', assetId: string, renditionId: string} }
 }
 ```
 
@@ -91,7 +92,10 @@ unready when playback is paused, in error or reconnecting.
 
 Send `POST /player/commands` with `requestId` from a fresh player snapshot and
 `command`: `start`, `pause`, `resume`, `stop`, `next`, `previous`,
-`restart-with-changes` or `clear`. Only `start` also requires `playlistId`.
+`restart-with-changes` or `clear`. `start` requires `playlistId` and accepts an optional expected `revision`.
+`show-media` requires `renditionId` and accepts optional `playback` policy.
+It creates temporary session context, without inserting a saved playlist.
+Invalid selections and stale revisions preserve the preceding session.
 Responses are snapshots after command context work; upload/dwell can still be
 loading. The [playback guide](playback.md) defines each control's semantics.
 
@@ -179,3 +183,10 @@ selects bounded identity, timing and evidence fields without captured playlists.
 The Originless browser-header exception applies only to the enabled `/mcp` route,
 which requires its own current bearer credential. API routes keep their existing
 Host, Origin, fetch-metadata and request-header checks.
+
+HTTP player commands and MCP playback tools share canonical admission and retained
+snapshots. Explicit revision and media policy participate in replay identity.
+Temporary snapshots retain a playlist-shaped traversal for the browser, but their
+source is `media` and player-state saved playlist ID/revision are null. The
+internal snapshot ID must not be used as a saved playlist ID. Restart with changes
+is unsupported for temporary sessions; select a saved playlist explicitly instead.

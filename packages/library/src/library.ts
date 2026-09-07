@@ -3,16 +3,20 @@ import { createReadStream } from 'node:fs';
 import { lstat, realpath } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { MediaError, MediaStore, type Rendition } from '@pixoo/media';
+import { MediaError, MediaStore, type Rendition,type MediaProfile } from '@pixoo/media';
 import { z } from 'zod';
 import { LibraryError, hashSchema, idSchema, itemsSchema, nameSchema, revisionSchema, validate,
-  type Asset, type ImportResult, type ItemInput, type Playlist, type PlaylistItem, type SessionReference } from './contracts.js';
+  type PlaybackPolicy, type Asset, type ImportResult, type ItemInput, type Playlist, type PlaylistItem, type SessionReference } from './contracts.js';
 import { acquireOwner, cleanup, databaseFile, recoverStaging } from './files.js';
-import {checkpointSchema,createCheckpoint,readCheckpoint,saveCheckpoint,clearCheckpoint,type PlaybackCheckpoint} from './checkpoint.js';
+import {checkpointSchema,createCheckpoint,readCheckpoint,saveCheckpoint,clearCheckpoint,type PlaybackCheckpoint,type CaptureHooks} from './checkpoint.js';
 import { APPLICATION_ID, MIGRATIONS, migrate, transaction } from './migrations.js';
+import {playbackPolicy,renditionTiming} from './playback-policy.js';
 import {snapshotFiles} from './snapshot.js';
 
 type RenderOptions = NonNullable<Parameters<MediaStore['render']>[1]>;
+export interface CaptureOptions extends CaptureHooks {revision?:number;profile?:Readonly<MediaProfile>;stillDelayMs?:number}
+export interface CatalogQuery {q:string;offset:number;limit:number}
+const catalogQuery=z.object({q:z.string().max(120),offset:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),limit:z.number().int().min(1).max(100)}).strict();
 type Row = Record<string, unknown>;
 const optionsSchema = z.object({repeat:z.boolean().optional(), shuffle:z.boolean().optional()}).strict();
 const json = <T>(value:unknown):T => JSON.parse(String(value)) as T;
@@ -90,6 +94,24 @@ export class Library {
   }
   listAssets():Promise<Asset[]> {
     return this.run(()=>this.db.prepare('SELECT * FROM assets ORDER BY created_at,id').all().map(row=>this.asset(row)));
+  }
+  async queryMedia(input:CatalogQuery,profile?:Readonly<MediaProfile>,stillDelayMs=100){
+    const {q,offset,limit}=validate(catalogQuery,input);
+    return this.run(()=>{
+      const total=Number(this.db.prepare('SELECT count(*) AS n FROM renditions r JOIN assets a ON a.id=r.asset_id WHERE instr(lower(a.name),lower(?))>0').get(q)!.n);
+      const rows=this.db.prepare('SELECT a.id AS asset_id,a.name,r.id,r.manifest_json FROM renditions r JOIN assets a ON a.id=r.asset_id WHERE instr(lower(a.name),lower(?))>0 ORDER BY a.created_at,a.id,r.id LIMIT ? OFFSET ?').all(q,limit,offset);
+      const items=rows.map(row=>{const rendition=json<Rendition>(row.manifest_json);let compatible=true;try{renditionTiming(rendition,profile,stillDelayMs);}catch{compatible=false;}
+        return {assetId:String(row.asset_id),renditionId:String(row.id),name:String(row.name),format:rendition.source.format,frameCount:rendition.frames.length,durationMs:rendition.effectiveDurationMs,compatible};});
+      return {items,total,offset,limit};
+    });
+  }
+  async queryPlaylists(input:CatalogQuery){
+    const {q,offset,limit}=validate(catalogQuery,input);
+    return this.run(()=>{
+      const total=Number(this.db.prepare('SELECT count(*) AS n FROM playlists WHERE instr(lower(name),lower(?))>0').get(q)!.n);
+      const rows=this.db.prepare('SELECT p.id,p.name,p.revision,p.repeat,p.shuffle,(SELECT count(*) FROM items i WHERE i.playlist_id=p.id) AS item_count FROM playlists p WHERE instr(lower(p.name),lower(?))>0 ORDER BY p.created_at,p.id LIMIT ? OFFSET ?').all(q,limit,offset);
+      return {items:rows.map(row=>({id:String(row.id),name:String(row.name),revision:Number(row.revision),itemCount:Number(row.item_count),repeat:row.repeat===1,shuffle:row.shuffle===1})),total,offset,limit};
+    });
   }
   async listRenditions(assetId:string):Promise<Rendition[]> {
     validate(idSchema,assetId);
@@ -244,9 +266,23 @@ export class Library {
     return this.run(()=>transaction(this.db,()=>{this.expected(id,revision);this.db.prepare('DELETE FROM playlists WHERE id=?').run(id);}));
   }
 
-  async createPlaybackCheckpoint(playlistId:string):Promise<PlaybackCheckpoint> {
-    validate(idSchema,playlistId);
-    return this.run(()=>transaction(this.db,()=>createCheckpoint(this.db,this.playlist(playlistId))));
+  async createPlaybackCheckpoint(playlistId:string,options:CaptureOptions={}):Promise<PlaybackCheckpoint> {
+    validate(idSchema,playlistId);if(options.revision!==undefined)validate(revisionSchema,options.revision);
+    return this.run(()=>{const record=transaction(this.db,()=>{
+      const snapshot=options.revision===undefined?this.playlist(playlistId):this.expected(playlistId,options.revision);
+      for(const item of snapshot.items)playbackPolicy(this.manifest(item.renditionId),item.playback,options.profile,options.stillDelayMs);
+      return createCheckpoint(this.db,snapshot,options);
+    });options.adopt?.(record);return record;});
+  }
+  async createMediaCheckpoint(renditionId:string,playback:PlaybackPolicy|undefined,options:CaptureOptions={}):Promise<PlaybackCheckpoint>{
+    validate(hashSchema,renditionId);
+    return this.run(()=>{const record=transaction(this.db,()=>{
+      const rendition=this.manifest(renditionId),row=this.db.prepare('SELECT a.* FROM assets a JOIN renditions r ON r.asset_id=a.id WHERE r.id=?').get(renditionId);
+      const asset=this.asset(row),now=new Date().toISOString();
+      const snapshot:Playlist={id:randomUUID(),revision:1,name:asset.name,createdAt:now,updatedAt:now,repeat:true,shuffle:false,
+        items:[{id:randomUUID(),renditionId,playback:playbackPolicy(rendition,playback,options.profile,options.stillDelayMs)}]};
+      return createCheckpoint(this.db,snapshot,options,{kind:'media',assetId:asset.id,renditionId});
+    });options.adopt?.(record);return record;});
   }
   getPlaybackCheckpoint():Promise<PlaybackCheckpoint|undefined> {return this.run(()=>readCheckpoint(this.db));}
   async savePlaybackCheckpoint(record:PlaybackCheckpoint):Promise<void> {

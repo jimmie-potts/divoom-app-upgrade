@@ -1,16 +1,34 @@
 import type {Player} from '@pixoo/playback';
 import type {OperationResult} from '@pixoo/device';
-import {displayCommand} from '@pixoo/core';
+import type {Library} from '@pixoo/library';
+import type {MediaProfile} from '@pixoo/media';
+import {displayCommand,playerCommand,catalogQuery} from '@pixoo/core';
 import {Commands} from './commands.js';
 import {parse} from './validation.js';
 import {ApiError} from './security.js';
 export class ControlService {
- constructor(readonly player:Player,readonly commands:Commands,readonly mode:'simulator'|'device'){}
+ constructor(readonly player:Player,readonly commands:Commands,readonly mode:'simulator'|'device',readonly library?:Library,readonly profile?:Readonly<MediaProfile>,readonly stillDelayMs=100){}
  snapshot=()=>({sampledAtMs:performance.now(),serverId:this.commands.epoch,nextRequestId:this.commands.nextRequestId,player:this.player.getState(),session:this.player.getSession()});
  status(){
   const state=this.player.getState();
   return {ready:true,mode:this.mode,connected:this.mode==='simulator'?false:state.availability==='unknown'?null:state.availability==='available',
    serverId:this.commands.epoch,nextRequestId:this.commands.nextRequestId,sampledAtMs:performance.now(),display:this.player.getDisplayEvidence(),player:state};
+ }
+ async playback(input:unknown){
+  const body=parse(playerCommand,input);
+  const retained=await this.commands.execute(body.requestId,['player',body],async()=>{
+   if(body.command==='start')await this.player.start(body.playlistId,body.revision);
+   else if(body.command==='show-media')await this.player.showMedia(body.renditionId,body.playback);
+   else if(body.command==='restart-with-changes')await this.player.restartWithChanges();
+   else await this.player[body.command]();
+   return this.snapshot();
+  });
+  return structuredClone(retained);
+ }
+ async catalog(kind:'media'|'playlists',input:unknown){
+  const query=parse(catalogQuery,input);
+  if(!this.library)throw new ApiError('closed',503);
+  return kind==='media'?this.library.queryMedia(query,this.profile,this.stillDelayMs):this.library.queryPlaylists(query);
  }
  async display(input:unknown){
   const body=parse(displayCommand,input);

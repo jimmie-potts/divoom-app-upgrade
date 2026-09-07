@@ -1,4 +1,5 @@
-import type {Library,PlaybackCheckpoint} from '@pixoo/library';
+import type {Library,PlaybackCheckpoint,CaptureHooks,PlaybackPolicy} from '@pixoo/library';
+import {renditionTiming} from '@pixoo/library';
 import {MediaError,type MediaProfile} from '@pixoo/media';
 import type {PlaybackStore} from './contracts.js';
 import {PlaybackError} from './contracts.js';
@@ -13,16 +14,15 @@ export class LibraryPlaybackStore implements PlaybackStore {
     if(!Number.isSafeInteger(this.stillDelayMs)||this.stillDelayMs<1||this.stillDelayMs>655350)throw new MediaError('invalid-input');
   }
   claim():()=>void {if(owners.has(this.library))throw new PlaybackError('busy');owners.add(this.library);return ()=>{owners.delete(this.library);};}
-  capture(id:string){return this.library.createPlaybackCheckpoint(id);}
+  capture(id:string,hooks?:CaptureHooks,revision?:number){return this.library.createPlaybackCheckpoint(id,{...hooks,...(revision===undefined?{}:{revision}),...(this.profile?{profile:this.profile}:{}),stillDelayMs:this.stillDelayMs});}
+  captureMedia(id:string,policy:PlaybackPolicy|undefined,hooks:CaptureHooks){return this.library.createMediaCheckpoint(id,policy,{...hooks,...(this.profile?{profile:this.profile}:{}),stillDelayMs:this.stillDelayMs});}
   read(){return this.library.getPlaybackCheckpoint();}
   save(record:PlaybackCheckpoint){return this.library.savePlaybackCheckpoint(record);}
   clear(){return this.library.clearPlaybackCheckpoint();}
   async load(id:string,signal:AbortSignal){
     const {rendition,frames}=await this.library.readRendition(id,signal);
-    const prepared=frames.map((rgb,index)=>({rgb,delayMs:rendition.source.format==='gif'?rendition.frames[index]!.delayMs??100:this.stillDelayMs}));
-    const profile=this.profile;
-    if(profile&&(prepared.length>profile.maxFrames||prepared.some(frame=>frame.delayMs<profile.minDelayMs||frame.delayMs>profile.maxDelayMs)||
-      (profile.uniformTiming&&prepared.some(frame=>frame.delayMs!==prepared[0]?.delayMs))))throw new MediaError('profile-limit');
+    const delays=renditionTiming(rendition,this.profile,this.stillDelayMs);
+    const prepared=frames.map((rgb,index)=>({rgb,delayMs:delays[index]!}));
     return {frames:prepared};
   }
 }

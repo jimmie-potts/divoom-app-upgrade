@@ -39,16 +39,18 @@ it.each(['2025-11-25','2025-06-18'])('keeps admitted work and authentication aft
   await client.close();expect((await fetch(`${base}/api/health`)).status).toBe(200);
  }finally{release();await client.close();await app.close();await rm(directory,{recursive:true,force:true});}
 },20000);
-it('limits read credentials to status and leaves disabled MCP unavailable',async()=>{
+it('limits read credentials to status and catalogs and leaves disabled MCP unavailable',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'pixoo-mcp-read-'));const token=await provisionCredential(directory,'reader',['read']);
  const app=createApp({dataDir:directory,mcpEnabled:true});const client=new Client({name:'reader',version:'1'});
  try{
   await app.listen({host:'127.0.0.1',port:0});const address=app.server.address();if(!address||typeof address==='string')throw new Error();
   const base=`http://127.0.0.1:${address.port}`;
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`),{requestInit:{headers:{authorization:`Bearer ${token}`}}}) as Transport);
-  expect((await client.listTools()).tools.map(t=>t.name)).toEqual(['get_status']);
+  expect((await client.listTools()).tools.map(t=>t.name)).toEqual(['get_status','list_media','list_playlists']);
   const before=result(await client.callTool({name:'get_status',arguments:{}}));
   expect((await client.callTool({name:'set_screen',arguments:{on:false,request_id:before.nextRequestId}})).isError).toBe(true);
+  expect((await client.callTool({name:'control_playback',arguments:{action:'stop',request_id:before.nextRequestId}})).isError).toBe(true);
+  expect(result(await client.callTool({name:'list_media',arguments:{}}))).toMatchObject({items:[],total:0});
   expect(result(await client.callTool({name:'get_status',arguments:{}})).nextRequestId).toBe(before.nextRequestId);
  }finally{await client.close();await app.close();}
  const disabled=createApp({dataDir:directory});try{expect((await disabled.inject('/mcp')).statusCode).toBe(404);}finally{await disabled.close();await rm(directory,{recursive:true,force:true});}

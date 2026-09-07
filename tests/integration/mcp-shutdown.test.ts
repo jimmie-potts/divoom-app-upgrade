@@ -16,7 +16,7 @@ it('bounds sessions, releases a deleted session and closes connected clients on 
   for(let n=0;n<16;n++)await connect();
   await expect(connect()).rejects.toThrow();
   await transports[0]!.terminateSession();await clients[0]!.close();
-  const replacement=await connect();expect((await replacement.listTools()).tools).toHaveLength(3);
+  const replacement=await connect();expect((await replacement.listTools()).tools).toHaveLength(8);
   expect((await fetch(`${base}/api/health`)).status).toBe(200);
   await app.close();await expect(replacement.listTools()).rejects.toThrow();
  }finally{await Promise.all(clients.map(client=>client.close()));await app.close();await rm(directory,{recursive:true,force:true});}
