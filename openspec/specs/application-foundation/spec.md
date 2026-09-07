@@ -24,7 +24,7 @@ The health endpoint SHALL report server readiness separately from device connect
 #### Scenario: Ready foundation
 - **WHEN** the ready server is queried
 - **THEN** it returns HTTP 200 with status ready, mode simulator, and device connected false
-- **AND** the page displays Simulator mode and Server ready without suggesting playlist or device functionality exists
+- **AND** the page displays Simulator mode and Server ready with available simulator controls clearly separated from physical-device connectivity
 
 #### Scenario: Health unavailable
 - **WHEN** the browser cannot obtain a valid health response

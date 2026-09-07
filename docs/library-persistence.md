@@ -2,9 +2,9 @@
 
 `@pixoo/library` stores a media catalog, revisioned playlists and session retention
 records in SQLite. It uses `@pixoo/media` for original files and immutable frames.
-This is a backend library. Startup still serves the simulator status page;
+This is a backend library. Startup serves the [controller UI](controller-ui.md);
 the [playback package](playback.md) integrates through its library store.
-The [HTTP API](api.md) exposes uploads and revisioned edits. Library/player UI follows in separate issues.
+The [HTTP API](api.md) exposes uploads and revisioned edits. The browser library and editor use those routes.
 
 ## Open and close
 

@@ -4,7 +4,7 @@ import {playerCommand} from '@pixoo/core';
 import {Commands} from './commands.js';
 import {parse} from './validation.js';
 export function playerRoutes(app:FastifyInstance,player:Player,commands:Commands,changed:()=>void=()=>{}){
- const snapshot=()=>({serverId:commands.epoch,nextRequestId:commands.nextRequestId,player:player.getState(),session:player.getSession()});
+ const snapshot=()=>({sampledAtMs:performance.now(),serverId:commands.epoch,nextRequestId:commands.nextRequestId,player:player.getState(),session:player.getSession()});
  app.get('/api/player',snapshot);
  app.post('/api/player/commands',request=>{
   const body=parse(playerCommand,request.body);

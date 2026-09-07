@@ -6,7 +6,10 @@
   "dependencies": {
     "@pixoo/core": "0.0.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "@pixoo/library": "0.0.0",
+    "@pixoo/media": "0.0.0",
+    "@pixoo/playback": "0.0.0"
   },
   "scripts": {
     "build": "vite build"

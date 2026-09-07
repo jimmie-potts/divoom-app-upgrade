@@ -96,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence, playlist-playback and controller-api.
+The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence, playlist-playback and controller-api and controller-ui.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or

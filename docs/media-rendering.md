@@ -2,8 +2,7 @@
 
 `@pixoo/media` accepts streamed PNG, JPEG and GIF bytes and returns immutable
 64x64 renditions. It is a backend library. [The library package](library-persistence.md)
-owns database metadata, playlists and deletion policies. HTTP upload routes,
-UI belongs to later issues; the [playback package](playback.md) consumes effective
+owns database metadata, playlists and deletion policies. The [browser UI](controller-ui.md) uploads and previews media through the HTTP API; the [playback package](playback.md) consumes effective
 frames through the library store.
 No renderer call contacts a device.
 

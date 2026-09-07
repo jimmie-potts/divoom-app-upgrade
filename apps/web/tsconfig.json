@@ -21,6 +21,15 @@
   "references": [
     {
       "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/library"
+    },
+    {
+      "path": "../../packages/media"
+    },
+    {
+      "path": "../../packages/playback"
     }
   ]
 }

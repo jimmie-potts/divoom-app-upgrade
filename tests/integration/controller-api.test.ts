@@ -110,3 +110,11 @@ it('authenticates streams and uploads before any request effects',async()=>{
   expect((await app.inject({url:'/api/assets',headers:{authorization:'Bearer fixture'}})).json().total).toBe(0);
  }finally{await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
+
+it('samples the server monotonic clock alongside player deadlines',async()=>{
+ const dataDir=await mkdtemp(join(tmpdir(),'pixoo-api-clock-')),app=createApp({dataDir});try{
+  const before=performance.now();const state=(await app.inject('/api/player')).json();
+  expect(state.sampledAtMs).toBeGreaterThanOrEqual(before);
+  expect(state.sampledAtMs).toBeLessThanOrEqual(performance.now());
+ }finally{await app.close();await rm(dataDir,{recursive:true,force:true});}
+});
