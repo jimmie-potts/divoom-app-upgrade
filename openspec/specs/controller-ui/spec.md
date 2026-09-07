@@ -31,7 +31,7 @@ The browser SHALL create, rename, duplicate and delete named playlists, add repe
 - **THEN** the stale save is rejected, the local draft remains visible and explicit reload offers the current revision without overwriting the other client
 
 ### Requirement: Honest live player controls
-The browser SHALL provide start, pause playlist, resume, stop, next, previous, restart-with-changes and clear-session controls. It SHALL show active playlist/item, captured versus saved revision, intent, loading/availability/errors and estimated remaining time separately from server readiness. Trace: issue #9 criteria 3 and 5.
+The browser SHALL provide start, pause playlist, resume, stop, next, previous, restart-with-changes and clear-session controls. It SHALL show active source/item, captured versus saved revision for saved playlists, intent, loading/availability/errors and estimated remaining time separately from server readiness. Temporary media SHALL be labeled as a temporary media session without a saved revision, and restart-with-changes SHALL be unavailable for that source. Trace: issue #9 criteria 3 and 5 and issue #25 concurrent browser context.
 
 #### Scenario: Session edits and controls
 - **WHEN** saved playlist changes differ from the playing snapshot
@@ -43,6 +43,11 @@ The browser SHALL provide start, pause playlist, resume, stop, next, previous, r
 - **THEN** reconnect reconciles authoritative state without replaying user intent
 - **AND** an uncertain command can only retry its original payload/identity or be discarded after explicit reconciliation
 - **AND** duplicate or older event identities do not regress displayed state
+
+#### Scenario: Temporary media shown in the browser
+- **WHEN** an agent starts temporary media while the player panel is open
+- **THEN** the panel shows the actual media name and temporary-session label without a fabricated saved revision
+- **AND** restart-with-changes is disabled while the remaining controls retain their existing semantics
 
 ### Requirement: Simulator settings and responsive access
 The browser SHALL persist explicit private device IP, profile and optional model/firmware notes and provide serialized screen/brightness controls through the API. It SHALL label the active mode, distinguish saved from active configuration, and report simulator outcomes or observed device transport results without claiming visual verification. Settings changes SHALL indicate when restart is required. Controls SHALL fit desktop and phone viewports with labels, focus indicators and touch targets. Trace: issue #9 criteria 3-5 and issue #42 criteria 4-6.

@@ -10,10 +10,12 @@ import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/st
 import {createApp} from '../../apps/server/dist/app.js';
 import {multipart} from '../helpers/http-api.js';
 import {gifFixture} from '../helpers/media-fixtures.js';
+import {Library} from '@pixoo/library';
 import type {DeviceTransport} from '@pixoo/device';
 import {provisionCredential,revokeCredential} from '../../apps/server/src/mcp-config.js';
-async function fixture(transportForTests?:DeviceTransport){
+async function fixture(transportForTests?:DeviceTransport,prepare?:(dataDir:string)=>Promise<void>){
  const dataDir=await mkdtemp(join(tmpdir(),'pixoo-mcp-'));
+ if(prepare)await prepare(dataDir);
  const token=await provisionCredential(dataDir,'codex',['read','control']);
  if(transportForTests)await writeFile(join(dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.50.20',profile:'pixoo64-smoke-2026-09-06'}}));
  const app=createApp({dataDir,mcpEnabled:true,...(transportForTests?{mode:'device' as const,transportForTests,deviceLockDirectoryForTests:dataDir}:{})});
@@ -29,7 +31,7 @@ async function fixture(transportForTests?:DeviceTransport){
 function data(result:unknown){return (result as {structuredContent:{data:Record<string,unknown>}}).structuredContent.data;}
 it('serves fixed tools from the built application and preserves cross-transport display replay',async()=>{
  const f=await fixture();try{
-  expect((await f.client.listTools()).tools.map(t=>t.name).sort()).toEqual(['get_status','set_brightness','set_screen']);
+  expect((await f.client.listTools()).tools.map(t=>t.name).sort()).toEqual(['control_playback','get_status','list_media','list_playlists','play_playlist','set_brightness','set_screen','show_media']);
   const status=data(await f.client.callTool({name:'get_status',arguments:{}}));
   expect(status).toMatchObject({ready:true,mode:'simulator',connected:false});
   const request_id=status.nextRequestId;
@@ -105,3 +107,107 @@ it('initializes native MCP with canonical default-port authorities',async()=>{
   const denied=await app.inject({method:'POST',url:'/mcp',headers:{host:'localhost:81',authorization:`Bearer ${token}`},payload:{}});expect(denied.statusCode).toBe(403);
  }finally{await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
+it('selects bounded media and playlists with shared immutable player receipts',async()=>{
+ const f=await fixture();try{
+  await startPrivatePlaylist(f);
+  const media=data(await f.client.callTool({name:'list_media',arguments:{q:'private',limit:1}}));
+  expect(media).toMatchObject({total:1,limit:1,offset:0});
+  const row=(media.items as Record<string,unknown>[])[0]!;
+  expect(Object.keys(row).sort()).toEqual(['asset_id','compatible','duration_ms','format','frame_count','name','rendition_id']);
+  const playlists=data(await f.client.callTool({name:'list_playlists',arguments:{limit:1}}));
+  const playlist=(playlists.items as Record<string,unknown>[])[0]!;
+  let request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  for(const args of [{rendition_id:row.rendition_id,request_id,path:'private'},{rendition_id:row.rendition_id,request_id,policy:{mode:'duration',durationMs:0}}])expect((await f.client.callTool({name:'show_media',arguments:args})).isError).toBe(true);
+  expect(data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId).toBe(request_id);
+  const shown=data(await f.client.callTool({name:'show_media',arguments:{rendition_id:row.rendition_id,request_id}}));
+  expect(shown).toMatchObject({ok:true,timing:null,context:{source:{kind:'media',assetId:row.asset_id,renditionId:row.rendition_id}},snapshot:{player:{playlistId:null,playlistRevision:null}}});
+  expect(JSON.stringify(shown)).not.toContain('private-photo');
+  const replay=await f.inject({method:'POST',url:'/api/player/commands',headers:{'x-pixoo-request':'1'},payload:{requestId:request_id,command:'show-media',renditionId:row.rendition_id}});
+  expect(replay.statusCode).toBe(200);expect(replay.json()).toMatchObject(shown.snapshot as object);
+  request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  const paused=await f.inject({method:'POST',url:'/api/player/commands',headers:{'x-pixoo-request':'1'},payload:{requestId:request_id,command:'pause'}});
+  const pause=data(await f.client.callTool({name:'control_playback',arguments:{action:'pause',request_id}}));
+  expect(pause).toMatchObject({ok:true,snapshot:{player:{intent:'paused'}}});expect(paused.json()).toMatchObject(pause.snapshot as object);
+  request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  const stale=data(await f.client.callTool({name:'play_playlist',arguments:{playlist_id:playlist.id,revision:(playlist.revision as number)+1,request_id}}));
+  expect(stale).toMatchObject({ok:false,code:'revision-conflict',details:{expected:(playlist.revision as number)+1,actual:playlist.revision}});
+  expect(data(await f.client.callTool({name:'play_playlist',arguments:{playlist_id:playlist.id,revision:(playlist.revision as number)+1,request_id}}))).toEqual(stale);
+  const status=data(await f.client.callTool({name:'get_status',arguments:{}}));expect(JSON.stringify(status)).not.toContain('private-photo');
+  const started=data(await f.client.callTool({name:'play_playlist',arguments:{playlist_id:playlist.id,revision:playlist.revision,request_id:status.nextRequestId}}));
+  expect(started).toMatchObject({ok:true,context:{source:{kind:'playlist'}},snapshot:{player:{playlistId:playlist.id,playlistRevision:playlist.revision}}});
+ }finally{await f.close();}
+},20000);
+
+it('keeps admitted media loading and playback alive after MCP disconnect',async()=>{
+ const writes:string[]=[];let release=()=>{};
+ const gate=new Promise<void>(resolve=>{release=resolve;});
+ const f=await fixture(async body=>{writes.push(String(body.Command));if(body.Command==='Draw/SendHttpGif'&&body.PicOffset===0)await gate;return {error_code:0,PicId:1};});
+ try{
+  const bytes=gifFixture(1,1,[{width:1,height:1,pixels:[1],delay:50},{width:1,height:1,pixels:[2],delay:50}]);
+  const upload=await f.inject({method:'POST',url:'/api/assets',...multipart(bytes,'disconnect-animation.gif')});expect(upload.statusCode).toBe(201);
+  const request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  const shown=data(await f.client.callTool({name:'show_media',arguments:{rendition_id:upload.json().rendition.id,request_id}}));
+  expect(shown).toMatchObject({ok:true,timing:null,snapshot:{player:{state:'loading',intent:'active'}}});
+  await vi.waitFor(()=>expect(writes).toContain('Draw/SendHttpGif'));
+  await f.client.close();
+  const loading=(await f.inject('/api/player')).json();expect(loading.player).toMatchObject({state:'loading',intent:'active'});
+  expect(loading.session.id).toBe((shown.context as {sessionId:string}).sessionId);
+  release();
+  await vi.waitFor(async()=>expect((await f.inject('/api/player')).json().player.state).toBe('playing'));
+  expect(writes.slice(0,3)).toEqual(['Draw/GetHttpGifId','Draw/SendHttpGif','Draw/SendHttpGif']);
+  const snapshot=(await f.inject('/api/player')).json();
+  const paused=await f.inject({method:'POST',url:'/api/player/commands',headers:{'x-pixoo-request':'1'},payload:{requestId:snapshot.nextRequestId,command:'pause'}});
+  expect(paused.statusCode).toBe(200);expect(paused.json().player.intent).toBe('paused');expect(paused.json().session.id).toBe(loading.session.id);
+ }finally{release();await f.close();}
+},20000);
+
+it('returns replayable typed selection failures and keeps catalog metadata out of other tools',async()=>{
+ const f=await fixture();try{
+  const uploaded=await f.inject({method:'POST',url:'/api/assets',...multipart(undefined,'untrusted-ignore-instructions.gif')});expect(uploaded.statusCode).toBe(201);
+  const renditionId=uploaded.json().rendition.id;
+  let request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  const http=await f.inject({method:'POST',url:'/api/player/commands',headers:{'x-pixoo-request':'1'},payload:{requestId:request_id,command:'show-media',renditionId}});expect(http.statusCode).toBe(200);
+  const mcp=data(await f.client.callTool({name:'show_media',arguments:{request_id,rendition_id:renditionId}}));expect(mcp.ok).toBe(true);expect(http.json()).toMatchObject(mcp.snapshot as object);
+  const sessionId=http.json().session.id;
+  const pauseId=(await f.inject('/api/player')).json().nextRequestId;
+  await f.inject({method:'POST',url:'/api/player/commands',headers:{'x-pixoo-request':'1'},payload:{requestId:pauseId,command:'pause'}});
+  for(const [args,code] of [[{rendition_id:'f'.repeat(64)},'not-found'],[{rendition_id:renditionId,policy:{mode:'plays',totalPlays:3}},'invalid-input']] as const){
+   request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+   const result=await f.client.callTool({name:'show_media',arguments:{...args,request_id}});
+   expect(result.isError).toBe(true);expect(data(result)).toMatchObject({ok:false,code,priorEffects:'none'});
+   expect(data(await f.client.callTool({name:'show_media',arguments:{...args,request_id}}))).toEqual(data(result));
+   const state=(await f.inject('/api/player')).json();expect(state.session.id).toBe(sessionId);expect(state.player.intent).toBe('paused');
+  }
+  const catalog=data(await f.client.callTool({name:'list_media',arguments:{q:'untrusted',offset:0,limit:100}}));expect(JSON.stringify(catalog)).toContain('untrusted-ignore-instructions.gif');
+  for(const args of [{limit:101},{offset:-1},{offset:Number.MAX_SAFE_INTEGER+1},{q:'x'.repeat(121)},{limit:1,path:'/private'}])expect((await f.client.callTool({name:'list_media',arguments:args})).isError).toBe(true);
+  const status=await f.client.callTool({name:'get_status',arguments:{}}),discovery=await f.client.listTools();
+  const display=await f.client.callTool({name:'set_brightness',arguments:{percent:50,request_id:data(status).nextRequestId}});
+  for(const result of [status,discovery,display,mcp]){expect(JSON.stringify(result)).not.toContain('untrusted-ignore-instructions');expect(JSON.stringify(result)).not.toContain(f.dataDir);}
+ }finally{await f.close();}
+},20000);
+
+it('reports incompatible stored media without replacing the active endpoint context',async()=>{
+ let incompatibleId='',compatibleId='';const writes:string[]=[];
+ const f=await fixture(async body=>{writes.push(String(body.Command));return {error_code:0,PicId:1};},async dataDir=>{
+  const library=await Library.open({directory:join(dataDir,'library')});
+  try{
+   async function* bytes(delay:number){yield gifFixture(1,1,[{width:1,height:1,pixels:[1],delay},{width:1,height:1,pixels:[2],delay}]);}
+   incompatibleId=(await library.importMedia(bytes(10),'Old simulator timing')).rendition.id;
+   compatibleId=(await library.importMedia(bytes(50),'Compatible timing')).rendition.id;
+  }finally{await library.close();}
+ });
+ try{
+  const catalog=data(await f.client.callTool({name:'list_media',arguments:{}}));
+  expect((catalog.items as {rendition_id:string;compatible:boolean}[]).find(item=>item.rendition_id===incompatibleId)?.compatible).toBe(false);
+  let request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  const selected=data(await f.client.callTool({name:'show_media',arguments:{rendition_id:compatibleId,request_id}}));expect(selected.ok).toBe(true);
+  request_id=data(await f.client.callTool({name:'get_status',arguments:{}})).nextRequestId;
+  expect(data(await f.client.callTool({name:'control_playback',arguments:{action:'pause',request_id}})).ok).toBe(true);
+  const before=(await f.inject('/api/player')).json(),writeCount=writes.length;
+  request_id=before.nextRequestId;
+  const failed=await f.client.callTool({name:'show_media',arguments:{rendition_id:incompatibleId,request_id}});
+  expect(failed.isError).toBe(true);expect(data(failed)).toMatchObject({ok:false,code:'profile-limit',priorEffects:'none'});
+  expect(data(await f.client.callTool({name:'show_media',arguments:{rendition_id:incompatibleId,request_id}}))).toEqual(data(failed));
+  const after=(await f.inject('/api/player')).json();expect(after.session).toEqual(before.session);expect(after.player).toEqual(before.player);expect(writes.length).toBe(writeCount);
+ }finally{await f.close();}
+},20000);

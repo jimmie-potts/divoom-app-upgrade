@@ -46,7 +46,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
     logging:{persistent:false},limits:{requests:32,eventClients:16,eventHistory:32,commandReceipts:256,playbackRenditions:2}});
   });
   let changed=()=>{};
-  const commands=new Commands(),service=new ControlService(active,commands,runtime.mode),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
+  const commands=new Commands(),service=new ControlService(active,commands,runtime.mode,library,profile,runtime.mode==='device'?500:100),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
   if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
   app.addHook('preClose',async()=>{

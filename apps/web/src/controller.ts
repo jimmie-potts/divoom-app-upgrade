@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {healthSchema,type DeviceConfiguration,type PlayerCommand} from '@pixoo/core';
 import {request,RequestError,explain,type PlayerState,type Playlist,type Rendition} from './api';
-export interface Snapshot {serverId:string;sampledAtMs:number;nextRequestId:string;player:PlayerState;session:{id:string;playlist:Playlist}|null}
+export interface Snapshot {serverId:string;sampledAtMs:number;nextRequestId:string;player:PlayerState;session:{id:string;playlist:Playlist;source?:{kind:'playlist'}|{kind:'media';assetId:string;renditionId:string}}|null}
 export interface Device {mode:'simulator'|'device';connected:boolean|null;availability:'unknown'|'available'|'offline';configuration:DeviceConfiguration|null;activeConfiguration:DeviceConfiguration|null;restartRequired:boolean;activeProfile:Rendition['profile'];profiles:Rendition['profile'][]}
 type Runtime={serverId:string;device:Device};
 type Pending={path:string;method:string;body:Record<string,unknown>};

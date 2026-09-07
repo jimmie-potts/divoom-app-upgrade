@@ -17,8 +17,10 @@ export const renditionRequest=z.object({transform:transformRequest.optional()}).
 export const deviceConfiguration=z.object({ip:z.ipv4().refine(ip=>{const [a,b]=ip.split('.').map(Number);return a===10||a===172&&b!>=16&&b!<=31||a===192&&b===168;}),model:apiName.optional(),firmware:apiName.optional(),profile:z.enum(['simulator-v1','pixoo64-smoke-2026-09-06'])}).strict();
 export type DeviceConfiguration=z.infer<typeof deviceConfiguration>;
 export const requestIdentity=z.string().regex(/^[a-f0-9-]{36}:[1-9][0-9]{0,15}$/);
+export const catalogQuery=z.object({q:z.string().max(120).default(''),offset:z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),limit:z.number().int().min(1).max(100).default(25)}).strict();
 export const playerCommand=z.discriminatedUnion('command',[
- z.object({requestId:requestIdentity,command:z.literal('start'),playlistId:apiId}).strict(),
+ z.object({requestId:requestIdentity,command:z.literal('start'),playlistId:apiId,revision:apiRevision.optional()}).strict(),
+ z.object({requestId:requestIdentity,command:z.literal('show-media'),renditionId:apiHash,playback:playbackPolicy.optional()}).strict(),
  z.object({requestId:requestIdentity,command:z.enum(['pause','resume','stop','next','previous','restart-with-changes','clear'])}).strict(),
 ]);
 export type PlayerCommand=z.infer<typeof playerCommand>;

@@ -1,5 +1,5 @@
 import {systemClock,type Animation,type Clock,type DeviceAdapter,type OperationResult,type UploadResult} from '@pixoo/device';
-import {checkpointSchema,type PlaybackCheckpoint} from '@pixoo/library';
+import {checkpointSchema,type PlaybackCheckpoint,type CaptureHooks,type PlaybackPolicy} from '@pixoo/library';
 import {PlaybackError,type PlaybackStore,type PlayerState} from './contracts.js';
 import {cycle,next,previous,started,upcoming} from './traversal.js';
 const owners=new WeakSet<DeviceAdapter>();
@@ -20,6 +20,7 @@ export class Player {
   private intent:PlaybackCheckpoint['intent']='stopped';
   private availability:PlayerState['availability']='unknown';
   private epoch=0;
+  private admission=0;
   private adapterGeneration:number;
   private abort=new AbortController();
   private cancelTimer=()=>{};
@@ -68,10 +69,10 @@ export class Player {
       return player;
     }catch{player.release();throw new PlaybackError('storage-error');}
   }
-  getSession(){return this.record?structuredClone({id:this.record.sessionId,playlist:this.record.snapshot}):null;}
+  getSession(){return this.record?structuredClone({id:this.record.sessionId,playlist:this.record.snapshot,...(this.record.source?{source:this.record.source}:{})}):null;}
   getState():PlayerState {
     return structuredClone({state:this.state,intent:this.intent,availability:this.availability,generation:this.epoch,
-      sessionId:this.record?.sessionId??null,playlistId:this.record?.snapshot.id??null,playlistRevision:this.record?.snapshot.revision??null,
+      sessionId:this.record?.sessionId??null,playlistId:this.record?.source?.kind==='media'?null:this.record?.snapshot.id??null,playlistRevision:this.record?.source?.kind==='media'?null:this.record?.snapshot.revision??null,
       itemId:this.record?.currentItemId??null,estimatedReadyAtMs:this.readyAt,dwellDeadlineMs:this.deadline,timing:'estimated',
       requestedScreenOn:this.requestedScreenOn,lastError:this.lastError});
   }
@@ -92,9 +93,11 @@ export class Player {
   }
   private dispatch(action:()=>Promise<boolean|void>,intent?:PlaybackCheckpoint['intent'],cancelDevice=true):Promise<void> {
     if(this.closing)return Promise.reject(new PlaybackError('closed'));
+    if(cancelDevice)this.admission++;
     const token=this.retire(cancelDevice);if(intent)this.intent=intent;
     this.state=this.intent==='active'?'loading':this.intent==='paused'?'paused':'idle';this.notify();
     return this.queue(async()=>{
+      if(!cancelDevice&&token!==this.epoch)return;
       const proceed=await action();
       if(token!==this.epoch)return;
       if((proceed===false || !this.record) && this.intent==='active')this.intent='stopped';
@@ -110,14 +113,30 @@ export class Player {
       throw error;
     });
   }
-  start(playlistId:string):Promise<void> {
-    return this.dispatch(async()=>{
-      this.record=checkpointSchema.parse(await this.store.capture(playlistId));
-      this.record.order=cycle(this.record,this.random);this.record.currentItemId=this.record.order[0]!;
-      this.cache.clear();this.failed.clear();this.retries=0;this.lastError=null;
-    },'active');
+  start(playlistId:string,revision?:number):Promise<void> {return this.admit(hooks=>this.store.capture(playlistId,hooks,revision));}
+  showMedia(renditionId:string,policy?:PlaybackPolicy):Promise<void> {
+    if(!this.store.captureMedia)return Promise.reject(new PlaybackError('unsupported-operation'));
+    return this.admit(hooks=>this.store.captureMedia!(renditionId,policy,hooks));
   }
-  restartWithChanges():Promise<void> {return this.record?this.start(this.record.snapshot.id):Promise.reject(new PlaybackError('no-context'));}
+  private admit(capture:(hooks:CaptureHooks)=>Promise<PlaybackCheckpoint>):Promise<void> {
+    if(this.closing)return Promise.reject(new PlaybackError('closed'));
+    const admission=++this.admission;
+    return this.queue(async()=>{
+      const guard=()=>!this.closing&&admission===this.admission;
+      if(!guard())throw new PlaybackError('cancelled');
+      let adopted=false,token=0;
+      const prepare=(record:PlaybackCheckpoint)=>{record.order=cycle(record,this.random);record.currentItemId=record.order[0]!;};
+      const adopt=(record:PlaybackCheckpoint)=>{
+        token=this.retire();this.record=record;this.intent=this.requestedScreenOn?'active':'paused';this.state=this.intent==='active'?'loading':'paused';
+        this.cache.clear();this.failed.clear();this.retries=0;this.lastError=null;adopted=true;
+      };
+      const record=await capture({guard,prepare,adopt});
+      // In-memory test stores may not implement the optional synchronous hooks.
+      if(!adopted){if(!guard())throw new PlaybackError('cancelled');const parsed=checkpointSchema.parse(record);prepare(parsed);adopt(parsed);}
+      try{await this.persist();if(this.valid(token))this.launch(token);}catch(error){if(token===this.epoch&&!this.closing)this.fatal(codeOf(error));throw error;}
+    });
+  }
+  restartWithChanges():Promise<void> {if(this.record?.source?.kind==='media')return Promise.reject(new PlaybackError('unsupported-operation'));return this.record?this.start(this.record.snapshot.id):Promise.reject(new PlaybackError('no-context'));}
   pause():Promise<void> {return this.dispatch(async()=>{},'paused');}
   stop():Promise<void> {return this.dispatch(async()=>{},'stopped');}
   resume():Promise<void> {
@@ -191,7 +210,7 @@ export class Player {
   }
   close():Promise<void> {
     if(this.closePromise)return this.closePromise;
-    this.closing=true;this.retire();this.intent='paused';this.state=this.record?'paused':'idle';
+    this.closing=true;this.admission++;this.retire();this.intent='paused';this.state=this.record?'paused':'idle';
     this.closePromise=this.queue(()=>this.persist()).finally(()=>this.release());return this.closePromise;
   }
 
@@ -255,7 +274,7 @@ export class Player {
     if(this.failed.size>=this.record.snapshot.items.length || !next(this.record,this.random)){
       this.state='error';this.intent='paused';await this.persist();return;
     }
-    this.state='loading';await this.persist();if(this.valid(token))this.launch(token);
+    this.state='loading';try{await this.persist();if(this.valid(token))this.launch(token);}catch(error){if(token===this.epoch&&!this.closing)this.fatal(codeOf(error));throw error;}
   }
   private async recover(token:number,code:string):Promise<void> {
     if(!this.valid(token))return;
@@ -269,7 +288,7 @@ export class Player {
       void this.device.probe({generation,signal,timeoutMs:this.operationTimeoutMs}).then(result=>{
         this.background(token,async()=>{
           this.observeProbe(result,generation);
-          if(result.ok){this.availability='available';this.state='loading';await this.persist();if(this.valid(token))this.launch(token);}
+          if(result.ok){this.availability='available';this.state='loading';try{await this.persist();if(this.valid(token))this.launch(token);}catch(error){if(token===this.epoch&&!this.closing)this.fatal(codeOf(error));throw error;}}
           else if(result.code==='stale-generation'||result.code==='cancelled'){this.intent='paused';this.state='paused';this.lastError={code:'external-control'};await this.persist();}
           else await this.recover(token,result.code);
         });

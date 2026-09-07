@@ -155,3 +155,23 @@ policy validation, stale edits, item identity, immutable cache changes, referenc
 protection, cleanup retry and migration rollback. They do not contact hardware.
 The [persistence spec](../openspec/specs/library-persistence/spec.md) defines the
 capability; [ADR 0006](decisions/0006-library-persistence.md) records the design.
+
+## Media selection and catalog pages
+
+`queryMedia({q,offset,limit}, profile?, stillDelayMs?)` returns one bounded summary
+per rendition, with asset/rendition identities and active-profile compatibility.
+`queryPlaylists({q,offset,limit})` returns revisioned summaries and item counts.
+Both cap pages at 100, order with stable ID tie-breakers and count/select within
+one queued operation. Separate requests do not freeze the catalog between pages.
+
+`createPlaybackCheckpoint` accepts an expected revision and guarded capture
+options for its player owner. `createMediaCheckpoint` retains one existing
+rendition and explicit media source without inserting saved playlists. Validation,
+checkpoint replacement and reference changes share a transaction. Its synchronous
+adoption callback runs after commit before the queue yields. Callers must use
+nonthrowing adoption and must not perform async work in the transaction.
+
+Checkpoint source metadata is immutable on save. Older source-less checkpoints
+remain readable. A temporary session's generated internal traversal snapshot ID
+is not a saved playlist identity. Reference checks, offline verification and
+paused recovery preserve its actual asset and rendition until replacement/clear.

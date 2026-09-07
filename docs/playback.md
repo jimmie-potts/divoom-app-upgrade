@@ -180,3 +180,27 @@ these notifications for SSE and keeps command/event sequences separate.
 Application shutdown retires player and adapter work before waiting for HTTP
 handlers to drain. The library and target ownership stay open until those handlers
 and in-flight transport settle, so a pending control cannot send during shutdown.
+
+## Guarded media selection
+
+`start(playlistId, revision?)` checks a supplied saved revision during atomic
+checkpoint capture. `showMedia(renditionId, playback?)` starts an existing
+rendition as a temporary single-item session. Selection validates active profile
+limits and effective policy arithmetic before retiring the previous writer or
+replacing references. Invalid selection preserves existing playback. A later
+stop, close or replacement can cancel pending admission before it commits.
+Checkpoint adoption completes before later controls can persist that context.
+
+Temporary sessions use repeat on and shuffle off, with 30000 ms for stills and
+three total plays for multi-frame animation unless a valid policy is supplied.
+Single-frame GIFs use still policy validation. They create no saved playlist.
+`getSession()` identifies the media source; player state reports null saved
+playlist ID/revision. Pause, resume, stop and navigation retain normal semantics.
+`restartWithChanges()` rejects temporary media with `unsupported-operation`.
+
+Temporary context restores paused and retains its rendition until replacement
+or clear. Old checkpoints without source metadata remain saved-playlist context.
+An older binary may reject a temporary checkpoint; clear it using the current
+version or restore a compatible offline backup before downgrade. No automatic
+parse-error recovery deletes context. Admission receipts do not prove upload
+completion or visible display behavior.

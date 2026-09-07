@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { MediaSource, Rendition } from '@pixoo/media';
-export type LibraryErrorCode='invalid-input'|'not-found'|'revision-conflict'|'asset-referenced'|'busy'|'closed'|'migration-error'|'database-error'|'cleanup-pending'|'storage-error'|'catalog-corrupt'|'checkpoint-owned';
+export type LibraryErrorCode='cancelled'|'invalid-input'|'not-found'|'revision-conflict'|'asset-referenced'|'busy'|'closed'|'migration-error'|'database-error'|'cleanup-pending'|'storage-error'|'catalog-corrupt'|'checkpoint-owned';
 const messages:Record<LibraryErrorCode,string>={
+  cancelled:'The selection was superseded before admission.',
   'invalid-input':'Check the supplied name, IDs, revision and playback policy.', 'not-found':'The requested catalog entry does not exist.',
   'revision-conflict':'Reload the playlist and apply edits to its current revision.', 'asset-referenced':'Remove playlist entries and release retained sessions before deleting this asset.',
   busy:'Close the other library owner before opening this storage directory.', closed:'Open a library before making requests.',

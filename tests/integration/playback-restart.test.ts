@@ -11,7 +11,7 @@ import {FakeDeviceAdapter} from '@pixoo/device';
 import {ManualClock} from '../helpers/manual-clock.js';
 import {gifFixture} from '../helpers/media-fixtures.js';
 
-it('recovers a killed process paused with retained media and a fresh full dwell',async()=>{
+it.each([false,true])('recovers a killed process paused with retained media and a fresh full dwell; temporary=%s',async temporary=>{
  const directory=await mkdtemp(join(tmpdir(),'pixoo-player-restart-'));
  let library=await Library.open({directory});let player:Player|undefined;
  try{
@@ -27,12 +27,12 @@ it('recovers a killed process paused with retained media and a fresh full dwell'
     const library=await Library.open({directory:${JSON.stringify(directory)}});
     const player=await Player.open({store:new LibraryPlaybackStore(library),device:new FakeDeviceAdapter()});
     globalThis.runtime={library,player};
-    await player.start(${JSON.stringify(playlist.id)});
+    await player.${temporary?'showMedia':'start'}(${JSON.stringify(temporary?imported.rendition.id:playlist.id)});
     const timer=setInterval(async()=>{
       if(player.getState().state!=='playing')return;
       clearInterval(timer);
       const record=await library.getPlaybackCheckpoint();
-      await library.deletePlaylist(record.snapshot.id,record.snapshot.revision);
+      await library.deletePlaylist(${JSON.stringify(playlist.id)},2);
       global.gc();process.send(record);
       setInterval(()=>{},1000);
     },10);
@@ -47,6 +47,7 @@ it('recovers a killed process paused with retained media and a fresh full dwell'
     });
   }finally{if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}}
   expect(record.state).toBe('playing');expect(record.intent).toBe('active');
+  if(temporary)expect(record.source).toEqual({kind:'media',assetId:imported.asset.id,renditionId:imported.rendition.id});
   expect(JSON.stringify(record)).not.toMatch(/deadline|ReadyAt|startedAt/);
   library=await Library.open({directory});const clock=new ManualClock(),device=new FakeDeviceAdapter({clock});
   player=await Player.open({store:new LibraryPlaybackStore(library),device,clock});

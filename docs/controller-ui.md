@@ -71,3 +71,8 @@ a normal playback event cannot silently discard a Stop click. A backend identity
 change still requires refreshed labels and a fresh action. If an HTTP shutdown
 response permanently closes the browser event stream, the UI recreates that
 stream after three seconds while controls remain unavailable.
+
+Temporary single-media context shows the asset name and "Temporary media session".
+"Restart with changes" is disabled because there is no saved playlist revision
+to reload. The other controls retain their normal behavior. Saved sessions keep
+the session/saved revision labels.
