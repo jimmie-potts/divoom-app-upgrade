@@ -21,3 +21,5 @@ decisions have not been finalized by the repository bootstrap.
 - [ADR 0008: Local controller API and replay identity](decisions/0008-controller-api.md)
 
 - [ADR 0009: Browser state and command recovery](decisions/0009-controller-ui.md) records draft ownership, reconnect and command identity handling.
+
+- [ADR 0010: Shared agent-device-hub adoption](decisions/0010-shared-agent-device-hub.md)

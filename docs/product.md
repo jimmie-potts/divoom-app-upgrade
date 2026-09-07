@@ -49,3 +49,12 @@ The [hardware evidence](hardware-validation.md) records a bounded Pixoo64 smoke
 test with unknown firmware and early loading screens. Broader limits, precise
 play counts and phone access remain unverified.
 The handoff's six follow-on areas remain deferred GitHub issues.
+
+
+## Shared agent monitoring direction
+
+The accepted [hub integration plan](hub-integration.md) uses shared provider
+qualification, agent state and controller/MCP contracts from agent-device-hub.
+Pixoo owns consumer integration, media/playback, its 64x64 renderer and one
+device writer. The first shared core can run in this backend; a standalone hub
+requires a separate ownership migration. These capabilities remain planned.

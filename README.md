@@ -70,3 +70,5 @@ and status. [Product direction](docs/product.md) links the preserved handoff,
 [reviewed foundation requirements](openspec/specs/application-foundation/spec.md),
 and future work. [Decisions](docs/decisions.md) records accepted architecture.
 Source delivery, app installation, and physical acceptance remain separate.
+
+[Shared monitoring direction](docs/hub-integration.md) records the planned hub integration and its GitHub dependencies. It changes no current simulator behavior.

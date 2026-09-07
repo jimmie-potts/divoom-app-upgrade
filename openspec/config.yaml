@@ -8,6 +8,9 @@ context: |
   local startup and readiness. Device-adapter covers the fake; the HTTP spike is
   separately invoked. Media rendering and SQLite media/playlist persistence are backend libraries;
   playback has paused recovery; simulator HTTP/SSE routes integrate the backend. The controller UI exposes those routes. Secure LAN deployment remains future work.
+  Future shared agent monitoring follows docs/hub-integration.md and the hub's
+  canonical contracts. Pixoo owns consumer composition/rendering and its writer;
+  shared state first embeds here, with standalone hosting separately planned.
   Physical evidence is scoped to the dated hardware-validation record.
   Use this worktree's planning root and npm run openspec -- <arguments>.
   Default to simulator. Preserve originals/private state and one serialized
