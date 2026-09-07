@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { LibraryError, hashSchema, idSchema, itemsSchema, nameSchema, revisionSchema, validate,
   type Asset, type ImportResult, type ItemInput, type Playlist, type PlaylistItem, type SessionReference } from './contracts.js';
 import { acquireOwner, cleanup, databaseFile, recoverStaging } from './files.js';
+import {checkpointSchema,createCheckpoint,readCheckpoint,saveCheckpoint,clearCheckpoint,type PlaybackCheckpoint} from './checkpoint.js';
 import { migrate, transaction } from './migrations.js';
 
 type RenderOptions = NonNullable<Parameters<MediaStore['render']>[1]>;
@@ -90,6 +91,14 @@ export class Library {
       const stored = this.manifest(id), actual = await this.media.getRendition(id);
       if(JSON.stringify(stored)!==JSON.stringify(actual)) throw new LibraryError('catalog-corrupt');
       return actual;
+    });
+  }
+  async readRendition(id:string,signal?:AbortSignal):Promise<{rendition:Rendition;frames:Buffer[]}> {
+    validate(hashSchema,id);
+    return this.run(async()=>{
+      const stored=this.manifest(id),loaded=await this.media.readFrames(id,signal);
+      if(JSON.stringify(stored)!==JSON.stringify(loaded.rendition))throw new LibraryError('catalog-corrupt');
+      return loaded;
     });
   }
   async readFrame(id:string,index:number,format:'rgb'|'png'):Promise<Buffer> {
@@ -222,6 +231,17 @@ export class Library {
     return this.run(()=>transaction(this.db,()=>{this.expected(id,revision);this.db.prepare('DELETE FROM playlists WHERE id=?').run(id);}));
   }
 
+  async createPlaybackCheckpoint(playlistId:string):Promise<PlaybackCheckpoint> {
+    validate(idSchema,playlistId);
+    return this.run(()=>transaction(this.db,()=>createCheckpoint(this.db,this.playlist(playlistId))));
+  }
+  getPlaybackCheckpoint():Promise<PlaybackCheckpoint|undefined> {return this.run(()=>readCheckpoint(this.db));}
+  async savePlaybackCheckpoint(record:PlaybackCheckpoint):Promise<void> {
+    record=validate(checkpointSchema,record);
+    return this.run(()=>transaction(this.db,()=>saveCheckpoint(this.db,record)));
+  }
+  clearPlaybackCheckpoint():Promise<void> {return this.run(()=>transaction(this.db,()=>clearCheckpoint(this.db)));}
+
   async retainSession(renditionIds:string[]):Promise<SessionReference> {
     renditionIds = validate(z.array(hashSchema).min(1).max(1000),renditionIds);
     return this.run(()=>transaction(this.db,()=>{
@@ -240,7 +260,10 @@ export class Library {
   }
   async releaseSession(id:string):Promise<void> {
     validate(idSchema,id);
-    return this.run(()=>{this.db.prepare('DELETE FROM sessions WHERE id=?').run(id);});
+    return this.run(()=>{
+      if(this.db.prepare('SELECT slot FROM playback_checkpoint WHERE session_id=?').get(id))throw new LibraryError('checkpoint-owned');
+      this.db.prepare('DELETE FROM sessions WHERE id=?').run(id);
+    });
   }
   async deleteAsset(id:string):Promise<void> {
     validate(idSchema,id);

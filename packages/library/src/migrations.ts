@@ -17,6 +17,9 @@ export const MIGRATIONS=[
     CREATE TABLE session_refs(session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, rendition_id TEXT NOT NULL REFERENCES renditions(id) ON DELETE RESTRICT, PRIMARY KEY(session_id,rendition_id));
     CREATE INDEX session_rendition ON session_refs(rendition_id);
   `},
+  {version:3,sql:`
+    CREATE TABLE playback_checkpoint(slot INTEGER PRIMARY KEY CHECK(slot=1), session_id TEXT NOT NULL UNIQUE REFERENCES sessions(id) ON DELETE RESTRICT, payload TEXT NOT NULL);
+  `},
 ] as const;
 export function transaction<T>(db:DatabaseSync,action:()=>T):T {
   db.exec('BEGIN IMMEDIATE');

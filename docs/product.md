@@ -21,9 +21,9 @@ shuffle disabled, fit with black padding, and nearest-neighbor scaling. Handoff
 sections 5-8 define proposed contracts and evidence boundaries. In particular,
 three plays means three total executions; playback timing is estimated from
 rendered frame delays. Pause stops advancement, resume restarts the item, and
-stop leaves the last content displayed. The full controls, immutable playback
-snapshot, generation cancellation, shuffle history, and recovery semantics remain
-in section 6 and must be carried into issue-linked specs before implementation.
+stop leaves the last content displayed. The [playback specification](../openspec/specs/playlist-playback/spec.md) now
+defines controls, immutable snapshots, generation cancellation, shuffle history
+and paused recovery for the backend library.
 
 GitHub issues own delivery acceptance criteria and dependencies. Translate their
 outcomes into observable OpenSpec scenarios as each feature becomes ready, linking
@@ -38,7 +38,8 @@ remaining handoff capabilities are proposed behavior, not implementation evidenc
 
 The application serves a simulator status page and health API. The media
 package renders files, and the library package persists metadata and playlists.
-Media-library UI and playback remain future work. M1 separates simulator/adapter source work
+The playback package orchestrates immutable sessions and paused recovery.
+Media-library/player UI and HTTP integration remain future work. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;

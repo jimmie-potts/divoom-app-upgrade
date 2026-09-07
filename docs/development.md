@@ -96,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering and library-persistence.
+The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence and playlist-playback.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -112,7 +112,8 @@ The process handles SIGINT/SIGTERM and preserves external files at shutdown.
 
 The library package supplies [SQLite persistence](library-persistence.md) for
 media, playlists and session retention. Startup does not open this library yet;
-the application has no player or LAN mode. The media package supplies
+the player is a [separate backend library](playback.md), and LAN mode remains
+future work. The media package supplies
 [bounded decoding, immutable frames and previews](media-rendering.md). The device package
 provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
 failure and cancellation tests. The independently written [HTTP spike](protocol-spike.md) uses Node HTTP and

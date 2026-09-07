@@ -3,7 +3,8 @@
 `@pixoo/media` accepts streamed PNG, JPEG and GIF bytes and returns immutable
 64x64 renditions. It is a backend library. [The library package](library-persistence.md)
 owns database metadata, playlists and deletion policies. HTTP upload routes,
-UI and playback belong to later issues.
+UI belongs to later issues; the [playback package](playback.md) consumes effective
+frames through the library store.
 No renderer call contacts a device.
 
 ## Use the library
@@ -35,7 +36,9 @@ cannot keep the media job or its partial files alive after the job deadline.
 profile, renderer version, ordered frame hashes/delays and timing warnings.
 `initialize` prepares private storage without rendering. `getRendition` reads
 and verifies an existing manifest, its original and cached frames. `readFrame`
-returns a fresh buffer. PNG previews encode the exact effective RGB
+returns a fresh buffer. `readFrames(id, signal?)` loads a verified rendition and
+its complete RGB buffers without validating the entire cache once per frame.
+PNG previews encode the exact effective RGB
 bytes; consumers use the manifest's ordered delays to animate them. No separate
 preview resampling or source-GIF replay is involved. Originals stay byte-identical.
 

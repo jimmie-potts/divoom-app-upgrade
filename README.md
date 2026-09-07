@@ -4,8 +4,7 @@ A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
 The current build serves a responsive simulator status page and a readiness API.
 The media package renders bounded PNG/JPEG/GIF uploads into immutable frames and
 previews. The library package persists media metadata and revisioned playlists
-with reference-safe deletion. Upload routes, playlist UI and playback follow in
-later issues. The
+with reference-safe deletion. The playback package runs playlists and restores paused sessions. Upload routes and player UI follow in later issues. The
 [Pixoo64 smoke test](docs/hardware-validation.md) passed its narrow profile.
 [Opt-in protocol tools](docs/protocol-spike.md) are separate from normal startup.
 
@@ -56,11 +55,12 @@ failure/retry. All tests use isolated data without a device. See
 [development](docs/development.md) for individual commands and platform details,
 [dependency licenses](docs/dependencies.md), and [the SDLC](docs/sdlc.md) for delivery.
 
-The six npm workspaces are web and server applications plus core, device,
-media and library packages. Core owns readiness validation. The device package includes a
+The seven npm workspaces are web and server applications plus core, device,
+media, library and playback packages. Core owns readiness validation. The device package includes a
 [deterministic fake adapter](docs/device-adapter.md) for complete RGB uploads,
-serialized controls, cancellation and failure tests. The media package provides [bounded rendering and immutable previews](docs/media-rendering.md). The library package provides [SQLite playlists and media retention](docs/library-persistence.md). The fake is a
-library for tests and future playback integration, not a browser player.
+serialized controls, cancellation and failure tests. The media package provides [bounded rendering and immutable previews](docs/media-rendering.md). The library package provides [SQLite playlists and media retention](docs/library-persistence.md);
+[playback](docs/playback.md) adds the backend player and recovery contract. The fake is a
+test adapter used by the backend player; browser controls remain future work.
 
 Open the repository root as a WSL project in Codex. The canonical checkout is
 `/home/jimmie/projects/divoom-app-upgrade`; work on issue branches in isolated

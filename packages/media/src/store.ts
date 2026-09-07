@@ -57,6 +57,20 @@ export class MediaStore {
     await this.verifyOriginal(root,rendition.sourceHash);
     return rendition;
   }
+  async readFrames(id:string,signal?:AbortSignal):Promise<{rendition:Rendition;frames:Buffer[]}> {
+    if(signal?.aborted)throw new MediaError('cancelled');
+    const rendition=await this.getRendition(id),root=await this.getRoot(),frames:Buffer[]=[];
+    try {
+      for(const frame of rendition.frames){
+        if(signal?.aborted)throw new MediaError('cancelled');
+        const bytes=await readFile(join(root,'renditions',id,`${frame.index}.rgb`));
+        if(hash(bytes)!==frame.rgbHash)throw new MediaError('cache-corrupt');
+        frames.push(bytes);
+      }
+      if(signal?.aborted)throw new MediaError('cancelled');
+      return {rendition,frames};
+    }catch(error){if(error instanceof MediaError)throw error;throw new MediaError('cache-corrupt');}
+  }
   private acquire(signal: AbortSignal): Promise<void> {
     if (signal.aborted) return Promise.reject(signalError(signal));
     if (this.active < this.limits.concurrency) { this.active++; return Promise.resolve(); }
