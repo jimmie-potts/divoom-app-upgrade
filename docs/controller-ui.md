@@ -65,3 +65,9 @@ physical telemetry. Authenticated HTTPS LAN deployment is separate work.
 When the backend restarts, the UI reloads its mode and active/saved settings before
 enabling controls. A click that discovers the restart must be repeated after those
 labels update; drafts and uncertain request identities remain intact.
+
+Explicit control reads are independent of event-driven presentation refreshes, so
+a normal playback event cannot silently discard a Stop click. A backend identity
+change still requires refreshed labels and a fresh action. If an HTTP shutdown
+response permanently closes the browser event stream, the UI recreates that
+stream after three seconds while controls remain unavailable.
