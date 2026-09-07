@@ -278,3 +278,19 @@ it('does not upload an uncommitted transition after checkpoint persistence fails
   expect(player.getState()).toMatchObject({state:'error',intent:'paused',dwellDeadlineMs:null});expect(device.effects).toHaveLength(effects);
  }finally{store.save=save;await player.close();}
 });
+
+it('rejects resume when an earlier queued clear removed its context',async()=>{
+ const clock=new ManualClock(),store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter({clock}),player=await Player.open({store,device,clock});
+ try{
+  await player.start(store.playlist.id);await flush(clock);
+  const uploads=device.operations.filter(operation=>operation.kind==='uploadAnimation').length;
+  const [cleared,resumed]=await Promise.allSettled([player.clear(),player.resume()]);
+  expect(cleared.status).toBe('fulfilled');
+  expect(resumed).toMatchObject({status:'rejected',reason:{code:'no-context'}});
+  await flush(clock);clock.advance(100000);await flush(clock);
+  expect(player.getState()).toMatchObject({state:'idle',intent:'stopped',sessionId:null,itemId:null,dwellDeadlineMs:null});
+  expect(player.getState().intent).not.toBe('active');
+  expect(store.record).toBeUndefined();expect(clock.pendingTimers).toBe(0);
+  expect(device.operations.filter(operation=>operation.kind==='uploadAnimation')).toHaveLength(uploads);
+ }finally{await player.close();}
+});

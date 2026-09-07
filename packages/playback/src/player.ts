@@ -80,7 +80,13 @@ export class Player {
       this.state=this.intent==='active'?'loading':this.intent==='paused'?'paused':'idle';
       await this.persist();
       if(this.valid(token)&&this.record)this.launch(token);
-    }).catch(error=>{if(token===this.epoch&&!this.closing)this.fatal(codeOf(error));throw error;});
+    }).catch(error=>{
+      if(token===this.epoch&&!this.closing){
+        if(error instanceof PlaybackError && error.code==='no-context' && !this.record){this.intent='stopped';this.state='idle';}
+        else this.fatal(codeOf(error));
+      }
+      throw error;
+    });
   }
   start(playlistId:string):Promise<void> {
     return this.dispatch(async()=>{
@@ -95,7 +101,10 @@ export class Player {
   resume():Promise<void> {
     if(!this.record)return Promise.reject(new PlaybackError('no-context'));
     if(!this.requestedScreenOn)return Promise.reject(new PlaybackError('screen-off'));
-    return this.dispatch(async()=>{this.failed.clear();this.retries=0;this.lastError=null;},'active');
+    return this.dispatch(async()=>{
+      if(!this.record)throw new PlaybackError('no-context');
+      this.failed.clear();this.retries=0;this.lastError=null;
+    },'active');
   }
   private advance(cancelDevice:boolean):Promise<void> {return this.dispatch(async()=>{this.retries=0;return this.record?next(this.record,this.random):false;},undefined,cancelDevice);}
   next():Promise<void> {return this.advance(true);}
