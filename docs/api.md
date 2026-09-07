@@ -151,3 +151,11 @@ event while it remains blocked disconnects it. Reconnect then uses replay/resync
 Shutdown ends streams before closing the player and library. These tests use local
 HTTP and fake-device state; they do not establish authenticated phone access or
 observed display timing.
+
+## Runtime diagnostics
+
+`GET /api/diagnostics` reports uptime, library readiness, simulator availability,
+player state/intent and fixed transient bounds. It uses the same host/origin and
+authentication boundary as other API reads. It excludes paths, IPs, media names
+and raw errors. Readiness is not a disk integrity scan or a hardware claim. See
+[local operations](local-operations.md) for CLI diagnostics and offline verification.

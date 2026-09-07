@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { realpath } from 'node:fs/promises';
+import { lstat, realpath } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { MediaError, MediaStore, type Rendition } from '@pixoo/media';
@@ -9,7 +9,8 @@ import { LibraryError, hashSchema, idSchema, itemsSchema, nameSchema, revisionSc
   type Asset, type ImportResult, type ItemInput, type Playlist, type PlaylistItem, type SessionReference } from './contracts.js';
 import { acquireOwner, cleanup, databaseFile, recoverStaging } from './files.js';
 import {checkpointSchema,createCheckpoint,readCheckpoint,saveCheckpoint,clearCheckpoint,type PlaybackCheckpoint} from './checkpoint.js';
-import { migrate, transaction } from './migrations.js';
+import { APPLICATION_ID, MIGRATIONS, migrate, transaction } from './migrations.js';
+import {snapshotFiles} from './snapshot.js';
 
 type RenderOptions = NonNullable<Parameters<MediaStore['render']>[1]>;
 type Row = Record<string, unknown>;
@@ -23,10 +24,11 @@ export class Library {
   private closed?:Promise<void>;
   private constructor(private db:DatabaseSync, private owner:DatabaseSync, private media:MediaStore, private mediaDirectory:string) {}
 
-  static async open(options:{directory:string}):Promise<Library> {
+  static async open(options:{directory:string;requireExisting?:boolean}):Promise<Library> {
     let db:DatabaseSync|undefined, owner:DatabaseSync|undefined;
     try {
       if(!options || typeof options.directory !== 'string') throw new LibraryError('invalid-input');
+      if(options.requireExisting && !(await lstat(join(options.directory,'catalog.sqlite'))).isFile())throw new LibraryError('catalog-corrupt');
       const media = new MediaStore({directory:join(options.directory,'media')});
       await media.initialize();
       const mediaDirectory = await realpath(join(options.directory,'media'));
@@ -35,6 +37,11 @@ export class Library {
       const database = join(directory,'catalog.sqlite');
       await databaseFile(database);
       db = new DatabaseSync(database,{timeout:1000,enableForeignKeyConstraints:true,allowExtension:false});
+      if(options.requireExisting){
+        const app=db.prepare('PRAGMA application_id').get()!.application_id;
+        const version=Number(db.prepare('PRAGMA user_version').get()!.user_version);
+        if(app!==APPLICATION_ID || version<1 || version>MIGRATIONS.length)throw new LibraryError('catalog-corrupt');
+      }
       db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF');
       migrate(db);
       await cleanup(db,mediaDirectory);
@@ -60,6 +67,12 @@ export class Library {
   close():Promise<void> {
     this.closing = true;
     return this.closed ??= this.tail.then(()=>{try {this.db.close();} finally {this.owner.close();}});
+  }
+
+  /** Offline tooling keeps this owner open across inventory, snapshot and copying. */
+  verifyStorage():Promise<string[]> {return this.run(()=>snapshotFiles(this.db,this.media));}
+  snapshotDatabase(destination:string):Promise<void> {
+    return this.run(()=>{this.db.prepare('VACUUM INTO ?').run(destination);});
   }
 
   private asset(row:Row|undefined):Asset {
