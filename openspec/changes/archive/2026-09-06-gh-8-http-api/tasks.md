@@ -7,7 +7,7 @@
 
 - [x] 2.1 Add request identity reservation, replay/conflict handling and authoritative snapshots; prove concurrent replay, expiration and restart rejection.
 - [x] 2.2 Add player subscriptions and bounded SSE replay/resync; prove real HTTP reconnect, backpressure/shutdown and continued backend playback.
-- [x] 2.3 Add persisted validated device settings and simulator controls; prove arbitrary destinations are rejected and fake observations remain separate from health.
+- [x] 2.3 Add persisted validated device settings and simulator controls; prove arbitrary destinations are rejected, runtime recording is disabled, and fake observations remain separate from health.
 
 ## 3. Startup and delivery validation
 

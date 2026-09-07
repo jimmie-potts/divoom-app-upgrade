@@ -10,7 +10,7 @@ import {join} from 'node:path';
 import {catalogRoutes} from './catalog-routes.js';
 export async function registerApi(app:FastifyInstance,dataDir:string):Promise<void> {
  const library=await Library.open({directory:join(dataDir,'library')});
- const device=new FakeDeviceAdapter();let player:Player;
+ const device=new FakeDeviceAdapter({recordHistory:false});let player:Player;
  try{player=await Player.open({store:new LibraryPlaybackStore(library),device});}catch(error){await library.close();throw error;}
  app.addHook('onClose',async()=>{try{await player.close();}finally{await library.close();}});
  let changed=()=>{};

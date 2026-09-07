@@ -17,7 +17,9 @@
 
 ### Modified Capabilities
 
-None. Foundation readiness and simulator-only binding remain intact; new routes compose existing library and playback contracts.
+- `device-adapter`: allow explicitly disabling diagnostic history for long-lived simulator use while preserving default test recording.
+
+Foundation readiness and simulator-only binding remain intact; new routes compose existing library and playback contracts.
 
 ## Impact
 

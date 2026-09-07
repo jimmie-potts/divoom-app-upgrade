@@ -4,6 +4,8 @@ The local Fastify server opens the private library and one simulator player at
 startup. Existing sessions restore paused. All routes are under `/api`; the
 browser status page remains unchanged. Library and player screens are later work.
 No route activates a physical adapter, even after saving a device IP.
+Startup disables fake-adapter frame/operation recording so repeated playback
+does not retain an ever-growing test history.
 
 ## Request security and errors
 

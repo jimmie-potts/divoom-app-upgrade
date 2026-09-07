@@ -1,21 +1,4 @@
-# Device adapter Specification
-
-## Purpose
-
-Provide a deterministic device boundary for simulator-backed rendering and playback development while keeping physical display evidence separate.
-
-## Requirements
-
-### Requirement: Typed simulator operations and timing
-The adapter SHALL expose probe, animation upload, brightness and screen operations with typed success/failure results. Results SHALL carry generation, submission/start/completion times and separate queue/service durations from an injectable monotonic clock. Upload success SHALL report an estimated ready time, never a hardware playback event. This covers issue #3 criterion 1.
-
-#### Scenario: Simulator readiness
-- **WHEN** a fake probe succeeds
-- **THEN** its result identifies simulator availability and no physical connection
-
-#### Scenario: Loading estimate
-- **WHEN** an upload completes after artificial latency
-- **THEN** its timing separates queue wait and upload time, and its ready estimate includes the configured additional ready delay without claiming visible playback
+## MODIFIED Requirements
 
 ### Requirement: Complete immutable RGB transactions
 The adapter SHALL accept nonempty animations of complete 64 by 64 frames, each containing 12288 row-major RGB bytes and a positive finite integer effective delay in milliseconds. It SHALL reject invalid frames and controls before recording effects, preserve all frames/delays, and snapshot accepted input before asynchronous work. Brightness SHALL be an integer from 0 through 100; screen state SHALL be boolean. Records returned for inspection SHALL not permit mutation of adapter-owned state. Diagnostic frame and operation history SHALL be enabled by default. A runtime SHALL be able to explicitly disable history, leaving inspection records empty while preserving accepted frames, operation results, FIFO ordering, timing and cancellation. This covers criteria 1 and 3; the runtime option also supports issue #8 bounded simulator startup. These are application contracts, not firmware limits.
