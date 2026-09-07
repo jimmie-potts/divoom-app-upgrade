@@ -28,6 +28,20 @@ export class Player {
   private closePromise:Promise<void>|undefined;
   private requestedScreenOn=true;
   private screenSequence=0;
+  private requestedBrightness:number|null=null;
+  private evidence:{brightness:{acknowledged:{value:number;atMs:number}|null;observed:{value:number;atMs:number}|null};screen:{acknowledged:{value:boolean;atMs:number}|null;observed:{value:boolean;atMs:number}|null};transport:{source:string;atMs:number;ok:boolean;priorEffects:'none'|'possible'}|null}={brightness:{acknowledged:null,observed:null},screen:{acknowledged:null,observed:null},transport:null};
+  getDisplayEvidence(){return structuredClone({requestedBrightness:this.requestedBrightness,requestedScreenOn:this.requestedScreenOn,...this.evidence});}
+  private observeResult<T>(result:OperationResult<T>,generation:number,source:string):void {
+    if(generation!==this.adapterGeneration||this.closing)return;
+    this.evidence.transport={source,atMs:result.timing.completedAtMs,ok:result.ok,priorEffects:result.ok?'none':result.priorEffects};
+  }
+  private observeProbe(result:Awaited<ReturnType<DeviceAdapter['probe']>>,generation:number):void{
+    this.observeResult(result,generation,'probe');
+    if(generation!==this.adapterGeneration||this.closing||!result.ok||result.value.mode!=='device')return;
+    const atMs=result.timing.completedAtMs;
+    this.evidence.brightness.observed=result.value.brightness===undefined?null:{value:result.value.brightness,atMs};
+    this.evidence.screen.observed=result.value.screenOn===undefined?null:{value:result.value.screenOn,atMs};
+  }
   private readyAt:number|null=null;
   private deadline:number|null=null;
   private lastError:PlaybackCheckpoint['lastError']=null;
@@ -139,12 +153,17 @@ export class Player {
     if(this.closing)throw new PlaybackError('closed');
     const generation=this.adapterGeneration;
     const result=await this.device.probe({generation,timeoutMs:this.operationTimeoutMs});
+    this.observeProbe(result,generation);
     await this.observedControl(result,generation);return result;
   }
   async setBrightness(percent:number):Promise<OperationResult<void>> {
+    if(!Number.isInteger(percent)||percent<0||percent>100)throw new PlaybackError('invalid-input');
     if(this.closing)throw new PlaybackError('closed');
     const generation=this.adapterGeneration;
+    this.requestedBrightness=percent;
     const result=await this.device.setBrightness(percent,{generation,timeoutMs:this.operationTimeoutMs});
+    this.observeResult(result,generation,'brightness');
+    if(generation===this.adapterGeneration&&!this.closing&&result.ok)this.evidence.brightness.acknowledged={value:percent,atMs:result.timing.completedAtMs};
     await this.observedControl(result,generation);return result;
   }
   async setScreen(on:boolean):Promise<OperationResult<void>|undefined> {
@@ -158,6 +177,8 @@ export class Player {
     await this.queue(async()=>{if(token===this.epoch)await this.persist();});
     if(token!==this.epoch || sequence!==this.screenSequence || this.closing)return undefined;
     const result=await this.device.setScreen(on,{generation,timeoutMs:this.operationTimeoutMs});
+    this.observeResult(result,generation,'screen');
+    if(generation===this.adapterGeneration&&!this.closing&&result.ok)this.evidence.screen.acknowledged={value:on,atMs:result.timing.completedAtMs};
     await this.observedControl(result,generation);
     return result;
   }
@@ -207,6 +228,7 @@ export class Player {
   }
   private async uploaded(token:number,result:OperationResult<UploadResult>,duration:number):Promise<void> {
     if(!this.valid(token))return;
+    this.observeResult(result,this.adapterGeneration,'upload');
     if(!result.ok){
       if(this.pauseOnUncertain && result.priorEffects==='possible'){this.pauseUncertain(result.code);await this.persist();return;}
       if(connectivityErrors.has(result.code)){await this.recover(token,result.code);return;}
@@ -246,6 +268,7 @@ export class Player {
       const signal=this.abort.signal,generation=this.adapterGeneration;
       void this.device.probe({generation,signal,timeoutMs:this.operationTimeoutMs}).then(result=>{
         this.background(token,async()=>{
+          this.observeProbe(result,generation);
           if(result.ok){this.availability='available';this.state='loading';await this.persist();if(this.valid(token))this.launch(token);}
           else if(result.code==='stale-generation'||result.code==='cancelled'){this.intent='paused';this.state='paused';this.lastError={code:'external-control'};await this.persist();}
           else await this.recover(token,result.code);

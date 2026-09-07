@@ -23,7 +23,8 @@
     "device:smoke": "node scripts/device-spike.mjs",
     "backup": "node apps/server/dist/operations-cli.js backup",
     "restore": "node apps/server/dist/operations-cli.js restore",
-    "diagnostics": "node apps/server/dist/operations-cli.js diagnostics"
+    "diagnostics": "node apps/server/dist/operations-cli.js diagnostics",
+    "mcp:credentials": "node apps/server/dist/mcp-cli.js"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.12.0",
@@ -34,7 +35,8 @@
     "@eslint/js": "10.0.1",
     "typescript-eslint": "8.69.0",
     "globals": "16.5.0",
-    "@types/node": "24.13.3"
+    "@types/node": "24.13.3",
+    "@modelcontextprotocol/sdk": "1.30.0"
   },
   "type": "module",
   "workspaces": [

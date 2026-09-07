@@ -11,6 +11,8 @@
     "@pixoo/library": "0.0.0",
     "@pixoo/media": "0.0.0",
     "@pixoo/playback": "0.0.0",
-    "fastify": "5.12.3"
+    "fastify": "5.12.3",
+    "@jimmie-potts/device-mcp": "file:../../vendor/jimmie-potts-device-mcp-1.0.0.tgz",
+    "zod": "4.5.4"
   }
 }

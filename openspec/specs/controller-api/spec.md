@@ -19,7 +19,7 @@ The API SHALL expose the handoff section 5 media, playlist, device configuration
 - **THEN** the API returns a typed error and preserves existing originals, playlists and retained sessions
 
 ### Requirement: Concurrency and command identity
-Playlist mutations SHALL require an expected revision. Player commands SHALL use a server-issued epoch and monotonically sequenced request identity. Concurrent matching replays SHALL share the same result; different payloads at one identity SHALL conflict. Old or expired identities SHALL never execute again, including after restart. Trace: issue #8 criteria 2 and 5.
+Playlist mutations SHALL require an expected revision. Player and display commands SHALL use a server-issued epoch and monotonically sequenced request identity shared across HTTP and MCP entry points. Concurrent matching replays SHALL share the same retained application outcome; different payloads at one identity SHALL conflict. Old or expired identities SHALL never execute again, including after restart. The last 256 completed outcomes SHALL be retained; pending work SHALL not be evicted as completed history. Trace: issue #8 criteria 2 and 5 and [issue #24](https://github.com/jimmie-potts/divoom-app-upgrade/issues/24), shared-service and replay criteria.
 
 #### Scenario: Stale editor
 - **WHEN** two clients edit the same playlist revision
@@ -28,6 +28,11 @@ Playlist mutations SHALL require an expected revision. Player commands SHALL use
 #### Scenario: Command replay and restart
 - **WHEN** clients replay a command, use its identity for a different command, or submit an identity from a previous server lifetime
 - **THEN** the matching retained replay returns its original result and conflicting or expired requests are rejected without another action
+
+#### Scenario: Cross-transport display replay
+- **WHEN** an HTTP caller and an MCP caller submit the same canonical display command and request identity in either arrival order
+- **THEN** only one display operation executes and each caller receives its existing transport projection of that same outcome
+- **AND** a retained failed outcome does not execute again on replay
 
 ### Requirement: Authoritative live state
 Player snapshots SHALL expose session identity, captured playlist revision and immutable session data, playback intent, adapter availability and estimated timing. SSE SHALL identify each event by server epoch and sequence, replay retained events, and send a full resync when history is unavailable. Stream disconnection SHALL not stop playback. Snapshots SHALL include a server monotonic sample in the same clock domain as timing deadlines so clients can estimate remaining time without comparing unrelated clocks. Trace: issue #8 criteria 2, 3 and 5 and issue #42 criteria 3-5.
@@ -42,15 +47,20 @@ Player snapshots SHALL expose session identity, captured playlist revision and i
 - **THEN** restart opens the existing session paused with a new server epoch and shutdown closes streams and persistence without deleting data
 
 ### Requirement: Local request security
-The server SHALL remain loopback-only and validate the exact listener host/port and any Origin. Unsafe requests SHALL require same-origin evidence or an explicit non-simple request header. Cross-site requests and arbitrary forwarded hosts SHALL not authorize access. An authentication hook SHALL gate API reads, writes and streams before effects when configured. Trace: issue #8 criteria 4 and 5.
+The server SHALL remain loopback-only and validate the exact listener host/port and any Origin. Unsafe HTTP API requests SHALL require same-origin evidence or an explicit non-simple request header. Only the explicitly enabled authenticated `/mcp` endpoint SHALL allow native mutations without that browser request header or an Origin. Cross-site requests and arbitrary forwarded hosts SHALL not authorize access. An authentication hook SHALL gate API reads, writes and streams before effects when configured. Trace: issue #8 criteria 4 and 5 and issue #24, authentication criterion.
 
 #### Scenario: Untrusted caller
-- **WHEN** a caller supplies a foreign host/origin, cross-site fetch metadata or a simple mutation without origin evidence
+- **WHEN** a caller supplies a foreign host/origin, cross-site fetch metadata or a simple API mutation without origin evidence
 - **THEN** the server rejects the request without storage or player effects
 
 #### Scenario: Authentication hook
 - **WHEN** the configured authentication hook denies or fails
 - **THEN** API data and effects remain unavailable, including event streams, with sanitized errors
+
+#### Scenario: Native exception remains local to MCP
+- **WHEN** an authenticated native MCP client omits an Origin and browser request header
+- **THEN** it can access the enabled MCP route
+- **AND** the same omission remains forbidden for unsafe HTTP API requests
 
 ### Requirement: Explicit device targets and bounded work
 Saved device settings SHALL accept only an explicit canonical private IPv4 address and supported fixed profile with bounded model/firmware notes. Simulator mode SHALL never activate hardware from saved settings. All physical HTTP transport SHALL remain fixed to port 80 and /post and reject redirects. HTTP admission, multipart bytes/parts, JSON bodies, command receipt history, event history and stream clients SHALL be bounded. Trace: issue #8 criteria 3-5 and issue #42 criteria 1-3.

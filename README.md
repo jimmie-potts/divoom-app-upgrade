@@ -10,6 +10,11 @@ with reference-safe deletion. The playback package runs playlists and restores p
 [Pixoo64 smoke test](docs/hardware-validation.md) passed its narrow profile.
 [Opt-in protocol tools](docs/protocol-spike.md) are separate from normal startup.
 
+The optional [local MCP endpoint](docs/local-mcp.md) exposes status, brightness and
+screen controls to authenticated local clients. It is disabled by default and
+uses the same application writer as the browser. Source delivery does not
+configure Codex or establish physical acceptance.
+
 ## Run the simulator
 
 Use Node 24 and npm. With nvm, run `nvm install` and `nvm use` from the root.

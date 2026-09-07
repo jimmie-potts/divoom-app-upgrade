@@ -6,6 +6,8 @@ import {PIXOO64_SMOKE_PROFILE,SIMULATOR_PROFILE} from '@pixoo/media';
 import {deviceRoutes} from './device-routes.js';
 import {Events} from './events.js';
 import {Commands} from './commands.js';
+import {ControlService} from './control-service.js';
+import {registerMcp} from './mcp.js';
 import {playerRoutes} from './player-routes.js';
 import {join} from 'node:path';
 import {catalogRoutes} from './catalog-routes.js';
@@ -14,6 +16,7 @@ import {diagnosticsSchema} from '@pixoo/core';
 import {loadRuntimeSelection,selectRuntime,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
 import {acquireDeviceOwner} from './device-owner.js';
 export interface ApiRuntimeOptions {
+ mcpEnabled?:boolean;
  mode?:RuntimeMode;
  runtime?:RuntimeSelection;
  transportForTests?:DeviceTransport;
@@ -43,13 +46,14 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
     logging:{persistent:false},limits:{requests:32,eventClients:16,eventHistory:32,commandReceipts:256,playbackRenditions:2}});
   });
   let changed=()=>{};
-  const commands=new Commands(),snapshot=playerRoutes(app,active,commands,()=>changed());
+  const commands=new Commands(),service=new ControlService(active,commands,runtime.mode),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
+  if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
   app.addHook('preClose',async()=>{
    unsubscribe();events.close();
    try{await active.close();}finally{await physical?.close();}
   });
-  await deviceRoutes(app,dataDir,active,commands,snapshot,changed,runtime);
+  await deviceRoutes(app,dataDir,active,changed,runtime,service);
   await catalogRoutes(app,library,profile);
   app.addHook('onClose',close);
   return observed;

@@ -5,16 +5,16 @@ import type {FastifyInstance} from 'fastify';
 import type {OperationResult} from '@pixoo/device';
 import type {Player} from '@pixoo/playback';
 import {SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE} from '@pixoo/media';
-import {deviceConfiguration,displayCommand,emptyRequest} from '@pixoo/core';
-import {Commands} from './commands.js';
+import {deviceConfiguration,emptyRequest} from '@pixoo/core';
 import {parse} from './validation.js';
+import {ControlService,requireDisplaySuccess} from './control-service.js';
 import {ApiError} from './security.js';
 import type {RuntimeSelection} from './device-settings.js';
 function result<T>(value:OperationResult<T>|undefined):T {
  if(!value)throw new ApiError('cancelled',409);
  if(!value.ok)throw new ApiError(value.code,value.code==='invalid-input'?400:503,{priorEffects:value.priorEffects});return value.value;
 }
-export async function deviceRoutes(app:FastifyInstance,directory:string,player:Player,commands:Commands,snapshot:()=>unknown,changed:()=>void,runtime:RuntimeSelection):Promise<void>{
+export async function deviceRoutes(app:FastifyInstance,directory:string,player:Player,changed:()=>void,runtime:RuntimeSelection,service:ControlService):Promise<void>{
  const path=join(directory,'device.json');let configuration=runtime.savedConfiguration;
  let tail=Promise.resolve();
  const status=()=>{const availability=player.getState().availability;return {configuration,activeConfiguration:runtime.activeConfiguration,
@@ -34,11 +34,8 @@ export async function deviceRoutes(app:FastifyInstance,directory:string,player:P
   parse(emptyRequest,request.body??{});
   return result(await player.probe());
  });
- app.patch('/api/device/display',request=>{
-  const body=parse(displayCommand,request.body);
-  return commands.execute(body.requestId,['display',body],async()=>{
-   result(body.screenOn!==undefined?await player.setScreen(body.screenOn):await player.setBrightness(body.brightness!));return snapshot();
-  }).finally(changed);
+ app.patch('/api/device/display',async request=>{
+  try{const outcome=await service.display(request.body);requireDisplaySuccess(outcome.operation);return outcome.snapshot;}finally{changed();}
  });
  app.addHook('onClose',()=>tail);
 }

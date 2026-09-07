@@ -9,6 +9,7 @@ export interface RuntimeConfig extends RuntimeSelection {
   host: '127.0.0.1';
   port: number;
   dataDir: string;
+  mcpEnabled?:boolean;
 }
 interface ConfigContext { root?: string; home?: string; platform?: string }
 
@@ -59,6 +60,7 @@ export async function loadConfig(
   if (env.PIXOO_MODE !== undefined && env.PIXOO_MODE !== 'simulator' && env.PIXOO_MODE !== 'device') {
     throw new Error('PIXOO_MODE must be simulator or device');
   }
+  if(env.PIXOO_MCP_ENABLED!==undefined&&env.PIXOO_MCP_ENABLED!=='1')throw new Error('PIXOO_MCP_ENABLED must be 1 or absent');
   const rawPort = env.PIXOO_PORT ?? '8787';
   if (!/^\d+$/.test(rawPort) || Number(rawPort) > 65535) {
     throw new Error('PIXOO_PORT must be an integer from 0 through 65535');
@@ -80,5 +82,5 @@ export async function loadConfig(
   const probe = await mkdtemp(join(dataDir, '.pixoo-write-check-'));
   try { await writeFile(join(probe, 'probe'), ''); }
   finally { await rm(probe, { recursive: true, force: true }); }
-  return Object.freeze({ host: '127.0.0.1', port: Number(rawPort), dataDir, ...await loadRuntimeSelection(dataDir,env.PIXOO_MODE??'simulator') });
+  return Object.freeze({ host: '127.0.0.1', port: Number(rawPort), dataDir, ...(env.PIXOO_MCP_ENABLED==='1'?{mcpEnabled:true}:{}), ...await loadRuntimeSelection(dataDir,env.PIXOO_MODE??'simulator') });
 }

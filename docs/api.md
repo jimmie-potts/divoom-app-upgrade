@@ -169,3 +169,13 @@ player state/intent and fixed transient bounds. It uses the same host/origin and
 authentication boundary as other API reads. It excludes paths, IPs, media names
 and raw errors. Readiness is not a disk integrity scan or a hardware claim. See
 [local operations](local-operations.md) for CLI diagnostics and offline verification.
+
+## Local MCP bindings
+
+The optional authenticated `/mcp` route uses the [shared local MCP module](local-mcp.md).
+HTTP and MCP display commands share canonical input, one request sequence and
+the same retained outcome. HTTP responses retain their existing shape; MCP
+selects bounded identity, timing and evidence fields without captured playlists.
+The Originless browser-header exception applies only to the enabled `/mcp` route,
+which requires its own current bearer credential. API routes keep their existing
+Host, Origin, fetch-metadata and request-header checks.
