@@ -61,3 +61,7 @@ transport request through the player. Device transport starts unknown and report
 observed availability; visible output remains unverified. Brightness and screen controls
 share the backend's serialized writer with playback. Requested values are not
 physical telemetry. Authenticated HTTPS LAN deployment is separate work.
+
+When the backend restarts, the UI reloads its mode and active/saved settings before
+enabling controls. A click that discovers the restart must be repeated after those
+labels update; drafts and uncertain request identities remain intact.

@@ -45,7 +45,10 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   let changed=()=>{};
   const commands=new Commands(),snapshot=playerRoutes(app,active,commands,()=>changed());
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
-  app.addHook('preClose',async()=>{unsubscribe();events.close();});
+  app.addHook('preClose',async()=>{
+   unsubscribe();events.close();
+   try{await active.close();}finally{await physical?.close();}
+  });
   await deviceRoutes(app,dataDir,active,commands,snapshot,changed,runtime);
   await catalogRoutes(app,library,profile);
   app.addHook('onClose',close);

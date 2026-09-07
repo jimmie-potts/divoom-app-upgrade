@@ -176,3 +176,7 @@ after killing a child process. No test contacts hardware. The
 `subscribe(listener)` returns an unsubscribe function; listeners read state on
 notifications. Observer failures do not interrupt playback. The HTTP layer uses
 these notifications for SSE and keeps command/event sequences separate.
+
+Application shutdown retires player and adapter work before waiting for HTTP
+handlers to drain. The library and target ownership stay open until those handlers
+and in-flight transport settle, so a pending control cannot send during shutdown.

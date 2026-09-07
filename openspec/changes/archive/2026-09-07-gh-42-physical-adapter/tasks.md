@@ -26,10 +26,17 @@
 Focused tests first reproduced missing runtime selection/ownership, upload skip
 and control recovery after possible effects, absent rendition-profile checks and
 hardcoded simulator UI labels. All corresponding tests pass after implementation.
-Node 24 npm run check passed: lint, typecheck, build, 222 application tests and
-10 workflow tests. All 40 desktop/mobile browser checks passed with isolated
+Node 24 npm run check passed: lint, typecheck, build, 223 application tests and
+10 workflow tests. All 46 desktop/mobile browser checks passed with isolated
 storage and fake transport responses. The browser cache and temporary directory
 were relocated after /tmp filled; no application change was needed for its
 screenshot failure. All nine specs validate strictly; the six changed specs match
 these deltas and preserve previous scenarios. Physical and local Codex acceptance
 remain with #12/#26 and require separate setup/operation authorization.
+
+Independent review reproduced stale simulator labels after a backend restart and
+shutdown waiting for HTTP handlers before cancelling device work. Regression
+tests failed before the fixes. Runtime identity now gates refreshed labels and
+controls while preserving drafts and replay identity; pre-close cancellation
+retires queued writes before handler drain and retains ownership until transport
+settles. The full checks above include both fixes.

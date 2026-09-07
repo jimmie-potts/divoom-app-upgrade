@@ -3,14 +3,17 @@ import { createRoot } from 'react-dom/client';
 import { healthSchema, type Health } from '@pixoo/core';
 import './style.css';
 import {Workspace} from './workspace';
+import {useController} from './controller';
 
 type Phase = 'loading' | 'ready' | 'error';
 
 function App() {
   const [phase, setPhase] = useState<Phase>('loading');
   const [initialized, setInitialized] = useState(false);
-  const [mode, setMode] = useState<Health['mode']|null>(null);
+  const [initialMode, setMode] = useState<Health['mode']|null>(null);
   const [attempt, setAttempt] = useState(0);
+  const controller = useController(initialized);
+  const mode = controller.runtime?.device.mode ?? initialMode;
   useEffect(() => {
     const controller = new AbortController();
     // A hung request must eventually reach the same actionable error state.
@@ -41,13 +44,13 @@ function App() {
         <h1>Pixoo playlists</h1>
         <p className="lede">A local home for your images, GIFs, and playlists.</p>
       </section>
-      {initialized && mode && <Workspace mode={mode}/>}
+      {initialized && mode && <Workspace mode={mode} controller={controller}/>}
       <section className="connection compact" aria-label="Local server connection">
         <div className={`status-box ${phase}`}><span className="status-dot" aria-hidden="true" />
           <p role={phase === 'error' ? 'alert' : 'status'}>{phase === 'ready' ? 'Server ready' : phase === 'loading' ? 'Checking server…' : 'Could not reach the local server or validate its response. Confirm it is running, then retry.'}</p>
         </div>
         <p className="device-note">{mode === 'device' ? 'Device transport status is shown in Settings. Visible output is unverified.' : mode === 'simulator' ? 'No physical display connected.' : 'Device status is unknown.'}</p>
-        <button type="button" className="quiet" disabled={phase === 'loading'} onClick={() => setAttempt(value => value + 1)}>{phase === 'error' ? 'Retry connection' : 'Refresh status'}</button>
+        <button type="button" className="quiet" disabled={phase === 'loading'} onClick={() => { setAttempt(value => value + 1); if (initialized) void controller.refresh(true).catch(() => {}); }}>{phase === 'error' ? 'Retry connection' : 'Refresh status'}</button>
       </section>
     </main>
     <footer><span>Made for your Pixoo-64</span><span>Local server · {mode === 'device' ? 'Device controller' : mode === 'simulator' ? 'Simulator controller' : 'Checking controller'}</span></footer>

@@ -162,6 +162,30 @@ it('releases target ownership when opening the library fails',async()=>{
  const other=await directory();await settings(other);
  const working=createApp({...options,dataDir:other});cleanup.push(()=>working.close());await working.ready();
 });
+it('cancels queued display requests before real HTTP shutdown drains handlers',async()=>{
+ const dataDir=await directory(),deviceLockDirectoryForTests=await directory();await settings(dataDir);
+ let release!:()=>void,requestSignal:AbortSignal|undefined;
+ const gate=new Promise<void>(resolve=>{release=resolve;}),requests:unknown[]=[];
+ const options={dataDir,mode:'device' as const,deviceLockDirectoryForTests,transportForTests:async(body:Record<string,unknown>,signal:AbortSignal)=>{
+  requests.push(body);requestSignal=signal;await gate;return {error_code:0};
+ }};
+ const app=createApp(options);cleanup.push(()=>app.close());cleanup.push(async()=>release());
+ const address=await app.listen({host:'127.0.0.1',port:0});
+ const snapshot=async()=>(await fetch(`${address}/api/player`,{headers:{connection:'close'}})).json();
+ const send=(requestId:string,brightness:number)=>fetch(`${address}/api/device/display`,{method:'PATCH',headers:{...headers,'content-type':'application/json',connection:'close'},body:JSON.stringify({requestId,brightness})}).then(response=>response.status);
+ const first=send((await snapshot()).nextRequestId,10);
+ await vi.waitFor(()=>expect(requests).toHaveLength(1));
+ const secondId=(await snapshot()).nextRequestId,second=send(secondId,20);
+ await vi.waitFor(async()=>expect((await snapshot()).nextRequestId).not.toBe(secondId));
+ const closing=app.close();
+ try{
+  await vi.waitFor(()=>expect(requestSignal?.aborted).toBe(true));
+  const other=await directory();await settings(other);
+  const competing=createApp({...options,dataDir:other});cleanup.push(()=>competing.close());
+  expect(await competing.ready().then(()=>'ready',(error:Error)=>error.message)).toContain('busy');
+ }finally{release();await Promise.all([first,second,closing]);}
+ expect(requests).toEqual([{Command:'Channel/SetBrightness',Brightness:10}]);
+});
 it('persists a possible physical write paused across application restart and resumes only on fresh intent',async()=>{
  let fail=true;
  const {app,server,dataDir,deviceLockDirectoryForTests}=await appFixture((body,res)=>{
