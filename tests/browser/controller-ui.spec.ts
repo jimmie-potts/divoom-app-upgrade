@@ -155,3 +155,23 @@ test('saved edits require explicit restart and referenced media cannot be delete
  await page.getByRole('button',{name:'Player',exact:true}).click();await expect(page.getByText(/Saved changes are waiting/)).toBeVisible();await page.getByRole('button',{name:'Restart with changes'}).click();await expect(page.getByText(/Saved changes are waiting/)).toHaveCount(0);
  await page.getByRole('button',{name:'Stop',exact:true}).click();await page.getByRole('button',{name:'Library',exact:true}).click();page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Delete media'}).click();await expect(page.getByRole('alert')).toContainText('used by a playlist or saved player session');
 });
+
+test('readiness refresh preserves selected playlist and unsaved draft',async({page},info)=>{
+ await page.goto('/');await page.getByRole('button',{name:'Playlists',exact:true}).click();
+ await page.getByLabel('New playlist name').fill(`Health ${info.project.name}`);await page.getByRole('button',{name:'Create playlist'}).click();
+ await expect(page.getByLabel('Playlist name',{exact:true})).toHaveValue(`Health ${info.project.name}`);
+ await page.getByLabel('Playlist name',{exact:true}).fill('Unsaved health draft');
+ await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(page.getByRole('status')).toHaveText('Server ready');
+ await page.getByRole('button',{name:'Playlists',exact:true}).click();await expect(page.getByLabel('Playlist name',{exact:true})).toHaveValue('Unsaved health draft');
+});
+
+test('readiness refresh preserves uncertain identity until exact retry',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'Player',exact:true}).click();const bodies:unknown[]=[];
+ await page.route('**/api/player/commands',async route=>{bodies.push(route.request().postDataJSON());await route.fetch();await route.abort('failed');});
+ await page.getByRole('button',{name:'Stop',exact:true}).click();await expect(page.getByRole('button',{name:'Retry command',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(page.getByRole('status')).toHaveText('Server ready');
+ await expect(page.getByRole('button',{name:'Retry command',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Player',exact:true}).click();await expect(page.getByRole('button',{name:'Stop',exact:true})).toBeDisabled();
+ await page.unroute('**/api/player/commands');await page.route('**/api/player/commands',async route=>{bodies.push(route.request().postDataJSON());await route.continue();});
+ await page.getByRole('button',{name:'Retry command',exact:true}).click();await expect(page.getByRole('button',{name:'Stop',exact:true})).toBeEnabled();expect(bodies).toHaveLength(2);expect(bodies[1]).toEqual(bodies[0]);
+});

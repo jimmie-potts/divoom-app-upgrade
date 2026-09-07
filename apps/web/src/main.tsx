@@ -8,6 +8,7 @@ type Phase = 'loading' | 'ready' | 'error';
 
 function App() {
   const [phase, setPhase] = useState<Phase>('loading');
+  const [initialized, setInitialized] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
@@ -20,7 +21,7 @@ function App() {
         const response = await fetch('/api/health', { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error('Health request failed');
         healthSchema.parse(await response.json());
-        if (active) setPhase('ready');
+        if (active) { setPhase('ready'); setInitialized(true); }
       } catch {
         if (active) setPhase('error');
       } finally { window.clearTimeout(timer); }
@@ -39,7 +40,7 @@ function App() {
         <h1>Pixoo playlists</h1>
         <p className="lede">A local home for your images, GIFs, and playlists.</p>
       </section>
-      {phase === 'ready' && <Workspace/>}
+      {initialized && <Workspace/>}
       <section className="connection compact" aria-label="Simulator connection">
         <div className={`status-box ${phase}`}><span className="status-dot" aria-hidden="true" />
           <p role={phase === 'error' ? 'alert' : 'status'}>{phase === 'ready' ? 'Server ready' : phase === 'loading' ? 'Checking server…' : 'Could not reach the local server or validate its response. Confirm it is running, then retry.'}</p>

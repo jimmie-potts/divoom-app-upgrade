@@ -36,7 +36,7 @@ restarts the current item from its beginning. Stop leaves the last content.
 Screen off pauses orchestration, and screen on does not resume. Clear session
 releases the saved context and its media references.
 
-Closing or refreshing the page does not stop the backend. EventSource reconnects
+Refresh status checks readiness without discarding local drafts or uncertain command identities. Closing or refreshing the page does not stop the backend. EventSource reconnects
 and reads current state. When a command response is interrupted, Retry command
 uses the original identity. Reconcile and discard reads current state before
 letting you choose a new action. Neither option silently repeats a command with
