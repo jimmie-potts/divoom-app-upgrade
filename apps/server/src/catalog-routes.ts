@@ -1,11 +1,12 @@
 import multipart from '@fastify/multipart';
 import type {FastifyInstance} from 'fastify';
 import type {Library} from '@pixoo/library';
+import {SIMULATOR_PROFILE,type MediaProfile} from '@pixoo/media';
 import {apiId,apiHash,apiName,playlistCreate,playlistRename,playlistOptions,playlistItems,playlistOrder,expectedRevision,assetQuery,renditionRequest} from '@pixoo/core';
 import {parse} from './validation.js';
 import {ApiError} from './security.js';
 type Id={Params:{id:string}};
-export async function catalogRoutes(app:FastifyInstance,library:Library):Promise<void> {
+export async function catalogRoutes(app:FastifyInstance,library:Library,profile:MediaProfile=SIMULATOR_PROFILE):Promise<void> {
  await app.register(multipart,{limits:{fileSize:10*1024*1024,files:1,fields:0,parts:1,fieldNameSize:40,headerPairs:20}});
  let mediaRequests=0;
  async function media<T>(work:()=>Promise<T>):Promise<T>{if(mediaRequests>=4)throw new ApiError('busy',503);mediaRequests++;try{return await work();}finally{mediaRequests--;}}
@@ -22,12 +23,12 @@ export async function catalogRoutes(app:FastifyInstance,library:Library):Promise
   }
   if(!bytes||!name)throw new ApiError('invalid-input');
   const input=bytes;async function* stream(){yield input;}
-  const result=await library.importMedia(stream(),name);reply.code(201);return result;
+  const result=await library.importMedia(stream(),name,{profile});reply.code(201);return result;
  }));
  app.get<Id>('/api/assets/:id',async request=>{const id=parse(apiId,request.params.id);return {asset:await library.getAsset(id),renditions:await library.listRenditions(id)};});
  app.post<Id>('/api/assets/:id/renditions',async request=>media(async()=>{
   const id=parse(apiId,request.params.id),options=parse(renditionRequest,request.body);
-  return {status:'complete',...await library.renderAsset(id,options.transform?{transform:options.transform}:{})};
+  return {status:'complete',...await library.renderAsset(id,{profile,...(options.transform?{transform:options.transform}:{})})};
  }));
  app.delete<Id>('/api/assets/:id',async(request,reply)=>{await library.deleteAsset(parse(apiId,request.params.id));return reply.code(204).send();});
  app.get<Id>('/api/renditions/:id',request=>library.getRendition(parse(apiHash,request.params.id)));

@@ -30,7 +30,7 @@ export function explain(error:unknown):string{
   'decode-failed':'The file could not be decoded. Try another PNG, JPEG or GIF.',
   'profile-limit':'This animation exceeds the rendering profile. Use fewer frames or supported frame delays.',
   busy:'The server is busy. Wait for current work to finish, then retry.',
-  'screen-off':'Turn the simulated screen on, then explicitly resume.',
+  'screen-off':'Turn the screen on, then explicitly resume.',
   'request-conflict':'Another controller used this command identity. Reconcile state, then choose your next action.',
   'request-expired':'This command identity expired or the server restarted. Reconcile state before choosing a new action.',
   'request-order':'Command state is out of date. Reconcile state before choosing a new action.',

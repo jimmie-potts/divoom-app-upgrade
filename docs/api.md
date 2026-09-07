@@ -1,8 +1,9 @@
 # Controller HTTP API
 
-The local Fastify server opens the private library and one simulator player at
-startup. Existing sessions restore paused. All routes are under `/api`; the [browser UI](controller-ui.md) uses these routes for media, playlists, player and settings.
-No route activates a physical adapter, even after saving a device IP.
+The local Fastify server opens the private library and one player at startup,
+using the explicitly selected mode and immutable device configuration. Existing sessions restore paused. All routes are under `/api`; the [browser UI](controller-ui.md) uses these routes for media, playlists, player and settings.
+No route activates or retargets a physical adapter. Device mode requires an
+explicit backend restart with valid private settings.
 Startup disables fake-adapter frame/operation recording so repeated playback
 does not retain an ever-growing test history.
 
@@ -37,7 +38,7 @@ No generic filesystem, raw device command or remote-URL import route exists.
 
 | Method and route | Body or result |
 | --- | --- |
-| `GET /health` | Server ready, simulator mode, physical device connected false |
+| `GET /health` | Server readiness, selected mode and observed nullable device connectivity |
 | `POST /assets` | Multipart with exactly one file part named `file`; returns `{asset,rendition}` with 201 |
 | `GET /assets?offset=0&limit=25&q=` | `{items,total,offset,limit}`; name search, limit 1-100 |
 | `GET /assets/:id` | `{asset,renditions}` |
@@ -109,27 +110,36 @@ silently executing twice without retaining an unbounded command journal.
 
 ## Device settings and controls
 
-`GET /device` returns saved `configuration` or null, simulator mode, physical
-`connected: false`, observed adapter availability, active simulator profile and
-supported profiles. `PUT /device` accepts `{ip,profile,model?,firmware?}`.
+`GET /device` returns saved `configuration` or null, selected `mode`,
+`connected`, observed adapter `availability`, `activeConfiguration`,
+`restartRequired`, `activeProfile` and supported `profiles`. Simulator connectivity
+is false and active configuration is null. Device connectivity starts null;
+observed available/offline transport maps to true/false without visual claims. `PUT /device` accepts `{ip,profile,model?,firmware?}`.
 IP must be canonical RFC1918 IPv4. Profile is `simulator-v1` or
 `pixoo64-smoke-2026-09-06`. Port/path/URL overrides and unknown fields are rejected.
-Saving the smoke profile does not change the active simulator render profile.
+Saving never changes the running adapter or active render profile. In device mode,
+`restartRequired` reports when saved settings differ from the active snapshot.
+Device startup requires the smoke profile; saving simulator settings during a
+device session is valid for storage but requires changing mode or profile before
+that next startup.
 
 Settings are stored in versioned `device.json` under the private data directory.
 Replacement is atomic and writes are serialized. Invalid existing settings fail
 startup without resetting them. Concurrent setting writes complete in submission
 order. No credentials are accepted or needed.
 
-`POST /device/probe` takes an empty object or no body and probes the simulator
-through the player-owned writer. It reports adapter availability and no physical
-connection. `PATCH /device/display` takes `requestId` plus exactly one of
+`POST /device/probe` takes an empty object or no body and probes the selected
+adapter through the player-owned writer. It reports mode and adapter availability;
+simulator connectivity stays false. Device success reports transport connectivity
+and only the telemetry returned by the probe. Ordinary status reads do not probe. `PATCH /device/display` takes `requestId` plus exactly one of
 `brightness` from 0-100 or boolean `screenOn`. It uses the same replay sequence as
 player commands and returns a player snapshot. Off pauses orchestration; on does
-not resume. These are simulated effects.
+not resume. Device writes with possible prior effects pause playback and retain
+the uncertainty marker until fresh explicit intent.
 
-The separately invoked HTTP spike remains pinned to validated private IPv4,
-port 80 and `/post`, with no redirects. It is not connected to these HTTP routes.
+Device composition reuses the validated private IPv4 transport on port 80 and
+`/post`, with no redirects. The separately invoked spike remains outside these
+routes; reset-ID and raw protocol commands are not exposed.
 [Protocol documentation](protocol-spike.md) defines its separate authorization.
 
 ## State events
@@ -154,7 +164,7 @@ observed display timing.
 
 ## Runtime diagnostics
 
-`GET /api/diagnostics` reports uptime, library readiness, simulator availability,
+`GET /api/diagnostics` reports uptime, mode, library readiness, adapter availability,
 player state/intent and fixed transient bounds. It uses the same host/origin and
 authentication boundary as other API reads. It excludes paths, IPs, media names
 and raw errors. Readiness is not a disk integrity scan or a hardware claim. See

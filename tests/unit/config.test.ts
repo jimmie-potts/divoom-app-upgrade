@@ -19,7 +19,7 @@ describe('runtime configuration', () => {
   it('defaults to loopback and simulator with external user storage', async () => {
     const context = await fixture();
     const config = await loadConfig({}, { ...context, platform: 'linux' });
-    expect(config).toEqual({ host: '127.0.0.1', port: 8787, mode: 'simulator', dataDir: join(context.home, '.local', 'share', 'pixoo-playlist-controller') });
+    expect(config).toEqual({ host: '127.0.0.1', port: 8787, mode: 'simulator', activeConfiguration:null, savedConfiguration:null, dataDir: join(context.home, '.local', 'share', 'pixoo-playlist-controller') });
     expect(await readdir(config.dataDir)).toEqual([]);
   });
   it('uses LOCALAPPDATA for Windows and keeps existing files', async () => {

@@ -45,6 +45,29 @@ test('settings save explicit configuration without connecting hardware',async({p
  await expect(page.getByText('No physical display connected.',{exact:true})).toBeVisible();
 });
 
+test('device settings distinguish active target, saved changes and unverified output',async({page})=>{
+ const active={ip:'192.168.1.40',profile:'pixoo64-smoke-2026-09-06'};
+ let saved={...active};
+ const source=await (await page.request.get('/api/device')).json();
+ await page.route('**/api/health',async route=>{const response=await route.fetch();await route.fulfill({json:{...await response.json(),mode:'device',device:{connected:null}}});});
+ await page.route('**/api/player',async route=>{const response=await route.fetch();const snapshot=await response.json();await route.fulfill({json:{...snapshot,player:{...snapshot.player,availability:'unknown'}}});});
+ await page.route('**/api/device',async route=>{
+  if(route.request().method()==='PUT')saved=route.request().postDataJSON();
+  await route.fulfill({json:{...source,mode:'device',connected:null,availability:'unknown',configuration:saved,activeConfiguration:active,restartRequired:saved.ip!==active.ip,activeProfile:source.profiles.find((p:{name:string})=>p.name===active.profile)}});
+ });
+ await page.goto('/');
+ await expect(page.getByText('Device mode',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await expect(page.getByText('Device transport: unknown. Visible output is unverified.',{exact:true})).toBeVisible();
+ await expect(page.getByText('Active target: 192.168.1.40',{exact:true})).toBeVisible();
+ await page.getByLabel('Device IP').fill('192.168.1.41');
+ await page.getByRole('button',{name:'Save configuration'}).click();
+ await expect(page.getByText('Configuration saved. Restart the backend to apply it.',{exact:true})).toBeVisible();
+ await expect(page.getByText('Active target: 192.168.1.40',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('Device IP')).toHaveValue('192.168.1.41');
+ await expect(page.getByText('Restart required. The active target and profile stay unchanged until the backend restarts.',{exact:true})).toBeVisible();
+});
+
 test('mixed playlist journey preserves independent policies and saved session across refresh',async({page},info)=>{
  const {gifFixture}=await import('../helpers/media-fixtures.js');
  await page.goto('/');

@@ -1,13 +1,16 @@
 schema: spec-driven
 context: |
-  Pixoo-64 playlist controller is a local-first TypeScript simulator foundation.
+  Pixoo-64 playlist controller is a local TypeScript application with default
+  simulator mode and explicit validated device activation.
   GitHub issues in jimmie-potts/divoom-app-upgrade own delivery scope, acceptance
   criteria, dependencies, status, and delivery target. Read AGENTS.md, docs/sdlc.md,
   and docs/product.md. The preserved handoff is a proposal baseline; reviewed
   specs are normative for delivered capabilities. Application-foundation covers
   local startup and readiness. Device-adapter covers the fake; the HTTP spike is
   separately invoked. Media rendering and SQLite media/playlist persistence are backend libraries;
-  playback has paused recovery; simulator HTTP/SSE routes integrate the backend. The controller UI exposes those routes. Secure LAN deployment remains future work.
+  playback has paused recovery; HTTP/SSE routes use the selected adapter.
+  Device mode uses immutable private startup settings and the observed smoke
+  profile, and possible prior effects pause until explicit intent. The controller UI exposes those routes. Secure LAN deployment remains future work.
   Future shared agent monitoring follows docs/hub-integration.md and the hub's
   canonical contracts. Pixoo owns consumer composition/rendering and its writer;
   shared state first embeds here, with standalone hosting separately planned.

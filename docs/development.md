@@ -115,7 +115,8 @@ media, playlists and session retention. Startup opens the private library and [p
 [bounded decoding, immutable frames and previews](media-rendering.md). The device package
 provides the [fake adapter](device-adapter.md) with deterministic frame, timing,
 failure and cancellation tests. The independently written [HTTP spike](protocol-spike.md) uses Node HTTP and
-separate opt-in commands; application startup still uses simulator mode. The API admits bounded multipart uploads to the library. Read the handoff and exact issue before extending them.
+separate opt-in commands. Application startup defaults to simulator mode; explicit
+validated device composition is documented in [device operations](device-application.md). The API admits bounded multipart uploads to the library. Read the handoff and exact issue before extending them.
 Do not claim physical behavior from the readiness API or simulator page.
 
 [Local operations](local-operations.md) documents the built backup, restore and

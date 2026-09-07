@@ -39,7 +39,9 @@ remaining handoff capabilities are proposed behavior, not implementation evidenc
 The application serves the [controller UI](controller-ui.md) and health API. The media
 package renders files, and the library package persists metadata and playlists.
 The playback package orchestrates immutable sessions and paused recovery.
-The [controller API](api.md) exposes simulator-backed media, playlist and player operations with SSE. The responsive media library, editor, player and settings UI uses those routes. M1 separates simulator/adapter source work
+The [controller API](api.md) exposes media, playlist and player operations with
+SSE. Startup defaults to simulator mode; explicit validated device activation
+uses the dated smoke profile through the same player and writer. The responsive media library, editor, player and settings UI uses those routes. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;

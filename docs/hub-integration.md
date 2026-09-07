@@ -13,8 +13,9 @@ dependencies and status.
 
 Pixoo retains media ingestion/renditions, catalog/playlists, player, 64x64 status
 rendering, explicit Monitor/Media policy and its existing serialized writer.
-The delivered controller API remains simulator-only. This planning change adds
-no running monitoring, hub, MCP, device mode or installed hook.
+Startup defaults to the simulator; explicit validated device activation uses
+the dated smoke profile through the same controller API and writer. Shared
+monitoring, hub integration, MCP and installed hooks remain planned.
 
 ## Adoption sequence
 

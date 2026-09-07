@@ -2,12 +2,12 @@ import { mkdir, mkdtemp, writeFile, rm, stat, readFile, realpath } from 'node:fs
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import {loadRuntimeSelection,type RuntimeSelection} from './device-settings.js';
 
 export const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
-export interface RuntimeConfig {
+export interface RuntimeConfig extends RuntimeSelection {
   host: '127.0.0.1';
   port: number;
-  mode: 'simulator';
   dataDir: string;
 }
 interface ConfigContext { root?: string; home?: string; platform?: string }
@@ -56,8 +56,8 @@ export async function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
   context: ConfigContext = {},
 ): Promise<RuntimeConfig> {
-  if (env.PIXOO_MODE !== undefined && env.PIXOO_MODE !== 'simulator') {
-    throw new Error('PIXOO_MODE must be simulator; device transport is not implemented');
+  if (env.PIXOO_MODE !== undefined && env.PIXOO_MODE !== 'simulator' && env.PIXOO_MODE !== 'device') {
+    throw new Error('PIXOO_MODE must be simulator or device');
   }
   const rawPort = env.PIXOO_PORT ?? '8787';
   if (!/^\d+$/.test(rawPort) || Number(rawPort) > 65535) {
@@ -80,5 +80,5 @@ export async function loadConfig(
   const probe = await mkdtemp(join(dataDir, '.pixoo-write-check-'));
   try { await writeFile(join(probe, 'probe'), ''); }
   finally { await rm(probe, { recursive: true, force: true }); }
-  return { host: '127.0.0.1', port: Number(rawPort), mode: 'simulator', dataDir };
+  return Object.freeze({ host: '127.0.0.1', port: Number(rawPort), dataDir, ...await loadRuntimeSelection(dataDir,env.PIXOO_MODE??'simulator') });
 }

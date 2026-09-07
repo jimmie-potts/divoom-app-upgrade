@@ -25,3 +25,5 @@ decisions have not been finalized by the repository bootstrap.
 - [ADR 0010: Shared agent-device-hub adoption](decisions/0010-shared-agent-device-hub.md)
 
 - [0011: Offline local recovery](decisions/0011-offline-local-recovery.md) records consistent backup and fresh-directory restore.
+
+- [ADR 0012: Opt-in physical application adapter](decisions/0012-physical-application-adapter.md) records immutable startup configuration, smoke limits and uncertainty pause.

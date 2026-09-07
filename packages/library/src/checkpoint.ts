@@ -13,7 +13,7 @@ export const checkpointSchema=z.object({
   history:z.array(idSchema).max(10000),historyCursor:z.number().int().nonnegative().nullable(),
   currentItemId:idSchema,frontierPlayed:z.boolean(),
   intent:z.enum(['active','paused','stopped']),state:z.enum(['idle','loading','playing','paused','reconnecting','error']),
-  requestedScreenOn:z.boolean(),lastError:z.object({code:z.string().min(1).max(64),itemId:idSchema.optional()}).strict().nullable(),
+  requestedScreenOn:z.boolean(),lastError:z.object({code:z.string().min(1).max(64),itemId:idSchema.optional(),priorEffects:z.enum(['none','possible']).optional()}).strict().nullable(),
 }).strict().refine(record=>{
   const ids=new Set(record.snapshot.items.map(item=>item.id));
   return ids.size===record.snapshot.items.length && record.order.length===ids.size && new Set(record.order).size===ids.size &&

@@ -1,28 +1,26 @@
-import {lstat,readFile,writeFile,rename,rm} from 'node:fs/promises';
+import {writeFile,rename,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {FastifyInstance} from 'fastify';
 import type {OperationResult} from '@pixoo/device';
 import type {Player} from '@pixoo/playback';
 import {SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE} from '@pixoo/media';
-import {deviceConfiguration,displayCommand,emptyRequest,type DeviceConfiguration} from '@pixoo/core';
+import {deviceConfiguration,displayCommand,emptyRequest} from '@pixoo/core';
 import {Commands} from './commands.js';
 import {parse} from './validation.js';
 import {ApiError} from './security.js';
+import type {RuntimeSelection} from './device-settings.js';
 function result<T>(value:OperationResult<T>|undefined):T {
  if(!value)throw new ApiError('cancelled',409);
  if(!value.ok)throw new ApiError(value.code,value.code==='invalid-input'?400:503,{priorEffects:value.priorEffects});return value.value;
 }
-export async function deviceRoutes(app:FastifyInstance,directory:string,player:Player,commands:Commands,snapshot:()=>unknown,changed:()=>void):Promise<void>{
- const path=join(directory,'device.json');let configuration:DeviceConfiguration|null=null;
- try{
-  const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink()||info.size>4096)throw new ApiError('storage-error',500);
-  const stored:unknown=JSON.parse(await readFile(path,'utf8'));
-  if(!stored||typeof stored!=='object'||!('version'in stored)||stored.version!==1||!('configuration'in stored))throw new ApiError('storage-error',500);
-  configuration=parse(deviceConfiguration,stored.configuration);
- }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw new ApiError('storage-error',500);}
+export async function deviceRoutes(app:FastifyInstance,directory:string,player:Player,commands:Commands,snapshot:()=>unknown,changed:()=>void,runtime:RuntimeSelection):Promise<void>{
+ const path=join(directory,'device.json');let configuration=runtime.savedConfiguration;
  let tail=Promise.resolve();
- const status=()=>({configuration,mode:'simulator',connected:false,availability:player.getState().availability,activeProfile:SIMULATOR_PROFILE,profiles:[SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE]});
+ const status=()=>{const availability=player.getState().availability;return {configuration,activeConfiguration:runtime.activeConfiguration,
+  restartRequired:runtime.mode==='device'&&JSON.stringify(configuration)!==JSON.stringify(runtime.activeConfiguration),mode:runtime.mode,
+  connected:runtime.mode==='simulator'?false:availability==='unknown'?null:availability==='available',availability,
+  activeProfile:runtime.mode==='device'?PIXOO64_SMOKE_PROFILE:SIMULATOR_PROFILE,profiles:[SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE]};};
  app.get('/api/device',status);
  app.put('/api/device',request=>{
   const settings=parse(deviceConfiguration,request.body);

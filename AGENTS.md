@@ -51,9 +51,12 @@ Verify all merged-revision main CI jobs before issue closure.
 
 ## Runtime boundaries
 
-Normal application startup remains simulator-only. The device package also has
-a separately invoked HTTP spike; it is not enabled by startup. Before protocol or
-hardware work, read docs/protocol-spike.md for command stages and evidence gates.
+Application startup defaults to the simulator. Explicit PIXOO_MODE=device uses
+the validated private startup configuration and observed smoke profile. Before
+changing activation, settings or target ownership, read docs/device-application.md
+and ADR 0012 for immutable configuration, limits and uncertainty pause. The device
+package also has a separately invoked HTTP spike. Before protocol or hardware
+work, read docs/protocol-spike.md for command stages and evidence gates.
 Before media ingestion, rendering, or cache work, read docs/media-rendering.md
 for the library contract, limits and profile evidence. Before catalog, playlist,
 migration or media deletion work, read docs/library-persistence.md for revision,

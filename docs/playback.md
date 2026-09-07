@@ -36,9 +36,10 @@ Opening an existing checkpoint restores paused context and sends no device
 requests. Starting or resuming is explicit. One player may claim a library and
 adapter at a time; duplicates fail with `PlaybackError('busy')`. The library's
 SQLite owner also excludes another process using that storage directory. The
-installation owner must still supply only one adapter/backend for its configured
-device. Separate installations cannot establish exclusive physical ownership
-through this in-process lease.
+application also holds a per-user local target lock in device mode, including
+when other backends use different data directories. Other users, hosts and
+external apps remain outside that ownership boundary. Keep them from writing to
+the same target. See [device operations](device-application.md).
 
 ## State and commands
 
@@ -88,8 +89,10 @@ Only then does dwell begin. A duration can interrupt a GIF. A plays policy uses
 `totalPlays * sum(effective uploaded frame delays)`; three plays means three total
 executions. Embedded GIF repeat metadata is irrelevant. Overflowing or invalid
 computed dwell rejects the item before upload. A still uses a positive 100 ms
-transport placeholder, while its duration policy exclusively determines dwell.
-This placeholder has no physical timing claim.
+transport placeholder in simulator mode, or 500 ms under the active device smoke
+profile. Its duration policy exclusively determines dwell. GIF effective delays
+are preserved, including single-frame GIFs. The transport placeholder has no
+physical timing claim.
 
 `estimatedReadyAtMs` and `dwellDeadlineMs` exist only in the current clock domain.
 The state labels timing `estimated`. A late callback advances one item and starts
@@ -119,7 +122,13 @@ adapter work. Automatic dwell advancement retires player callbacks while letting
 already queued brightness/screen controls finish before the next upload. The
 player's generation is distinct from the adapter's writer generation.
 
-Connectivity errors from upload or display controls suspend dwell. Recovery
+Device composition selects `pauseOnUncertain: true`. A current operation failure
+with `priorEffects: possible` pauses intent and playback before reconnect or
+failed-item traversal. It retains the error and item context in the checkpoint
+and issues no automatic retry, skip or probe. Explicit resume starts the current
+item again. The simulator keeps its existing recovery behavior.
+
+Definite connectivity errors from upload or display controls suspend dwell. Recovery
 probes default to delays of 250, 500 and 1000 ms, with a 5000 ms operation timeout.
 Options allow `retryBaseMs` 1-1000, `maxRetries` 1-8 and `operationTimeoutMs`
 1-120000. The retry budget covers successful probes followed by failed uploads;
@@ -130,7 +139,8 @@ Invalid media and rejected uploads retain a visible item error and can skip to
 the next item. If every item fails before another successful start, attempts end
 in error. Stop/pause supersede reconnect results; a successful stale probe cannot
 restart playback. Persistence errors cancel orchestration before an uncommitted
-transition can upload. `lastError` records a code and, when applicable, item ID.
+transition can upload. `lastError` records a code and, when applicable, item ID
+and optional `priorEffects`. Older checkpoints without that marker remain valid.
 
 `takeover()` is an integration-owned observation. This package does not invent
 firmware/channel detection or periodically reclaim the display. An adapter
@@ -166,3 +176,7 @@ after killing a child process. No test contacts hardware. The
 `subscribe(listener)` returns an unsubscribe function; listeners read state on
 notifications. Observer failures do not interrupt playback. The HTTP layer uses
 these notifications for SSE and keeps command/event sequences separate.
+
+Application shutdown retires player and adapter work before waiting for HTTP
+handlers to drain. The library and target ownership stay open until those handlers
+and in-flight transport settle, so a pending control cannot send during shutdown.

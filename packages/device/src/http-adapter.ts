@@ -35,6 +35,8 @@ export class HttpDeviceAdapter implements DeviceAdapter {
   private readonly clock: Clock;
   private readonly profile: DeviceProfile;
   private currentGeneration = 0;
+  private closed=false;
+  private idle: (()=>void)[]=[];
   private waiting: Work[] = [];
   private active: Work | undefined;
   constructor(options: HttpOptions, transportForTests?: DeviceTransport) {
@@ -92,10 +94,16 @@ export class HttpDeviceAdapter implements DeviceAdapter {
   resetAnimationIds(options: OperationOptions): Promise<OperationResult<void>> {
     return this.enqueue(options, true, async context => { await context.send({ Command: 'Draw/ResetHttpGifId' }, true); });
   }
+  async close():Promise<void> {
+    this.closed=true;
+    for(const work of [this.active,...this.waiting])work?.cancel('cancelled');
+    if(this.active||this.waiting.length)await new Promise<void>(resolve=>this.idle.push(resolve));
+  }
   private pump() {
     if (this.active) return;
     this.active = this.waiting.shift();
     this.active?.start();
+    if(!this.active&&!this.waiting.length)for(const resolve of this.idle.splice(0))resolve();
   }
   private enqueue<T>(options: OperationOptions, valid: boolean, run: (context: Context) => Promise<T>): Promise<OperationResult<T>> {
     const generation = options.generation;
@@ -111,7 +119,7 @@ export class HttpDeviceAdapter implements DeviceAdapter {
     let cancelTimer = () => {};
     return new Promise(resolve => {
       const interrupted = (): FailureCode | undefined => reason ??
-        (generation !== this.currentGeneration ? 'stale-generation' : signal?.aborted ? 'cancelled' : this.clock.now() >= deadline ? 'timeout' : undefined);
+        (this.closed?'cancelled':generation !== this.currentGeneration ? 'stale-generation' : signal?.aborted ? 'cancelled' : this.clock.now() >= deadline ? 'timeout' : undefined);
       const finish = (value?: T, error?: DeviceRequestError) => {
         if (done) return;
         done = true; cancelTimer(); signal?.removeEventListener('abort', abort);
@@ -148,7 +156,7 @@ export class HttpDeviceAdapter implements DeviceAdapter {
       if (!valid || !integer(generation, 0, Number.MAX_SAFE_INTEGER) || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(deadline)) {
         finish(undefined, new DeviceRequestError('invalid-input')); return;
       }
-      const code = interrupted(); if (code) { finish(undefined, new DeviceRequestError(code)); return; }
+      const code = this.closed?'cancelled':interrupted(); if (code) { finish(undefined, new DeviceRequestError(code)); return; }
       signal?.addEventListener('abort', abort, { once: true });
       cancelTimer = this.clock.schedule(timeoutMs, () => { cancel('timeout'); });
       this.waiting.push(work); this.pump();

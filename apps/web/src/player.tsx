@@ -1,8 +1,9 @@
 import {useEffect,useState} from 'react';
+import type {Health} from '@pixoo/core';
 import {request,type Playlist,type Rendition} from './api';
 import type {Controller} from './controller';
 import {Preview} from './preview';
-export function PlayerPanel({controller,selected,active}:{active:boolean;controller:Controller;selected:Playlist|null}){
+export function PlayerPanel({controller,selected,active,mode}:{active:boolean;controller:Controller;selected:Playlist|null;mode:Health['mode']}){
  const {sample,busy,connected,pending,command}=controller;
  const [now,setNow]=useState(performance.now()),[rendition,setRendition]=useState<Rendition|null>(null);
  const state=sample?.value.player,session=sample?.value.session;
@@ -14,9 +15,9 @@ export function PlayerPanel({controller,selected,active}:{active:boolean;control
  return <section aria-label="Player controls"><p className="eyebrow">Now playing</p><h2>Player</h2>
  <div className="editor-layout"><div className="panel"><h3>{session?.playlist.name??'Nothing playing'}</h3>
  {session?<><p>Session revision {session.playlist.revision}{selected?.id===session.playlist.id?` · Saved revision ${selected.revision}`:''}</p><p>Item {session.playlist.items.findIndex(i=>i.id===state?.itemId)+1} of {session.playlist.items.length}</p></>:<p>No active session.</p>}
- {state&&<><p>Playback: <strong>{state.state}</strong> · Intent: {state.intent}</p><p>Simulator adapter: {state.availability}</p><p>Requested screen: {state.requestedScreenOn?'on':'off'}</p>
+ {state&&<><p>Playback: <strong>{state.state}</strong> · Intent: {state.intent}</p><p>{mode==='device'?'Device transport':'Simulator adapter'}: {state.availability}</p><p>Requested screen: {state.requestedScreenOn?'on':'off'}</p>
  <p aria-live="off">{state.state==='loading'?'Loading frames; dwell has not started.':remaining!==null?`Estimated remaining: ${(remaining/1000).toFixed(1)} seconds`:'Estimated remaining: unavailable while not playing.'}</p>
- {state.lastError&&<p role="alert">Player error: {state.lastError.code}. Check the media, skip it, or explicitly resume to retry.</p>}</>}
+ {state.lastError&&<p role="alert">Player error: {state.lastError.code}. {mode==='device'&&state.lastError.priorEffects==='possible'?'The device may have applied part of the operation. Playback is paused. Explicit resume restarts the current item from its beginning.':'Check the media, skip it, or explicitly resume to retry.'}</p>}</>}
  {selected&&session?.playlist.id===selected.id&&selected.revision!==session.playlist.revision&&<p className="notice">Saved changes are waiting for the next session. Restart with changes applies them now.</p>}
  <div className="actions"><button disabled={disabled||!selected?.items.length} onClick={()=>command('start',selected?.id)}>Play playlist</button><button disabled={disabled||!session} onClick={()=>command('pause')}>Pause playlist</button><button disabled={disabled||!session} onClick={()=>command('resume')}>Resume</button><button disabled={disabled} onClick={()=>command('stop')}>Stop</button></div>
  <div className="actions"><button className="quiet" disabled={disabled||!session} onClick={()=>command('previous')}>Previous</button><button className="quiet" disabled={disabled||!session} onClick={()=>command('next')}>Next</button><button className="quiet" disabled={disabled||!session} onClick={()=>command('restart-with-changes')}>Restart with changes</button><button className="quiet" disabled={disabled} onClick={()=>command('clear')}>Clear session</button></div>
