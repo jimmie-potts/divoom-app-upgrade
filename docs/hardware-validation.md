@@ -74,9 +74,16 @@ writer activity was not independently established.
 
 Client state, credentials and synthetic media stayed outside Git. MCP entries
 were supplied per invocation; saved Codex configuration, model and approval
-settings were preserved. Successful child sessions reported `auto_review`.
-The client did not expose its complete MCP approval policy, and this
-noninteractive run does not establish that a human approval dialog appeared.
+settings were preserved. Earlier child sessions reported `auto_review` as the
+approval reviewer; their logs did not expose the selected approval policy.
+
+A later simulator-only policy check explicitly selected the existing
+`device-development` permissions profile for that invocation. The installed
+CLI startup header reported `approval: on-request`. Status, brightness 20 and
+final status completed successfully; revocation and host cleanup also passed.
+That policy readback belongs to this later simulator session, not the earlier
+physical sessions. No approval-policy or reviewer override was supplied, and
+saved configuration was unchanged. A human approval dialog was not observed.
 Live discovery classified `get_status`, `list_media` and `list_playlists` as
 reads, and the other five tools as writes.
 
