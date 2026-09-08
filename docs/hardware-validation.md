@@ -1,5 +1,157 @@
 # Hardware validation
 
+## Local playback acceptance, September 8, 2026 UTC
+
+**In progress** for [#12](https://github.com/jimmie-potts/divoom-app-upgrade/issues/12).
+The owner supplied the target privately, identified Pixoo64, and approved the
+synthetic still/GIF, controls, recovery and bounded soak sequence. Firmware remains
+unknown. The tested application source is
+`15b0820eaf14e6d61da44e299b2407f339bfe6c1`, running on Node 24.20.0 with
+`pixoo64-smoke-2026-09-06`. One device-mode backend at a time held the normal local target
+lock and used an isolated private synthetic library. Codex commands use the
+approved local HTTP proxy; the backend retains the serialized device writer.
+
+| Check | Result and evidence |
+| --- | --- |
+| Startup and read-only probe | Passed; device available and connected, channel 1, brightness 100%, screen on |
+| Initial still | Owner confirmed the white 30 and border on blue matched the expected image |
+| Still duration estimate | Backend playing interval was 30.002 seconds after a 220 ms loading interval; this is state-derived timing, not measured visible dwell. Completion leaves the image visible |
+| Visible still dwell during soak | Owner first reported about 28 seconds, then measured 30.3 seconds on each of two repeats, from solid blue appearance until the numbered GIF replaced it. Two readings are within the agreed 29-31-second range; the earlier approximate reading is outside it. Human stopwatch uncertainty and variation remain unquantified |
+| One GIF play | Owner confirmed one red 1 / green 2 cycle followed by the blue still; requested delays were 500 ms per frame |
+| Three GIF plays | Owner saw three complete cycles, then several rapid extra 1 / 2 cycles before the blue still. The expected visible sequence failed; precise burst timing is unmeasured |
+| Three-play backend timing | GIF playing interval 3000.159 ms, followed by a 195.791 ms transition to still readiness; no session error or reconnect was reported |
+| Five GIF plays | Owner confirmed five normal cycles then blue with the known flashing. Backend GIF interval 5000.601 ms; still loading 199.978 ms. The accepted defect persists; visible timing remains unmeasured |
+| Pause, resume and stop | Owner confirmed blue remained during pause, changed to the GIF about 30 seconds after resume, and GIF content remained after Stop. Backend held pause 50.877 seconds and gave the resumed still 30.002 seconds; GIF loading was 366.962 ms. Precise visible dwell remains unmeasured |
+| Skip during loading | Isolated repeat submitted Skip 4.112 ms after GIF loading began. The GIF never reached backend playing; owner confirmed blue 30 stayed visible with no delayed GIF start |
+| Brightness | In a separate observed repeat, owner confirmed dimming at requested 20% and restoration. Fresh device probe reported brightness 100% and screen on |
+| Isolated screen off/on repeat | Owner confirmed blue still after its playlist ended, a dark screen after Off, then random GIFs after On. The player remained paused. Screen controls operated, but uploaded content did not survive this off/on cycle. Owner accepted this as a known limitation for #12 |
+| Explicit Resume after screen-on | Owner confirmed blue 30 returned. The same retained session was resumed; backend loading-to-playing interval was 223.047 ms |
+| Backend restart | In a separate repeat without screen toggles, owner confirmed blue 30 stayed visible. The same session/item restored paused with connectivity unknown; only local health/status/catalog reads were made after restart |
+| Device disconnect/reconnect | Owner unplugged power. Resume entered bounded reconnect handling, then offline/error with paused intent after 15.089 seconds. Stop retired that attempt. On reconnection, owner saw native GIFs; a fresh probe confirmed connectivity while playback remained stopped. Fresh Resume restored blue 30, confirmed by the owner, with 284.255 ms backend loading. Final Stop/close completed |
+| Soak | Passed with accepted flashing defect #52: 60 minutes 2.192 seconds and 119 ordered transitions, with no backend error or recovery event. Stop and close succeeded at 23:17:46 UTC. Owner confirmed continued alternation through the end with only the known flashing |
+| Variable timing | Not demonstrated. The approved [500,1000], [1000,500] and [500,500] ms protocol stages each completed five acknowledged requests and closed after a 15-second hold and one blue-still upload. A was ambiguous: red 1 seemed longer, with explicit owner uncertainty, opposite the requested timing. In B, both frames seemed equally long. The control looked equal, and the owner confirmed final blue 30. The application profile remains uniform 500 ms; HTTP completion does not qualify normal application variable timing |
+
+Command acceptance, state timing and owner observations are separate evidence.
+Private session logs retain the source revision, command intents/results, SSE
+states and resource samples. During the soak the owner clarified that blue 30
+briefly interleaves with red 1 / green 2 before settling on solid blue. Defect
+#52 records this additional description. Stopwatch readings are approximate;
+the burst and precise frame timing have not been instrumentally measured.
+The completed controls and recovery checks satisfy their issue criterion with
+the accepted screen-retention limitation. The issue remains open for the
+outstanding timing and delivery evidence.
+
+After the extra flashing was reported, the coordinator stopped playback and
+closed the physical backend. Brightness and screen settings had not been
+changed; that run left the synthetic still displayed. A local application fixture using
+the same media and three-play policy sent exactly five protocol requests: an ID
+query, two GIF frames, another ID query, then one still frame. Every frame used
+500 ms and its expected rendered RGB hash. This excludes extra uploads and
+changed delays in that software reproduction, but does not explain the physical
+burst. No firmware cause is established.
+
+The owner authorized one traced repeat and reported the rapid burst again.
+The instrumented application adapter sent exactly five requests: the two GIF
+frames used returned animation ID 6, and the still used ID 7. All three frames
+used 500 ms and the expected RGB hashes. Every response reported error_code 0,
+with no retry or rejected request. The next ID query began 3004.108 ms after the
+final GIF response, and the query/still-upload interval was 205.987 ms. Trace
+overhead and HTTP completion are included; these are not visible-burst timings.
+The backend stopped and closed after the still. Extra application uploads,
+changed requested speed and reused IDs do not explain this recorded run.
+
+The owner accepted the rapid flashing as a known defect and authorized continuing
+the remaining tests. Backlog defect
+[#52](https://github.com/jimmie-potts/divoom-app-upgrade/issues/52) owns its
+investigation and correction. The failed visible sequence remains recorded; this
+disposition makes the artifact nonblocking for #12 and does not establish a fix
+or waive any other acceptance criterion. A recurrence of the same known burst
+will be logged during later stages. New uncertain writes, conflicting control or
+other unexpected output still require a stop and assessment.
+
+After the later screen-control and backend-restart sequence, the owner reported
+random GIFs and said they had not seen the test execute. The backend was closed
+immediately without another device command. The last settings probe had reported
+brightness 100%, screen on and channel 1; the player stayed paused across screen-on
+and restart. Those acknowledgments do not establish visible output or its cause.
+The onset of the non-test content is unknown. This separate mismatch is not
+covered by the accepted flashing defect, so physical stages paused at that point.
+
+The owner then authorized a step-by-step still-retention and screen off/on check.
+The normal application uploaded the blue still once and completed its still-only
+playlist after a 30001.476 ms backend playing-to-idle interval. After completion,
+the owner confirmed blue 30 was still showing. The owner then confirmed a dark
+screen after Off and reported "Random GIFs return." after On. The player stayed
+paused; no replacement artwork, Skip or backend restart occurred during this
+sequence. The backend closed after the final observation. Brightness was not
+changed in this repeat.
+
+Screen off/on is a sufficient trigger for the reported content change in this
+observed sequence. This does not establish the device's internal cause or precise
+return timing. Screen-on currently sends only the screen command and leaves
+playback paused, as specified; it does not restore artwork. The missed initial
+Skip/brightness sequence was followed by separate observed checks recorded above.
+The owner accepted this separate
+screen-retention limitation for #12 and authorized an explicit Resume to reload
+the retained content. The owner confirmed that Resume restored blue 30.
+Automatic artwork restoration was not added.
+
+### Soak measurements
+
+The normal application ran from 22:17:44 to 23:17:46 UTC. The runner admitted the
+approved playlist revision, alternated a still and a two-frame GIF for 30 seconds
+each, and required both one hour and 100 ordered transitions. It completed with
+120 playing visits and 119 transitions before the 75-minute cap. The final GIF
+may continue looping after Stop; shutdown sends no restoration upload.
+
+Loading intervals below run from backend loading to playing SSE observations.
+They include the upload path and local observation overhead, including the
+initial upload. They do not measure first-visible time or the flashing burst.
+Percentiles use the nearest-rank method.
+
+| Loading interval | Samples | Median | 95th percentile | Maximum |
+| --- | ---: | ---: | ---: | ---: |
+| All uploads | 120 | 246.307 ms | 379.620 ms | 1105.055 ms |
+| Still | 60 | 173.784 ms | 215.371 ms | 246.307 ms |
+| Two-frame GIF | 60 | 332.166 ms | 407.978 ms | 1105.055 ms |
+
+The 119 completed backend dwell intervals ranged from 29999.815 to 30001.208 ms.
+These estimates do not replace the owner's visible readings above. No error or
+reconnecting state appeared. The owner confirmed continued alternation at the
+midpoint and through the end, with only the known transition artifact. No freeze
+or new unexpected content was reported. This satisfies the soak criterion with
+the already accepted flashing defect; it does not qualify variable frame timing.
+
+Resource samples cover the application and its recorder in one process. RSS was
+88.703 MiB at startup, 88.113 MiB at the last periodic sample, and 88.363 MiB after
+close. The largest periodic sample was 104.168 MiB; the process-reported peak was
+113.656 MiB. Median RSS increased from 81.363 MiB during minutes 5-10 to
+88.113 MiB in the final five minutes, a 6.750 MiB increase. Average sampled CPU
+usage was about 0.106% of one core. These are observations from one bounded run,
+not proof that the server has no memory leak. Separate source/browser checks ran
+on the same host during the soak. Private logs retain the samples and shutdown
+receipt; independent log analysis matched the runner's counts and thresholds.
+
+### Variable-timing experiment
+
+Stages A, B and control each completed exactly five requests with error_code 0 and closed
+the adapter. The traces preserved the synthetic RGB hashes and frame order under
+one animation ID per GIF, requesting 500/1000 ms in A, 1000/500 ms in B and
+500/500 ms in control. Each
+sent one blue-still upload after the 15-second hold. No retry, reset, screen or
+brightness command was sent.
+
+For A, the owner said red 1 seemed longer but they could be mistaken. This is an
+ambiguous result, not a timing pass or a confirmed inversion. The owner confirmed
+blue 30 afterward. In B, the owner reported that neither frame lasted longer;
+they seemed equal. That observation does not demonstrate the requested timing
+difference. B's blue-still upload was acknowledged but not separately confirmed
+visually. The owner confirmed equal-looking control durations and final blue 30.
+All three helpers closed. Their combined observations do not establish effective
+variable timing or its cause. The application continues to reject media outside
+its uniform 500 ms profile; no retiming, expanded profile or workaround was added.
+Issue #12's variable-timing requirement remains open pending a disposition.
+
 ## Protocol smoke, September 6, 2026
 
 Hardware status on September 6, 2026: **Bounded smoke test passed** in
