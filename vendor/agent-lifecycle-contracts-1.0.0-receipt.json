@@ -1,0 +1,33 @@
+{
+  "artifact": "@jimmie-potts/agent-lifecycle-contracts",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "file": "jimmie-potts-agent-lifecycle-contracts-1.0.0.tgz",
+  "sha256": "669c8e3d8b2bac5255ea613eae96134c324515b4e7a767887e86fa59b87fef85",
+  "repository": "https://github.com/jimmie-potts/agent-device-hub",
+  "sourceRevision": "855bd3787803dad7245f29e88c758659f6e4eda4",
+  "sourceTree": "92d2f04961d84171f93d9d7f7a738663a77863d7",
+  "reviewedHead": "581cca0e758e46de4a121f2881babd5a42cc16c9",
+  "reviewedBase": "edfb94dcc06f437bd7a53365bd77284a7dcb16c5",
+  "pullRequest": 74,
+  "tag": "agent-lifecycle-contracts-v1.0.0",
+  "ci": {
+    "pullRequestRun": 34282511985,
+    "branchRun": 34282508683,
+    "mergedMainRun": 34283142367
+  },
+  "verification": {
+    "nodeTests": 84,
+    "sharedConformanceCases": 81,
+    "pythonTestMethods": 3,
+    "externalConsumers": [
+      "TypeScript",
+      "Python"
+    ],
+    "reproducibleArchives": 2
+  },
+  "limits": [
+    "Source validation does not establish installed-client compatibility or physical device acceptance.",
+    "Consumers must verify the archive SHA-256 and package manifest; release hosting alone is not an immutable pin."
+  ]
+}
