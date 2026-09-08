@@ -28,7 +28,8 @@ export function sendJson(host: string, port: number, body: Record<string, unknow
     const payload = JSON.stringify(body);
     let result: Record<string, unknown> | undefined;
     let failure: DeviceRequestError | undefined;
-    const req = request({ host, port, path: '/post', method: 'POST', agent: false, signal,
+    // Honor the runtime's proxy opt-in; Connection: close prevents connection reuse.
+    const req = request({ host, port, path: '/post', method: 'POST', signal,
       headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload), connection: 'close' },
     }, res => {
       const chunks: Buffer[] = [];

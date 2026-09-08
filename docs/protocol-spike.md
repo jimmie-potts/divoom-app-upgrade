@@ -43,10 +43,17 @@ are not universal limits or measurements for this device.
 
 These mappings come from the pinned sources above. HTTP 2xx and numeric zero
 error_code are both required. The parser rejects malformed JSON, wrong fields,
-nonzero device errors and responses over 16 KiB. Requests go directly to the
+nonzero device errors and responses over 16 KiB. Requests address the
 configured private IPv4, port 80 and `/post`. Hostnames, public destinations,
 URLs and redirects are rejected. No discovery, cloud call, arbitrary raw command,
 proxy destination, automatic retry or automatic reset is exposed by the CLI.
+
+The transport honors Node's operator-configured proxy support when enabled with
+`NODE_USE_ENV_PROXY=1` or `--use-env-proxy`. `HTTP_PROXY` and `NO_PROXY` determine
+the route; the configured device address, port and path remain fixed. The
+`Connection: close` header prevents device-request connection reuse. Cancellation
+waits for local request closure, but cannot recall a request already forwarded by
+a proxy or applied by the display. Use only the host's approved proxy settings.
 
 ## Build and review commands
 
