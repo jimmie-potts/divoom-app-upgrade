@@ -14,7 +14,7 @@ output, precise loop counts or phone access. Issues
 
 ## Prepare private settings
 
-Build with Node 24 using `npm ci` and `npm run build`. Choose the private data
+Build with Node 24.5 or later in the 24.x line using `npm ci` and `npm run build`. Choose the private data
 directory described in [local operations](local-operations.md). Start explicitly
 in simulator mode before saving settings. In Linux/WSL:
 

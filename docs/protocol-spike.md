@@ -57,7 +57,7 @@ a proxy or applied by the display. Use only the host's approved proxy settings.
 
 ## Build and review commands
 
-Use Node 24 from the worktree root:
+Use Node 24.5 or later in the 24.x line from the worktree root:
 
 ```bash
 npm ci

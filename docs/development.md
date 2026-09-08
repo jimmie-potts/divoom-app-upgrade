@@ -2,7 +2,9 @@
 
 ## Local checkout and worktrees
 
-Use Node 24/npm. With nvm, `nvm install` and `nvm use` read .nvmrc. From each
+Use Node 24.5 or later in the 24.x line with npm. With nvm, `nvm install` and
+`nvm use` read .nvmrc. Node 24.5 adds the HTTP proxy support used by device
+requests in environments that require it. From each
 fresh assigned worktree root:
 
 ```bash
