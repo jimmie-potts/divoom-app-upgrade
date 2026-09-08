@@ -16,3 +16,11 @@ The current user request supersedes the earlier independent-collector planning
 constraint. This changes future ownership/dependencies, not delivered runtime
 behavior, simulator defaults or physical acceptance. No product spec delta
 applies to this documentation/backlog update.
+
+## Contract adoption
+
+Issue #29 adopts the released Hub lifecycle schema and fixtures through the
+[vocabulary mapping](../agent-monitoring-vocabulary.md) and
+[consumer requirements](../agent-monitoring.md). Shared code remains in Hub
+packages. This source adoption changes no installed collector or running state
+owner. The embedded host and remote session-source boundary remain issue #31.
