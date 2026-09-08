@@ -117,3 +117,19 @@ automatic implementation routing, narrower local-only scope, stale review,
 missing CI, unresolved findings, unfinished archives, and unavailable independent
 review. Observe responses/actions; static schema validation alone does not prove
 agent routing. Fixture results do not prove real GitHub writes or host skill discovery.
+
+## Cross-project guide completion gate
+
+The [hub work guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md) is the canonical remaining-work,
+history and architecture document for these projects. For every authorized
+delivery, follow its maintenance procedure and identify the coordinator of the
+companion hub PR. Review affected status, dependencies, history, architecture
+and acceptance evidence. Record changed sections or a specific no-impact reason
+in the hub maintenance history. Link the hub PR and its validation here.
+
+Merge the hub adoption PR before these instructions take effect. Guide
+synchronization remains pending until its companion PR merges; include that
+status in the completion report. Reconcile post-merge facts in a follow-up when
+they were unavailable before review. Preserve source, installation, client and
+physical evidence as separate claims. These requirements do not grant authority
+for read-only tasks, tracker changes, installation or deployment.

@@ -23,3 +23,9 @@ Append the merged revision and main CI result after merge.
 Record source validation, installation status, and physical verification separately.
 Use Not run or Not in scope when appropriate. Simulator results do not establish
 physical display timing or authenticated phone access.
+
+## Cross-project work guide
+
+- [ ] Linked the coordinated hub guide PR and recorded its synchronization status.
+- [ ] Updated affected facts or recorded a specific no-impact reason in the hub maintenance history.
+- [ ] Recorded guide validation and any pending post-merge reconciliation.
