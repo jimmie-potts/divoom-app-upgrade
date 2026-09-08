@@ -87,7 +87,7 @@ and status. [Product direction](docs/product.md) links the preserved handoff,
 and future work. [Decisions](docs/decisions.md) records accepted architecture.
 Source delivery, app installation, and physical acceptance remain separate.
 
-[Shared monitoring direction](docs/hub-integration.md) records the planned hub integration and its GitHub dependencies. It changes no current simulator behavior.
+[Shared monitoring contracts](docs/agent-monitoring-vocabulary.md) pin the released Hub schema and fixtures. [Consumer requirements](docs/agent-monitoring.md) define task, attention, freshness and ownership behavior. Runtime monitoring and its UI remain planned under the [integration sequence](docs/hub-integration.md).
 
 ## Cross-project work guide
 

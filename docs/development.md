@@ -96,7 +96,7 @@ Initialize only specification storage:
 npm run openspec -- init --tools none --profile core --no-animation
 ```
 
-The current inventory includes application-foundation, device-adapter, device-http-spike, media-rendering, library-persistence, playlist-playback and controller-api and controller-ui and local-operations.
+The synchronized specification inventory includes application-foundation, controller-api, controller-ui, device-adapter, device-http-spike, library-persistence, local-mcp-controls, local-operations, mcp-media-playback, media-rendering, playlist-playback and shared-monitor-contract.
 Shared integrations remain central. `check:workflow` runs strict noninteractive validation for both
 current inventory and archived tasks, even if the first fails. These syntax and
 task-marker checks do not replace artifact completeness, acceptance tests, or
@@ -122,3 +122,11 @@ Do not claim physical behavior from the readiness API or simulator page.
 [Local operations](local-operations.md) documents the built backup, restore and
 diagnostics commands. Run application checks and browser checks sequentially in
 one worktree because both rebuild the production web assets.
+
+## Shared lifecycle contract conformance
+
+`npm test` and `npm run check` run the released lifecycle package consumer test
+on the existing Linux/Windows application CI jobs. It checks the committed
+archive/source receipt and installed manifest, then runs the original upstream
+validation/deduplication corpus. No provider session or device is invoked.
+This check establishes source contract compatibility only.

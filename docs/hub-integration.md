@@ -20,7 +20,7 @@ native hub controller integration and installed hooks remain planned.
 
 ## Adoption sequence
 
-- [divoom-app-upgrade#29](https://github.com/jimmie-potts/divoom-app-upgrade/issues/29) adopts qualified schemas/vocabulary from [agent-device-hub#2](https://github.com/jimmie-potts/agent-device-hub/issues/2).
+- [divoom-app-upgrade#29](https://github.com/jimmie-potts/divoom-app-upgrade/issues/29) records the [vocabulary mapping](agent-monitoring-vocabulary.md) and [consumer requirements](agent-monitoring.md), consuming qualified schemas/vocabulary from [agent-device-hub#2](https://github.com/jimmie-potts/agent-device-hub/issues/2).
 - [divoom-app-upgrade#31](https://github.com/jimmie-potts/divoom-app-upgrade/issues/31) embeds [agent-device-hub#3](https://github.com/jimmie-potts/agent-device-hub/issues/3) in the existing backend and uses
   [agent-device-hub#4](https://github.com/jimmie-potts/agent-device-hub/issues/4) for validated ingestion/snapshots. It owns composition,
   not another provider mapper, reducer, persistence engine or SSE stack.
@@ -79,4 +79,4 @@ do not install hooks, migrate live state or operate the display.
 Keep source/CI, installation, real-client, transport and visible-device evidence
 separate. Existing physical smoke evidence does not authorize further tests.
 [ADR 0010](decisions/0010-shared-agent-device-hub.md) records local adoption;
-reviewed capability specs remain unchanged by this planning-only delivery.
+the [monitoring consumer capability](../openspec/specs/shared-monitor-contract/spec.md) records source adoption. Runtime hosting, UI and installed acceptance retain their own gates.

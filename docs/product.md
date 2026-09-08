@@ -59,4 +59,4 @@ The accepted [hub integration plan](hub-integration.md) uses shared provider
 qualification, agent state and controller/MCP contracts from agent-device-hub.
 Pixoo owns consumer integration, media/playback, its 64x64 renderer and one
 device writer. The first shared core can run in this backend; a standalone hub
-requires a separate ownership migration. These capabilities remain planned.
+requires a separate ownership migration. Pixoo adopts the [released lifecycle contract](agent-monitoring-vocabulary.md) and [consumer requirements](agent-monitoring.md). Runtime monitoring remains planned.
