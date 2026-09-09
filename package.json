@@ -4,7 +4,7 @@
   "private": true,
   "description": "Pixoo-64 playlist controller development workflow",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24.5 <25"
   },
   "scripts": {
     "openspec": "node scripts/openspec.cjs",

@@ -14,7 +14,7 @@ output, precise loop counts or phone access. Issues
 
 ## Prepare private settings
 
-Build with Node 24 using `npm ci` and `npm run build`. Choose the private data
+Build with Node 24.5 or later in the 24.x line using `npm ci` and `npm run build`. Choose the private data
 directory described in [local operations](local-operations.md). Start explicitly
 in simulator mode before saving settings. In Linux/WSL:
 
@@ -139,3 +139,14 @@ lock files to force ownership. For offline transport, verify the authorized targ
 and current network reachability without guessing alternate addresses. Saved
 settings require restart to affect the active target. Health readiness confirms
 the backend opened; it does not prove device reachability or visible output.
+
+In a command environment that requires an HTTP proxy, enable Node's standard
+proxy support with `NODE_USE_ENV_PROXY=1` or `--use-env-proxy` and use the host's
+approved `HTTP_PROXY` settings. The device transport follows that configured
+route. Set `NO_PROXY=127.0.0.1,localhost` when local API clients must reach the
+backend inside the same environment. Adding the device to `NO_PROXY` requests a
+direct connection and will fail if the environment has no direct LAN route.
+Codex supplies proxy settings when its network proxy is active; its permission
+profile must also allow the exact device IP. An allowed destination and a usable
+connection route are both needed. Physical observations remain separate from a
+successful probe.

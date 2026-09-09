@@ -17,7 +17,8 @@ configure Codex or establish physical acceptance.
 
 ## Run the simulator
 
-Use Node 24 and npm. With nvm, run `nvm install` and `nvm use` from the root.
+Use Node 24.5 or later in the 24.x line and npm. With nvm, run `nvm install` and
+`nvm use` from the root. The minimum includes Node's built-in HTTP proxy support.
 
 ```bash
 npm ci
