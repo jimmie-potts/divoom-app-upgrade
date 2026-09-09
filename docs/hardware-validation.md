@@ -2,7 +2,11 @@
 
 ## Local playback acceptance, September 8, 2026 UTC
 
-**In progress** for [#12](https://github.com/jimmie-potts/divoom-app-upgrade/issues/12).
+**Accepted with recorded limitations** for the current uniform-500-ms profile in
+[#12](https://github.com/jimmie-potts/divoom-app-upgrade/issues/12). The owner
+approved deferring effective variable frame timing to
+[#55](https://github.com/jimmie-potts/divoom-app-upgrade/issues/55) after the
+completed experiments below; variable timing remains unverified.
 The owner supplied the target privately, identified Pixoo64, and approved the
 synthetic still/GIF, controls, recovery and bounded soak sequence. Firmware remains
 unknown. The tested application source is
@@ -38,8 +42,11 @@ briefly interleaves with red 1 / green 2 before settling on solid blue. Defect
 #52 records this additional description. Stopwatch readings are approximate;
 the burst and precise frame timing have not been instrumentally measured.
 The completed controls and recovery checks satisfy their issue criterion with
-the accepted screen-retention limitation. The issue remains open for the
-outstanding timing and delivery evidence.
+the accepted screen-retention limitation. The scoped physical observations are
+complete. The timing deferral preserves the approximate out-of-tolerance still
+reading, failed three-play sequence and accepted flashing defect; it changes
+only the variable-timing requirement. Source review, CI and guide delivery are
+tracked separately in the issue and PR.
 
 After the extra flashing was reported, the coordinator stopped playback and
 closed the physical backend. Brightness and screen settings had not been
@@ -150,7 +157,10 @@ visually. The owner confirmed equal-looking control durations and final blue 30.
 All three helpers closed. Their combined observations do not establish effective
 variable timing or its cause. The application continues to reject media outside
 its uniform 500 ms profile; no retiming, expanded profile or workaround was added.
-Issue #12's variable-timing requirement remains open pending a disposition.
+The owner approved moving this qualification to
+[#55](https://github.com/jimmie-potts/divoom-app-upgrade/issues/55), preserving
+the observations and the existing application profile. No additional physical
+run is part of #12 closeout. All helpers are closed; final blue 30 was confirmed.
 
 ## Protocol smoke, September 6, 2026
 
