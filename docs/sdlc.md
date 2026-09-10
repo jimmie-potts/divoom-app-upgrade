@@ -47,11 +47,18 @@ implementation. Reviewed specs replace proposed requirements for delivered
 capabilities. An empty bootstrap inventory is not an implemented behavior baseline.
 Resolve source conflicts before dependent work.
 
-Compose github-delivery for implementation, grill-with-docs for unsettled choices,
+Use plan-work and deliver-work only when explicitly invoked; ordinary work
+follows this SDLC. Compose grill-with-docs for unsettled choices,
 tdd for meaningful executable behavior, and code-review for review. Use research
 or openai-docs for source-dependent facts, how for existing behavior, and
 diagnosing-bugs for unknown failures. Investigation alone does not authorize a fix.
 Read docs/development.md for provisioning; do not copy shared skills into this repo.
+
+For planning, candidate review and completion, follow the
+[Hub guide checkpoints](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md).
+The coordinator owns the Hub companion and any authorized public publication.
+Report source/tracker completion, guide synchronization, public publication and
+live verification separately. Retain pending owners and narrower user limits.
 
 ## Plan and implement
 

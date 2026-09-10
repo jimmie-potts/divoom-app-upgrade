@@ -48,25 +48,26 @@ assignments, not configuration files loaded by the app.
 ## Shared skills
 
 Reusable methods belong to [agent-skills](https://github.com/jimmie-potts/agent-skills).
-The setup evaluated catalog revision `139ba8567a8b74d188850f83bff6d4687610c786`.
-Use a separate checkout at that revision and retain it while installed links use it.
+The guide checkpoints use reviewed catalog revision
+`ff80d247ea96a5d4c461d30a2c24148376197c7b`. Use a separate checkout at that
+revision for new provisioning and retain it while installed links use it.
 The local setup checkout is ignored at `.local/agent-skills` in the canonical
 repository, outside the tracked source and outside disposable worktrees.
 Do not clean that directory while installed skills depend on it.
 
-Required methods are github-delivery, grill-with-docs, grilling, tdd, code-review,
+Required methods are plan-work, deliver-work, grill-with-docs, grilling, tdd, code-review,
 domain-modeling, writing-for-agents, unslop, and the OpenSpec integrations:
 openspec-propose, openspec-explore, openspec-apply-change, openspec-update-change,
 openspec-sync-specs, openspec-archive-change. Existing central skills are preserved.
-A fresh host must inspect its catalog and install missing methods through the
-catalog manager without replacing conflicts. WSL links do not prove native
-Windows or cloud discovery; provision each host through its supported skill root.
+A fresh host must inspect its catalog and, when authorized, install missing
+methods through the catalog manager without replacing conflicts. WSL links do not
+prove native Windows or cloud discovery; provision each host through its supported skill root.
 
-On this setup host, the seven delivery/OpenSpec methods were missing. From the
-separate catalog checkout, run the manager in a writable host session:
+Check the installed methods before provisioning. When installation is authorized,
+run the manager from the separate catalog checkout in a writable host session:
 
 ```bash
-./scripts/manage-skills.sh install --agent codex github-delivery openspec-propose openspec-explore openspec-apply-change openspec-update-change openspec-sync-specs openspec-archive-change
+./scripts/manage-skills.sh install --agent codex plan-work deliver-work openspec-propose openspec-explore openspec-apply-change openspec-update-change openspec-sync-specs openspec-archive-change
 ./scripts/manage-skills.sh status --agent codex
 ```
 
@@ -76,10 +77,12 @@ host. Restart Codex if its skill catalog needs refresh and verify loaded source
 paths in a new task. A link created from WSL must not be assumed readable by a
 native Windows process. Do not generate repository-local copies as a fallback.
 
-Installation of the seven missing delivery/OpenSpec skills was verified after
-the user ran the manager from a writable WSL session. All seven are discovered
-in Codex and link to the pinned isolated catalog. Existing required skills remain
-in the original catalog. The manager calls those links foreign because they
+The earlier setup at `139ba8567a8b74d188850f83bff6d4687610c786` verified
+installation of seven then-missing delivery/OpenSpec skills after
+the user ran the manager from a writable WSL session. All seven were discovered
+in that Codex setup and linked to its pinned isolated catalog; this is historical
+evidence, not verification of the current planning/delivery skills. Other required
+skills remained in the original catalog. The manager calls those links foreign because they
 point at a different checkout; that is not a broken-link diagnosis. Keep both
 catalog checkouts available. Setup issue #1 is closed.
 
