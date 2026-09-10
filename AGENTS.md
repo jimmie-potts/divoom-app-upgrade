@@ -20,7 +20,8 @@ and main CI readback. Narrower user instructions prevail.
 
 ## Skills and validation
 
-Use the centrally installed `github-delivery` workflow for implementation.
+Follow `docs/sdlc.md` for ordinary implementation. Use centrally installed
+`plan-work` or `deliver-work` only when the user explicitly invokes it.
 Compose `grill-with-docs` for unsettled implementation-changing decisions, `tdd`
 for meaningful executable behavior, and `code-review` for review. This repository
 explicitly composes those methods without changing their global invocation settings.
@@ -94,3 +95,8 @@ that updates affected facts and records this delivery in
 that PR and synchronization status in this repository's PR and completion report.
 Pending guide synchronization remains unfinished delivery work. Read-only tasks
 do not authorize writes, and guide maintenance does not authorize devices or hosting.
+The shared skills consume that procedure at planning publication, candidate
+review, verified completion and authorized public publication. Report guide-source
+synchronization, public artifact publication and live verification separately,
+with evidence or a pending owner/next action. Tracker-only requests change only
+the tracker; a source merge does not update the public site.

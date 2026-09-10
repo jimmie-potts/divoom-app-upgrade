@@ -54,7 +54,7 @@ The local setup checkout is ignored at `.local/agent-skills` in the canonical
 repository, outside the tracked source and outside disposable worktrees.
 Do not clean that directory while installed skills depend on it.
 
-Required methods are github-delivery, grill-with-docs, grilling, tdd, code-review,
+Required methods are plan-work, deliver-work, grill-with-docs, grilling, tdd, code-review,
 domain-modeling, writing-for-agents, unslop, and the OpenSpec integrations:
 openspec-propose, openspec-explore, openspec-apply-change, openspec-update-change,
 openspec-sync-specs, openspec-archive-change. Existing central skills are preserved.
@@ -62,11 +62,11 @@ A fresh host must inspect its catalog and install missing methods through the
 catalog manager without replacing conflicts. WSL links do not prove native
 Windows or cloud discovery; provision each host through its supported skill root.
 
-On this setup host, the seven delivery/OpenSpec methods were missing. From the
-separate catalog checkout, run the manager in a writable host session:
+Check the installed methods before provisioning. When installation is authorized,
+run the manager from the separate catalog checkout in a writable host session:
 
 ```bash
-./scripts/manage-skills.sh install --agent codex github-delivery openspec-propose openspec-explore openspec-apply-change openspec-update-change openspec-sync-specs openspec-archive-change
+./scripts/manage-skills.sh install --agent codex plan-work deliver-work openspec-propose openspec-explore openspec-apply-change openspec-update-change openspec-sync-specs openspec-archive-change
 ./scripts/manage-skills.sh status --agent codex
 ```
 
