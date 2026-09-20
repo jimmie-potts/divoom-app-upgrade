@@ -7,10 +7,11 @@ import {Library} from '@pixoo/library';
 import {Player,LibraryPlaybackStore} from '../../packages/playback/src/index.js';
 import {SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE} from '@pixoo/media';
 import {FakeDeviceAdapter} from '../../packages/device/src/index.js';
+import {ManualClock} from '../helpers/manual-clock.js';
 import {gifFixture} from '../helpers/media-fixtures.js';
 const roots:string[]=[];const players:Player[]=[];const libraries:Library[]=[];
 afterEach(async()=>{for(const p of players)await p.close();for(const l of libraries)await l.close();for(const r of roots)await rm(r,{recursive:true,force:true});players.length=0;libraries.length=0;roots.length=0;});
-async function setup(){const directory=await mkdtemp(join(tmpdir(),'pixoo-admit-'));roots.push(directory);const library=await Library.open({directory});libraries.push(library);async function* bytes(){yield gifFixture(1,1,[{width:1,height:1,pixels:[1]}]);}const media=await library.importMedia(bytes(),'One');const p=await library.createPlaylist('Saved');const playlist=await library.replaceItems(p.id,1,[{renditionId:media.rendition.id}]);const device=new FakeDeviceAdapter();const player=await Player.open({store:new LibraryPlaybackStore(library),device});players.push(player);return {library,player,playlist,device,...media};}
+async function setup(clock?:ManualClock){const directory=await mkdtemp(join(tmpdir(),'pixoo-admit-'));roots.push(directory);const library=await Library.open({directory});libraries.push(library);async function* bytes(){yield gifFixture(1,1,[{width:1,height:1,pixels:[1]}]);}const media=await library.importMedia(bytes(),'One');const p=await library.createPlaylist('Saved');const playlist=await library.replaceItems(p.id,1,[{renditionId:media.rendition.id}]);const device=new FakeDeviceAdapter(clock?{clock}:{});const player=await Player.open({store:new LibraryPlaybackStore(library),device,...(clock?{clock}:{})});players.push(player);return {library,player,playlist,device,...media};}
 it('unknown start leaves the active session and writer generation untouched',async()=>{const {player,playlist,device}=await setup();await player.start(playlist.id);const state=player.getState(),session=player.getSession(),generation=device.generation;await expect(player.start(randomUUID())).rejects.toMatchObject({code:'not-found'});expect(device.generation).toBe(generation);expect(player.getState().intent).toBe(state.intent);expect(player.getSession()).toEqual(session);});
 it('rejects stale revisions without replacing context',async()=>{const {player,playlist,library}=await setup();await player.start(playlist.id);const old=await library.getPlaybackCheckpoint();await expect(player.start(playlist.id,1)).rejects.toMatchObject({code:'revision-conflict',details:{expectedRevision:1,actualRevision:2}});expect(await library.getPlaybackCheckpoint()).toEqual(old);});
 it('shows temporary media without saved rows and restores paused references',async()=>{const {player,library,rendition,asset}=await setup();const saved=await library.listPlaylists();await player.showMedia(rendition.id);expect(player.getSession()?.source).toEqual({kind:'media',assetId:asset.id,renditionId:rendition.id});expect(player.getState().playlistId).toBeNull();expect(player.getState().playlistRevision).toBeNull();expect(await library.listPlaylists()).toEqual(saved);const generation=player.getState().generation;await expect(player.restartWithChanges()).rejects.toMatchObject({code:'unsupported-operation'});expect(player.getState().generation).toBe(generation);await player.close();const reopened=await Player.open({store:new LibraryPlaybackStore(library),device:new FakeDeviceAdapter()});players.push(reopened);expect(reopened.getState().intent).toBe('paused');expect(reopened.getSession()?.source).toEqual({kind:'media',assetId:asset.id,renditionId:rendition.id});await expect(library.deleteAsset(asset.id)).rejects.toMatchObject({code:'asset-referenced'});});
@@ -82,12 +83,22 @@ it('offline verification accepts temporary source and legacy source-less recover
  await reopened.showMedia(rendition.id);expect(await library.verifyStorage()).toContain(`media/renditions/${rendition.id}/manifest.json`);
 });
 it('checks cancellation inside the real library queue behind a gated import',async()=>{
- const {player,playlist,library}=await setup();await player.start(playlist.id);const before=await library.getPlaybackCheckpoint();const entered=deferred(),release=deferred(),queued=deferred();
+ // Hold playback timers so readiness persistence cannot get ahead of admission
+ // and wait behind the same import that this test releases after capture queues.
+ const {player,playlist,library}=await setup(new ManualClock());await player.start(playlist.id);const before=await library.getPlaybackCheckpoint();const entered=deferred(),release=deferred(),queued=deferred();
  async function* input(){entered.resolve();await release.promise;yield gifFixture(1,1,[{width:1,height:1,pixels:[0]}]);}
- const importing=library.importMedia(input(),'Gated');await entered.promise;
  const capture=library.createPlaybackCheckpoint.bind(library);
  const mock=vi.spyOn(library,'createPlaybackCheckpoint').mockImplementation((id,options)=>{const result=capture(id,options);queued.resolve();return result;});
- const start=player.start(playlist.id,playlist.revision),rejected=expect(start).rejects.toMatchObject({code:'cancelled'});await queued.promise;
- const stop=player.stop();expect(player.getState().intent).toBe('stopped');release.resolve();await importing;await rejected;await stop;mock.mockRestore();
- expect((await library.getPlaybackCheckpoint())!.sessionId).toBe(before!.sessionId);expect((await library.listSessions()).map(s=>s.id)).toEqual([before!.sessionId]);
+ const importing=library.importMedia(input(),'Gated');let start:Promise<void>|undefined;
+ try {
+  await entered.promise;
+  start=player.start(playlist.id,playlist.revision);
+  const outcome=start.then(()=>({code:'unexpected-success'}),(error:unknown)=>error);await queued.promise;
+  const stop=player.stop();expect(player.getState().intent).toBe('stopped');release.resolve();await importing;
+  expect(await outcome).toMatchObject({code:'cancelled'});await stop;
+  expect((await library.getPlaybackCheckpoint())!.sessionId).toBe(before!.sessionId);expect((await library.listSessions()).map(s=>s.id)).toEqual([before!.sessionId]);
+ } finally {
+  const stopping=player.stop();release.resolve();
+  await Promise.allSettled([importing,start,stopping]);mock.mockRestore();
+ }
 });
