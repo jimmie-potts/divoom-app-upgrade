@@ -24,7 +24,8 @@
     "backup": "node apps/server/dist/operations-cli.js backup",
     "restore": "node apps/server/dist/operations-cli.js restore",
     "diagnostics": "node apps/server/dist/operations-cli.js diagnostics",
-    "mcp:credentials": "node apps/server/dist/mcp-cli.js"
+    "mcp:credentials": "node apps/server/dist/mcp-cli.js",
+    "test:controller": "npm run build && vitest run tests/integration/hub-controller.test.ts tests/integration/hub-controller-compatibility.test.ts tests/integration/hub-controller-events.test.ts tests/integration/hub-contract-package.test.ts"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.12.0",

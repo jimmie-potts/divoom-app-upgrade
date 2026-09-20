@@ -87,3 +87,12 @@ dependency consumed from its committed released archive. The
 Hub PR #74 and source revision; its SHA-256 and complete installed manifest
 are checked by the consumer test. Its runtime schema dependency is Ajv 8.20.0
 under the MIT license. No sibling-checkout package or provider adapter is used.
+
+## Shared controller contract
+
+The server pins `@jimmie-potts/device-contracts` 1.0.0 from the private
+`controller-contracts-v1.0.0` release. Its archive SHA-256 is
+`5e0b30ac92e6e8e1e38d8249b740b565de66e3cc810a04bc6fac23e182e84e87`.
+The adjacent vendor receipt records immutable source revision and release
+provenance. Ajv 8.20.0 is its MIT-licensed schema validator. Consumer checks
+verify the archive, every installed manifest hash and all 220 shared fixtures.

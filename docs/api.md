@@ -190,3 +190,9 @@ Temporary snapshots retain a playlist-shaped traversal for the browser, but thei
 source is `media` and player-state saved playlist ID/revision are null. The
 internal snapshot ID must not be used as a saved playlist ID. Restart with changes
 is unsupported for temporary sessions; select a saved playlist explicitly instead.
+
+## Native shared controller routes
+
+The separately enabled [shared controller API](hub-controller-api.md) serves
+`/controller/v1` using machine credentials and the same command ledger/player.
+Its narrow originless mutation exception does not change `/api` authorization.

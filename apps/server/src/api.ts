@@ -15,7 +15,10 @@ import {assertRuntimeDirectory} from './operations.js';
 import {diagnosticsSchema} from '@pixoo/core';
 import {loadRuntimeSelection,selectRuntime,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
 import {acquireDeviceOwner} from './device-owner.js';
+import {registerController,type ControllerIdentity} from './controller.js';
 export interface ApiRuntimeOptions {
+ controllerEnabled?:boolean;
+ controllerIdentity?:ControllerIdentity;
  mcpEnabled?:boolean;
  mode?:RuntimeMode;
  runtime?:RuntimeSelection;
@@ -49,6 +52,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   const commands=new Commands(),service=new ControlService(active,commands,runtime.mode,library,profile,runtime.mode==='device'?500:100),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
   if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
+  if(options.controllerEnabled)await registerController(app,dataDir,service,options.controllerIdentity);
   app.addHook('preClose',async()=>{
    unsubscribe();events.close();
    try{await active.close();}finally{await physical?.close();}
