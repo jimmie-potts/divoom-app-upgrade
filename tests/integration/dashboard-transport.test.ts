@@ -31,7 +31,9 @@ it('legacy protocol CLI refuses the backend target lock without contacting hardw
   const directory=process.platform==='win32'?join(home,'AppData','Local','PixooPlaylistControllerDeviceLocks'):join(home,'.local','share','pixoo-playlist-controller-device-locks');
   const release=await acquireDeviceOwner('192.168.1.2',directory);cleanup.push(release);
   const env={...process.env,HOME:home,USERPROFILE:home,PIXOO_DEVICE_IP:'192.168.1.2'};
-  await expect(promisify(execFile)(process.execPath,['scripts/device-spike.mjs','static','--allow-display-change'],{env})).rejects.toMatchObject({code:1,stderr:expect.stringContaining('busy')});
+  // A lock regression must fail the test without allowing a physical request.
+  const guard='data:text/javascript,'+encodeURIComponent("import http from 'node:http';import {syncBuiltinESMExports} from 'node:module';http.request=()=>{throw new Error('Test forbids network requests')};syncBuiltinESMExports();");
+  await expect(promisify(execFile)(process.execPath,['--import',guard,'scripts/device-spike.mjs','static','--allow-display-change'],{env})).rejects.toMatchObject({code:1,stderr:expect.stringContaining('busy')});
   release();
   const next=await acquireDeviceOwner('192.168.1.2',directory);next();
 });
