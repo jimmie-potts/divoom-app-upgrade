@@ -1,3 +1,4 @@
+import type {MediaOperationEvent} from '@pixoo/playback';
 import {randomUUID} from 'node:crypto';
 import {admit,validate,type Capabilities,type Command,type Identity,type Receipt,type Request,type Snapshot,type Ticket,type FailureCode} from '@jimmie-potts/device-contracts';
 import type {ControlService} from './control-service.js';
@@ -20,14 +21,17 @@ export class ControllerState {
  private pending=new Map<string,Snapshot['state']['pending'][number]>();
  private lastOutcome:Snapshot['state']['lastOutcome']={status:'unknown'};
  private lastSuccessfulSend:Snapshot['state']['lastSuccessfulSend']={status:'unknown'};
- private mediaRequest:Ticket|undefined;
- private uploadAt=-1;
+ private mediaOperations=new Map<number,{receipt:Receipt;pending?:Snapshot['state']['pending'][number]}>();
+ private earlyMediaOutcomes=new Map<string,Receipt>();
  private playlists=new Map<string,number>();
  private catalogSignature:string|undefined;
  private refreshWork:Promise<void>|undefined;
  private unsubscribe:()=>void;
  onChange=()=>{};
- constructor(readonly service:ControlService,readonly identity:Identity){this.unsubscribe=service.commands.subscribe(event=>this.observe(event));}
+ constructor(readonly service:ControlService,readonly identity:Identity){
+  const commands=service.commands.subscribe(event=>this.observe(event)),media=service.player.subscribeMediaOperations(event=>this.observeMedia(event));
+  this.unsubscribe=()=>{commands();media();};
+ }
  close(){this.unsubscribe();}
  private generation=():Ticket=>({epoch:this.identity.controllerEpoch,sequence:this.service.player.getState().generation});
  private clock=(sampledAtMs=performance.now())=>({domain:'controller-monotonic' as const,epoch:this.identity.controllerEpoch,sampledAtMs});
@@ -45,32 +49,46 @@ export class ControllerState {
  capabilities():Capabilities{return {power:{supported:true},brightness:{supported:true,minimum:0,maximum:100},media:{supported:true,actions:['pause','resume','stop','next','previous','clear'],playlistIds:[...this.playlists.keys()],renditionIds:[]},zones:{supported:false},scenes:{supported:false},preview:{supported:false},modes:{supported:false}};}
  snapshot(cursor:Ticket={epoch:this.feedEpoch,sequence:0}):Snapshot{
   const display=this.service.player.getDisplayEvidence();
-  if(this.mediaRequest&&display.transport?.source==='upload'&&display.transport.atMs>this.uploadAt){
-   this.uploadAt=display.transport.atMs;
-   const receipt=this.base(this.mediaRequest),transport=display.transport;
-   if(transport.ok){receipt.outcome='sent';receipt.priorEffects='confirmed-transmission';receipt.completedOperations=['media'];this.lastSuccessfulSend={status:'known',requestId:receipt.requestId,clock:this.clock(transport.atMs),operationIds:['media']};}
-   else{receipt.outcome=transport.priorEffects==='possible'?'uncertain':'failed';receipt.priorEffects=transport.priorEffects;receipt.failure={code:transport.priorEffects==='possible'?'uncertain-result':'transport-failure'};if(transport.priorEffects==='possible')receipt.uncertainOperations=['media'];}
-   this.lastOutcome={status:'known',receipt};
-  }
   const observed=[display.screen.observed?.atMs,display.brightness.observed?.atMs].filter((v):v is number=>v!==undefined);
   return {apiVersion:'1.0',identity:{...this.identity},configurationRevision:this.service.commands.configurationRevision,generation:this.generation(),nextRequestId:ticket(this.service.commands.nextRequestId),cursor,
    sampleClock:this.clock(),serviceHealth:'ready',capabilities:this.capabilities(),limits:{maxPending:32,maxBodyBytes:65536,maxInFlight:32,maxReceipts:256,maxEvents:32,maxStreams:16,authenticationTimeoutMs:1000},
-   state:{desired:{power:{status:'known',value:display.requestedScreenOn},brightness:display.requestedBrightness===null?{status:'unknown'}:{status:'known',value:display.requestedBrightness},mode:{status:'unknown'}},pending:structuredClone([...this.pending.values()]),lastSuccessfulSend:structuredClone(this.lastSuccessfulSend),lastOutcome:structuredClone(this.lastOutcome),externalControl:{status:'unknown'},
+   state:{desired:{power:{status:'known',value:display.requestedScreenOn},brightness:display.requestedBrightness===null?{status:'unknown'}:{status:'known',value:display.requestedBrightness},mode:{status:'unknown'}},pending:structuredClone([...new Map([...this.pending,...[...this.mediaOperations.values()].flatMap(value=>value.pending?[[`${value.receipt.requestId.epoch}:${value.receipt.requestId.sequence}`,value.pending] as const]:[])]).values()]),lastSuccessfulSend:structuredClone(this.lastSuccessfulSend),lastOutcome:structuredClone(this.lastOutcome),externalControl:{status:'unknown'},
     observation:this.service.mode==='simulator'||!observed.length?{status:'unknown'}:{status:'known',clock:this.clock(Math.min(...observed)),evidenceAgeMs:Math.max(0,performance.now()-Math.min(...observed)),power:display.screen.observed?{status:'known',value:display.screen.observed.value}:{status:'unknown'},brightness:display.brightness.observed?{status:'known',value:display.brightness.observed.value}:{status:'unknown'}}}};
  }
  private base(requestId:Ticket):Receipt{return {apiVersion:'1.0',controllerId:this.identity.controllerId,deviceId:this.identity.deviceId,requestId,configurationRevision:this.service.commands.configurationRevision,generation:this.generation(),outcome:'queued',priorEffects:'none',completedOperations:[],uncertainOperations:[]};}
+ private observeMedia(event:MediaOperationEvent):void{
+  if(event.phase==='pending'){
+   const body=this.service.playbackRequest;if(!body)return;
+   const receipt=this.base(ticket(body.requestId));receipt.generation={epoch:this.identity.controllerEpoch,sequence:event.generation};
+   const existing=this.pending.get(body.requestId);
+   const command:Command|undefined=existing?.command??(body.command==='start'?{kind:'media.start',playlistId:body.playlistId}:['resume','next','previous'].includes(body.command)?{kind:'media.control',action:body.command as 'resume'}:undefined);
+   this.mediaOperations.set(event.operationId,{receipt,...(command?{pending:{requestId:receipt.requestId,command,generation:receipt.generation}}:{})});
+  }else{
+   const operation=this.mediaOperations.get(event.operationId);if(!operation)return;
+   this.mediaOperations.delete(event.operationId);
+   const {receipt}=operation,result=event.result;
+   if(result.ok){receipt.outcome='sent';receipt.priorEffects='confirmed-transmission';receipt.completedOperations=['media'];this.lastSuccessfulSend={status:'known',requestId:receipt.requestId,clock:this.clock(result.timing.completedAtMs),operationIds:['media']};}
+   else{receipt.outcome=result.priorEffects==='possible'?'uncertain':result.code==='cancelled'||result.code==='stale-generation'?'cancelled':'failed';receipt.priorEffects=result.priorEffects;receipt.failure={code:result.priorEffects==='possible'?'uncertain-result':receipt.outcome==='cancelled'?'stale-generation':'transport-failure'};if(result.priorEffects==='possible')receipt.uncertainOperations=['media'];}
+   const requestId=`${receipt.requestId.epoch}:${receipt.requestId.sequence}`;
+   if(this.pending.has(requestId))this.earlyMediaOutcomes.set(requestId,receipt);
+   this.lastOutcome={status:'known',receipt};
+  }
+  this.onChange();
+ }
  private observe(event:CommandEvent){
   const [kind,body]=event.payload as [string,Record<string,unknown>];
   let command:Command|undefined;
   if(kind==='controller')command=(body as unknown as Request).command;
   else if(kind==='display')command=body.brightness!==undefined?{kind:'brightness.set',percent:body.brightness as number}:{kind:'power.set',on:body.screenOn as boolean};
   else if(kind==='player'&&body.command==='start')command={kind:'media.start',playlistId:body.playlistId as string};
-  else if(kind==='player'&&['pause','resume','stop','next','previous','clear','restart-with-changes'].includes(String(body.command)))command={kind:'media.control',action:body.command as 'pause'};
-  if(!command)return;
+  else if(kind==='player'&&['pause','resume','stop','next','previous','clear'].includes(String(body.command)))command={kind:'media.control',action:body.command as 'pause'};
+  if(!command){this.earlyMediaOutcomes.delete(event.requestId);return;}
   if(event.phase==='pending')this.pending.set(event.requestId,{requestId:ticket(event.requestId),command,generation:this.generation()});
   else{
    this.pending.delete(event.requestId);
-   if(kind==='controller'&&validate('receipt',event.result))this.lastOutcome={status:'known',receipt:structuredClone(event.result as Receipt)};
+   const media=this.earlyMediaOutcomes.get(event.requestId);this.earlyMediaOutcomes.delete(event.requestId);
+   if(media)this.lastOutcome={status:'known',receipt:media};
+   else if(kind==='controller'&&validate('receipt',event.result))this.lastOutcome={status:'known',receipt:structuredClone(event.result as Receipt)};
    else{
     const receipt=this.base(ticket(event.requestId));
     const result=event.result as Awaited<ReturnType<ControlService['applyDisplay']>>|undefined;
@@ -104,13 +122,10 @@ export class ControllerState {
      if(decision.decision!=='queued')return decision.receipt??{...receipt,outcome:'failed' as const,failure:{code:decision.decision as FailureCode}};
      this.service.commands.changed();receipt.configurationRevision=this.service.commands.configurationRevision;
    const command=request.command;
-     const previousUpload=this.service.player.getDisplayEvidence().transport;
-     const previousUploadAt=previousUpload?.source==='upload'?previousUpload.atMs:this.uploadAt;
      if(command.kind==='power.set'||command.kind==='brightness.set'){
       const result=await this.service.applyDisplay(command.kind==='power.set'?{requestId,screenOn:command.on}:{requestId,brightness:command.percent});this.operation(receipt,result.operation);
      }else if(command.kind==='media.start')await this.service.applyPlayback({requestId,command:'start',playlistId:command.playlistId,revision:this.playlists.get(command.playlistId)!});
      else if(command.kind==='media.control')await this.service.applyPlayback({requestId,command:command.action});
-     if(command.kind==='media.start'||command.kind==='media.control'){this.mediaRequest=request.requestId;this.uploadAt=Math.max(this.uploadAt,previousUploadAt);}
      receipt.generation=this.generation();
     }catch(error){this.failed(receipt,error);receipt.generation=this.generation();}
     return receipt;

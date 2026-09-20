@@ -1,3 +1,4 @@
+import {AsyncLocalStorage} from 'node:async_hooks';
 import type {Player} from '@pixoo/playback';
 import type {OperationResult} from '@pixoo/device';
 import type {Library} from '@pixoo/library';
@@ -7,6 +8,10 @@ import {Commands} from './commands.js';
 import {parse} from './validation.js';
 import {ApiError} from './security.js';
 export class ControlService {
+ // Async context follows queued player work, retries and automatic traversal.
+ // Each upload captures its initiating command even after another client takes over.
+ private playbackContext=new AsyncLocalStorage<PlayerCommand>();
+ get playbackRequest(){return this.playbackContext.getStore();}
  constructor(readonly player:Player,readonly commands:Commands,readonly mode:'simulator'|'device',readonly library?:Library,readonly profile?:Readonly<MediaProfile>,readonly stillDelayMs=100){}
  snapshot=()=>({sampledAtMs:performance.now(),serverId:this.commands.epoch,nextRequestId:this.commands.nextRequestId,player:this.player.getState(),session:this.player.getSession()});
  status(){
@@ -22,11 +27,13 @@ export class ControlService {
   return structuredClone(retained);
  }
  async applyPlayback(body:PlayerCommand){
+  return this.playbackContext.run(body,async()=>{
   if(body.command==='start')await this.player.start(body.playlistId,body.revision);
   else if(body.command==='show-media')await this.player.showMedia(body.renditionId,body.playback);
   else if(body.command==='restart-with-changes')await this.player.restartWithChanges();
   else await this.player[body.command]();
   return this.snapshot();
+  });
  }
  async catalog(kind:'media'|'playlists',input:unknown){
   const query=parse(catalogQuery,input);

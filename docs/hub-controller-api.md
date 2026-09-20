@@ -98,7 +98,14 @@ cancellation rules. A historical receipt cannot restore retired output.
 receipts initially acknowledge context work as `queued`; uploads happen through
 the existing player. Current snapshots separate desired values, pending native
 and representable local commands, last successful transmission and last outcome.
-A later failure preserves the last successful send. Possible prior effects stay
+Upload observers retain pending work until the adapter returns, including after
+generation retirement. Request context follows browser, MCP and native playback
+through retries and automatic traversal. Completion events carry the original
+request and generation; pause and stop cannot acquire an older upload. The
+original queued receipt remains immutable, while snapshots and feeds report
+the later transport outcome. Local rendition-only tools have no command form
+in contract v1, so their sends have request evidence but no shared pending
+command entry. A later failure preserves the last successful send. Possible prior effects stay
 explicit as `uncertain`. Physical observations are always unknown in simulator
 mode. External ownership remains unknown without a qualified observation.
 Reads and heartbeat messages never probe or refresh physical evidence.

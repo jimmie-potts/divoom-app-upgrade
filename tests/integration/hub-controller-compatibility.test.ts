@@ -118,3 +118,41 @@ it('projects asynchronous media uncertainty without changing its original queued
   expect((await f.post(body)).json()).toEqual(receipt.json());
  }finally{await f.close();}
 },15000);
+
+it.each(['browser','MCP'])('attributes %s media output to its own request after an earlier native pause',async clientKind=>{
+ const f=await fixture(),client=new Client({name:'media-evidence',version:'1'});try{
+  await f.post(f.request(await f.snapshot(),{kind:'media.control',action:'pause'}));
+  const part=multipart(),upload=await f.app.inject({method:'POST',url:'/api/assets',...part,headers:{...part.headers,...f.headers}});
+  const headers={...f.headers,'x-pixoo-request':'1'};
+  const playlist=(await f.app.inject({method:'POST',url:'/api/playlists',headers,payload:{name:'Synthetic'}})).json();
+  const edited=(await f.app.inject({method:'PUT',url:`/api/playlists/${playlist.id}/items`,headers,payload:{revision:1,items:[{renditionId:upload.json().rendition.id}]}})).json();
+  const id=(await f.snapshot()).nextRequestId;
+  if(clientKind==='browser')expect((await f.app.inject({method:'POST',url:'/api/player/commands',headers,payload:{requestId:`${id.epoch}:${id.sequence}`,command:'start',playlistId:playlist.id,revision:edited.revision}})).statusCode).toBe(200);
+  else{
+   await client.connect(new StreamableHTTPClientTransport(new URL(f.base+'/mcp'),{requestInit:{headers:{authorization:`Bearer ${f.token}`}}}) as Transport);
+   expect((await client.callTool({name:'play_playlist',arguments:{playlist_id:playlist.id,revision:edited.revision,request_id:`${id.epoch}:${id.sequence}`}})).isError).not.toBe(true);
+  }
+  await vi.waitFor(async()=>expect((await f.snapshot()).state.lastSuccessfulSend).toMatchObject({status:'known',requestId:id,operationIds:['media']}));
+ }finally{await client.close();await f.close();}
+},15000);
+
+it('keeps media pending and preserves possible effects when a browser stop retires its generation',async()=>{
+ let release=()=>{},sending=false;const gate=new Promise<void>(resolve=>{release=resolve;});
+ const f=await fixture(async body=>{if(body.Command==='Draw/SendHttpGif'){sending=true;await gate;}return {error_code:0,PicId:1};});
+ try{
+  const part=multipart(gifFixture(1,1,[{width:1,height:1,pixels:[1],delay:50}]));
+  const upload=await f.app.inject({method:'POST',url:'/api/assets',...part,headers:{...part.headers,...f.headers}});
+  const headers={...f.headers,'x-pixoo-request':'1'};
+  const playlist=(await f.app.inject({method:'POST',url:'/api/playlists',headers,payload:{name:'Synthetic'}})).json();
+  await f.app.inject({method:'PUT',url:`/api/playlists/${playlist.id}/items`,headers,payload:{revision:1,items:[{renditionId:upload.json().rendition.id}]}});
+  const body=f.request(await f.snapshot(),{kind:'media.start',playlistId:playlist.id}),queued=(await f.post(body)).json();
+  await vi.waitFor(()=>expect(sending).toBe(true));
+  expect((await f.snapshot()).state.pending).toContainEqual(expect.objectContaining({requestId:body.requestId}));
+  const id=(await f.snapshot()).nextRequestId;
+  await f.app.inject({method:'POST',url:'/api/player/commands',headers,payload:{requestId:`${id.epoch}:${id.sequence}`,command:'stop'}});
+  release();
+  await vi.waitFor(async()=>expect((await f.snapshot()).state.lastOutcome).toMatchObject({status:'known',receipt:{requestId:body.requestId,outcome:'uncertain',priorEffects:'possible'}}));
+  expect((await f.snapshot()).state.pending).toHaveLength(0);
+  expect((await f.post(body)).json()).toEqual(queued);
+ }finally{release();await f.close();}
+},15000);

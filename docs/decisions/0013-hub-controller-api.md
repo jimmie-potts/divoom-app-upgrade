@@ -15,7 +15,10 @@ All command sources share the existing ledger and player. Native envelopes keep
 revision/generation guards in their replay fingerprint. Reuse player/library
 execution helpers after admission, and retain the adapter's cancellation and
 possible-effects semantics. Track catalog revisions to guard native media
-selection and pass the selected revision into atomic capture.
+selection and pass the selected revision into atomic capture. Observe upload
+completion before the player discards retired-generation callbacks. Server-side
+async request context correlates browser, MCP and native uploads, including
+retries and traversal, without changing playback scheduling or device ownership.
 
 Use a separate bounded feed for shared contract envelopes so existing browser
 SSE remains compatible. Reauthorize streams before delivery and on a one-second

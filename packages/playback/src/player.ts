@@ -7,7 +7,13 @@ const connectivityErrors=new Set(['offline','timeout','http-error']);
 const codeOf=(error:unknown)=>typeof (error as {code?:unknown})?.code==='string'?String((error as {code:string}).code):'operation-failed';
 interface Options {store:PlaybackStore;device:DeviceAdapter;clock?:Clock;random?:()=>number;retryBaseMs?:number;maxRetries?:number;operationTimeoutMs?:number;pauseOnUncertain?:boolean}
 
+export type MediaOperationEvent = {operationId:number;generation:number} & ({phase:'pending'}|{phase:'complete';result:OperationResult<UploadResult>});
+
 export class Player {
+  private mediaListeners=new Set<(event:MediaOperationEvent)=>void>();
+  private mediaSequence=0;
+  subscribeMediaOperations(listener:(event:MediaOperationEvent)=>void):()=>void {this.mediaListeners.add(listener);return ()=>{this.mediaListeners.delete(listener);};}
+  private notifyMedia(event:MediaOperationEvent):void {for(const listener of this.mediaListeners){try{listener(event);}catch{/* Evidence observers cannot interrupt device work. */}}}
   private listeners=new Set<()=>void>();
   private published='';
   subscribe(listener:()=>void):()=>void {this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};}
@@ -241,7 +247,11 @@ export class Player {
     void this.prepare(item.renditionId,token).then(async animation=>{
       if(!this.valid(token))return;
       const duration=this.dwell(animation);
+      const operationId=++this.mediaSequence;
+      this.notifyMedia({operationId,generation:token,phase:'pending'});
       const result=await this.device.uploadAnimation(animation,{generation,signal,timeoutMs:this.operationTimeoutMs});
+      // Retired generations still have transport evidence, even though they cannot update playback.
+      this.notifyMedia({operationId,generation:token,phase:'complete',result});
       this.background(token,()=>this.uploaded(token,result,duration));
     }).catch(error=>{this.background(token,()=>this.failedItem(token,codeOf(error)));});
   }
