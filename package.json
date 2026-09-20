@@ -24,7 +24,9 @@
     "backup": "node apps/server/dist/operations-cli.js backup",
     "restore": "node apps/server/dist/operations-cli.js restore",
     "diagnostics": "node apps/server/dist/operations-cli.js diagnostics",
-    "mcp:credentials": "node apps/server/dist/mcp-cli.js"
+    "mcp:credentials": "node apps/server/dist/mcp-cli.js",
+    "monitor:manage": "node apps/server/dist/monitor-cli.js",
+    "monitor:hook": "node scripts/monitor-hook.mjs"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.12.0",

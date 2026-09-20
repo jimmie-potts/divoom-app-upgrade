@@ -1,8 +1,9 @@
 # Agent monitoring vocabulary
 
 Pixoo adopts the released Hub lifecycle contract as its monitoring vocabulary.
-This document maps it to consumer requirements. Provider adapters, a state
-reducer, browser monitoring panels and device rendering remain later work.
+This document maps it to consumer requirements. The released shared package supplies provider normalization and state reduction.
+Issue #31 composes its host; browser monitoring panels and device rendering
+remain later work.
 
 The canonical definitions are the
 [delivered Hub lifecycle contract](https://github.com/jimmie-potts/agent-device-hub/blob/855bd3787803dad7245f29e88c758659f6e4eda4/docs/agent-lifecycle-contract.md)

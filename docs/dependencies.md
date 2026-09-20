@@ -87,3 +87,10 @@ dependency consumed from its committed released archive. The
 Hub PR #74 and source revision; its SHA-256 and complete installed manifest
 are checked by the consumer test. Its runtime schema dependency is Ajv 8.20.0
 under the MIT license. No sibling-checkout package or provider adapter is used.
+
+The server consumes `@jimmie-potts/agent-state` 1.0.0 from the verified private
+release archive under `vendor/`. Its source receipt records Hub PR #105 and
+SHA-256 `ae589d311e282c3356579c85507a3aa973ab7990e06e062143aeb08d8d2dcc99`.
+It bundles the lifecycle contract; its exact public dependency is Ajv 8.20.0.
+The archive retains its upstream licenses. Pixoo owns the production storage
+adapter and authenticated host transport; the shared reducer remains upstream.

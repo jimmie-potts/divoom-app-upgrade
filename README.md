@@ -95,3 +95,7 @@ Source delivery, app installation, and physical acceptance remain separate.
 The [hub work guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md) contains the shared remaining-work
 map, delivery history and architecture diagrams. This project maintains its
 portion through a linked hub PR under the SDLC completion gate.
+
+[Shared agent monitoring](docs/agent-monitoring.md) is an explicit backend option.
+It embeds the pinned shared engine or selects a remote owner, with separate
+private storage and credentials. Enabling it does not install hooks or write to a device.

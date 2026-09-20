@@ -14,9 +14,11 @@ import {catalogRoutes} from './catalog-routes.js';
 import {assertRuntimeDirectory} from './operations.js';
 import {diagnosticsSchema} from '@pixoo/core';
 import {loadRuntimeSelection,selectRuntime,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
+import {registerMonitor} from './monitor.js';
 import {acquireDeviceOwner} from './device-owner.js';
 export interface ApiRuntimeOptions {
  mcpEnabled?:boolean;
+ monitorEnabled?:boolean;
  mode?:RuntimeMode;
  runtime?:RuntimeSelection;
  transportForTests?:DeviceTransport;
@@ -27,8 +29,9 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
  await assertRuntimeDirectory(dataDir);
  const runtime=options.runtime?selectRuntime(options.runtime.mode,options.runtime.savedConfiguration):await loadRuntimeSelection(dataDir,options.mode??'simulator');
  const profile=runtime.mode==='device'?PIXOO64_SMOKE_PROFILE:SIMULATOR_PROFILE;
+ let closeMonitor:(()=>Promise<void>)|undefined;
  let releaseOwner:(()=>void)|undefined,library:Library|undefined,physical:HttpDeviceAdapter|undefined,player:Player|undefined;
- const close=async()=>{try{await player?.close();}finally{try{await physical?.close();}finally{try{await library?.close();}finally{releaseOwner?.();}}}};
+ const close=async()=>{try{await closeMonitor?.();await player?.close();}finally{try{await physical?.close();}finally{try{await library?.close();}finally{releaseOwner?.();}}}};
  try{
   if(runtime.activeConfiguration)releaseOwner=await acquireDeviceOwner(runtime.activeConfiguration.ip,options.deviceLockDirectoryForTests);
   library=await Library.open({directory:join(dataDir,'library')});
@@ -48,6 +51,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   let changed=()=>{};
   const commands=new Commands(),service=new ControlService(active,commands,runtime.mode,library,profile,runtime.mode==='device'?500:100),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
+  if(options.monitorEnabled)closeMonitor=await registerMonitor(app,dataDir);
   if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
   app.addHook('preClose',async()=>{
    unsubscribe();events.close();
