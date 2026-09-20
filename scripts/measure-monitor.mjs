@@ -31,7 +31,7 @@ try{
       const child=spawn(process.execPath,[join(root,'scripts/monitor-hook.mjs'),path],{stdio:['pipe','pipe','pipe']});children.add(child);let output=0;
       const timeout=setTimeout(()=>{child.kill('SIGKILL');reject(new Error('hook-timeout'));},3000);
       child.stdout.on('data',part=>{output+=part.length;});child.stderr.on('data',part=>{output+=part.length;});
-      child.once('error',reject);child.once('exit',code=>{children.delete(child);clearTimeout(timeout);if(code!==0||output)reject(new Error('hook-failed'));else resolve();});
+      child.once('error',error=>{children.delete(child);clearTimeout(timeout);reject(error);});child.once('exit',code=>{children.delete(child);clearTimeout(timeout);if(code!==0||output)reject(new Error('hook-failed'));else resolve();});
       child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({session_id:`session-${number%concurrency}`,turn_id:`turn-${number}`,prompt:'EXCLUDED-PERFORMANCE-CANARY'}));
      });
      return performance.now()-at;

@@ -87,3 +87,23 @@ it('imports only into empty stores and explicitly resumes the current quiesced c
   try{expect(rollback.view().snapshot).toEqual(snapshot);}finally{await rollback.close();}
  }finally{await replacement?.close();await source.close();await rm(root,{recursive:true,force:true});}
 });
+it('serves remote filters and change notifications through the same protected HTTP facade',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'monitor-facades-'));const ownerDir=join(root,'owner'),proxyDir=join(root,'proxy');
+ await mkdir(join(ownerDir,'agent-monitor'),{recursive:true});await mkdir(join(proxyDir,'agent-monitor'),{recursive:true});
+ await writeFile(join(ownerDir,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));
+ const ownerToken=await provisionCredential(join(ownerDir,'agent-monitor'),'remote',['control']);
+ const proxyToken=await provisionCredential(join(proxyDir,'agent-monitor'),'reader',['read']);
+ const owner=createApp({dataDir:ownerDir,monitorEnabled:true});let proxy:ReturnType<typeof createApp>|undefined;const abort=new AbortController();
+ try{
+  const address=await owner.listen({host:'127.0.0.1',port:0});
+  await writeFile(join(proxyDir,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'remote',ownerId:'owner',endpoint:address+'/api/monitor/v1',token:ownerToken}));
+  proxy=createApp({dataDir:proxyDir,monitorEnabled:true});const url=await proxy.listen({host:'127.0.0.1',port:0}),headers={authorization:`Bearer ${proxyToken}`};
+  expect((await fetch(url+'/api/monitor/v1/sessions')).status).toBe(401);
+  const stream=await fetch(url+'/api/monitor/v1/changes',{headers,signal:abort.signal}),reader=stream.body!.getReader();await reader.read();
+  await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${ownerToken}`,'content-type':'application/json','x-pixoo-request':'1'},body:JSON.stringify({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'selected'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000})});
+  const view=await(await fetch(url+'/api/monitor/v1/sessions?q=selected&provider=codex',{headers})).json();expect(view).toMatchObject({snapshot:{revision:1},matches:[{sessionId:'selected'}]});
+  expect((await(await fetch(url+'/api/monitor/v1/sessions?q=absent',{headers})).json()).matches).toEqual([]);
+  const notification=await Promise.race([reader.read(),new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('remote-notification-timeout')),3000).unref())]);expect(new TextDecoder().decode(notification.value)).toContain('"revision":1');
+  expect(await readdir(join(proxyDir,'agent-monitor'))).not.toContain('state');
+ }finally{abort.abort();await proxy?.close();await owner.close();await rm(root,{recursive:true,force:true});}
+},10000);

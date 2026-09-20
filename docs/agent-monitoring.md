@@ -258,3 +258,11 @@ checkpointing. The separate owner database retains its exclusive lifetime lock.
 WAL reduces commit synchronization work while keeping durable commits; see the
 [SQLite WAL documentation](https://sqlite.org/wal.html). Export/import remains the
 only supported transfer boundary. Do not copy a live database without its WAL.
+
+Source qualification remains incomplete. The retained
+[local performance receipts](performance/gh-31-embedded-host.json) fail the frozen
+Linux percentile budgets. Do not treat the hook example as qualified for personal
+installation. The shared Hub #30 integrated qualification also remains open.
+
+The source-only guide companion is
+[Hub PR #112](https://github.com/jimmie-potts/agent-device-hub/pull/112).
