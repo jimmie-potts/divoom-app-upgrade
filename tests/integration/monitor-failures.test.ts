@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {mkdtemp,rm,readFile} from 'node:fs/promises';
+import {mkdtemp,rm,readFile,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
@@ -22,7 +22,7 @@ it('rejects privacy canaries, deduplicates, retains acknowledgment and separates
   now+=300000;expect(owner.snapshot()).toMatchObject({collector:'running',sessions:[{freshness:'uncertain'}]});
   now+=86400000;await owner.maintain();expect(owner.journal()).toEqual([]);
   expect(owner.snapshot().sessions[0]!.notices.length).toBeGreaterThan(0);
-  expect((await readFile(join(directory,'state.sqlite'))).includes(Buffer.from('PRIVATE-CANARY'))).toBe(false);
+  for(const file of await readdir(directory))expect((await readFile(join(directory,file))).includes(Buffer.from('PRIVATE-CANARY'))).toBe(false);
  }finally{await owner.shutdown();await rm(directory,{recursive:true,force:true});}
 });
 it('rolls back an aborted transaction and releases an OS lease when a process is killed',async()=>{
@@ -36,7 +36,7 @@ it('rolls back an aborted transaction and releases an OS lease when a process is
   expect(await lease.load(signal)).toMatchObject({revision:0});
  }finally{await lease.release();}
  const moduleUrl=new URL('../../apps/server/dist/monitor-storage.js',import.meta.url).href;
- const code=`const {MonitorStorage}=await import(${JSON.stringify(moduleUrl)}); await new MonitorStorage(process.argv[1]).acquire('child',new AbortController().signal); process.stdout.write('ready'); setInterval(()=>{},1000);`;
+ const code=`const {MonitorStorage}=await import(${JSON.stringify(moduleUrl)}); await new MonitorStorage(process.argv[1]).acquire('child',new AbortController().signal); const {DatabaseSync}=await import('node:sqlite'); const db=new DatabaseSync(process.argv[1]+'/state.sqlite'); db.exec("BEGIN IMMEDIATE; UPDATE state SET body='{}', revision=999 WHERE id=1"); process.stdout.write('ready'); setInterval(()=>{},1000);`;
  const child=spawn(process.execPath,['--input-type=module','-e',code,directory],{stdio:['ignore','pipe','pipe']});
  try{
   await Promise.race([once(child.stdout,'data'),once(child,'exit').then(()=>{throw new Error('child exited');}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('child timeout')),5000).unref())]);
@@ -44,4 +44,18 @@ it('rolls back an aborted transaction and releases an OS lease when a process is
   child.kill('SIGKILL');await once(child,'exit');
   const recovered=await storage.acquire('owner',signal);try{expect(await recovered.load(signal)).toMatchObject({revision:0});}finally{await recovered.release();}
  }finally{if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}await rm(directory,{recursive:true,force:true});}
+});
+
+it('preserves unavailable child rollup through durable restart',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'monitor-child-'));
+ let owner=await createAgentState({storage:new MonitorStorage(directory),ownerId:'owner',consumers,clock:()=>1000});
+ try{
+  await owner.ingest(event('turn.started',1));
+  const child={...event('turn.started',1),identity:{...identity,sessionId:'child'},parent:{status:'known',identity},ordering:{status:'unknown'}};
+  await owner.ingest(child);await owner.ingest({...child,event:{kind:'turn.ended'}});
+  expect(owner.snapshot().sessions[0]!.children).toEqual({active:0,uncertain:1});
+  await owner.shutdown();owner=await createAgentState({storage:new MonitorStorage(directory),ownerId:'owner',consumers,clock:()=>1000});
+  expect(owner.snapshot().sessions[0]!.children).toEqual({active:0,uncertain:1});
+  expect(owner.snapshot().sessions[1]!.activity).toBe('unknown');
+ }finally{await owner.shutdown();await rm(directory,{recursive:true,force:true});}
 });

@@ -10,7 +10,7 @@ Non-goals: install hooks, migrate personal data, implement monitor rendering/UI,
 
 ## Decisions
 
-- Keep monitor state under a distinct private agent-monitor directory. SQLite transactions implement durable commits; an exclusive lock held for the owner's lifetime prevents a second process. Refuse mounted Windows storage from Linux. Controller/library storage remains unchanged.
+- Keep monitor state under a distinct private agent-monitor directory. SQLite WAL transactions with synchronous=FULL implement durable commits and retain automatic checkpointing; an exclusive lock held for the owner's lifetime prevents a second process. Refuse mounted Windows storage from Linux. Controller/library storage remains unchanged.
 - Enable monitoring explicitly. Embedded configuration fixes owner identity and registered consumer policies. Remote configuration fixes one numeric loopback endpoint and credential; it never opens local shared state. No discovery, redirects or automatic fallback.
 - Reuse existing machine credential validation with a separate credential store. Reads require read/control; mutations require control. Preserve Host/Origin/native request-header checks. Use the existing Commands ledger for explicit operations; producer envelopes retain the shared engine's identity/deduplication semantics.
 - Generalize the existing Events route registration for monitor SSE. Bound clients/history/backpressure with the existing policy; each consumer is isolated. Remote reads refresh from the selected owner and retain visibly stale snapshots on failure; mutations never retry with new identities.

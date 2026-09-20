@@ -17,7 +17,9 @@ export class MonitorStorage implements Storage {
   const check=(abort?:AbortSignal)=>{if(released||abort?.aborted)throw new Error('storage-unavailable');};
   try{
    check(signal);lock=new DatabaseSync(paths[0]!);lock.exec('PRAGMA busy_timeout=0; BEGIN EXCLUSIVE');
-   check(signal);db=new DatabaseSync(paths[1]!);db.exec('PRAGMA busy_timeout=0; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (identity TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS journal (revision INTEGER PRIMARY KEY, atMs INTEGER NOT NULL, body TEXT NOT NULL)');
+   check(signal);db=new DatabaseSync(paths[1]!);await Promise.all(paths.map(path=>chmod(path,0o600)));
+   if(db.prepare('PRAGMA journal_mode=WAL').get()?.journal_mode!=='wal')throw new Error('wal-unavailable');
+   db.exec('PRAGMA busy_timeout=0; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (identity TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS journal (revision INTEGER PRIMARY KEY, atMs INTEGER NOT NULL, body TEXT NOT NULL)');
    await Promise.all(paths.map(path=>chmod(path,0o600)));check(signal);
    const database=db;
    const load=():DurableState|null=>{

@@ -14,7 +14,6 @@ import {catalogRoutes} from './catalog-routes.js';
 import {assertRuntimeDirectory} from './operations.js';
 import {diagnosticsSchema} from '@pixoo/core';
 import {loadRuntimeSelection,selectRuntime,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
-import {registerMonitor} from './monitor.js';
 import {acquireDeviceOwner} from './device-owner.js';
 export interface ApiRuntimeOptions {
  mcpEnabled?:boolean;
@@ -51,7 +50,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   let changed=()=>{};
   const commands=new Commands(),service=new ControlService(active,commands,runtime.mode,library,profile,runtime.mode==='device'?500:100),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
-  if(options.monitorEnabled)closeMonitor=await registerMonitor(app,dataDir);
+  if(options.monitorEnabled){const {registerMonitor}=await import('./monitor.js');closeMonitor=await registerMonitor(app,dataDir);}
   if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
   app.addHook('preClose',async()=>{
    unsubscribe();events.close();

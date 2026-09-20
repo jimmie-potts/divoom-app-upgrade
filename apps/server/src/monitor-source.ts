@@ -119,7 +119,7 @@ function remoteSource(config:Extract<MonitorConfig,{mode:'remote'}>):SessionSour
    if(input.operation==='quiesce')throw new ApiError('owner-operation-required',409);
    const result=await request('/commands',input);
    const outcome=z.union([z.object({ok:z.literal(true),revision:z.number().int().nonnegative(),outcome:z.enum(['applied','duplicate','stale','ambiguous'])}).strict(),z.object({ok:z.literal(false),code:z.enum(['invalid-event','invalid-operation','capacity','unavailable','storage-failed'])}).strict()]).safeParse(result);
-   if(!outcome.success)throw new ApiError('monitor-unavailable',503);return outcome.data;
+   if(!outcome.success){current={...current,connection:current.snapshot?'stale':'unavailable',nextRequestId:null};throw new ApiError('monitor-unavailable',503);}return outcome.data;
   },
   close:async()=>{closed=true;for(const controller of controllers)controller.abort();await refreshing;}
  };

@@ -1,5 +1,5 @@
-import {mkdir,lstat,open,rm} from 'node:fs/promises';
-import {join} from 'node:path';
+import {mkdir,lstat,open,rm,realpath} from 'node:fs/promises';
+import {join,dirname,isAbsolute} from 'node:path';
 import {validateExport} from '@jimmie-potts/agent-state';
 import {assertRuntimeDirectory} from './operations.js';
 import {privatePath} from './config.js';
@@ -24,7 +24,9 @@ export async function monitorOperation(operation:string,dataDir:string,argument?
   }
   if(operation==='import'){
    if(!argument||await lease.load(new AbortController().signal)!==null)throw new Error('occupied-or-invalid-destination');
-   const input=await readMonitorJson(await privatePath(argument),16*1024*1024),checked=validateExport(input);
+   if(!isAbsolute(argument))throw new Error('invalid-import-path');
+   const source=await realpath(argument);await privatePath(dirname(source));
+   const input=await readMonitorJson(source,16*1024*1024),checked=validateExport(input);
    if(!checked.ok)throw new Error('invalid-import');
    // Reserve the input exclusively; startup applies it under the owner's lease.
    const file=await open(join(directory,'import.json'),'wx',0o600);

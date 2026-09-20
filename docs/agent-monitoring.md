@@ -125,7 +125,7 @@ No route accepts a caller-selected device, URL, file path or command.
 | Method and suffix | Contract |
 | --- | --- |
 | `GET /sessions` | Version 1.0 envelope with owner ID, connection status, shared snapshot and next request ID |
-| `GET /sessions?q=label&provider=codex` | Optional bounded label/neutral-session-ID substring and provider filter |
+| `GET /sessions?q=label&provider=codex` | Full canonical snapshot plus matching identity list; optional bounded label/neutral-session-ID substring and provider filter |
 | `POST /events` | One shared lifecycle envelope, at most 2048 bytes; returns the core's typed outcome |
 | `POST /commands` | Strict label, acknowledgment or quiesce command with the selected owner's request ID |
 | `GET /changes` | Existing SSE replay/resync transport with bounded revision/health notifications |
@@ -144,7 +144,7 @@ intent. The existing command ledger retains 256 completed outcomes. Producer
 retries instead use the shared event identity and ordering evidence. Unknown
 ordering remains uncertain; it is never filled in from arrival order.
 
-SSE events contain owner ID, revision, connection status, collector status and
+SSE events contain owner ID, revision, connection status, collector status, shared loss count and
 uncertain-session count. Fetch `/sessions` on `state` or `resync`; notifications
 are not command effects. Reconnect uses `Last-Event-ID`. Unknown/expired cursors
 resync, and consumers must replace current state rather than replay old effects.
@@ -252,3 +252,9 @@ scenes. Source adoption installs no hooks, changes no personal settings, starts
 no client sessions, migrates no live state and contacts no device. Hub #8 owns
 shared installation/migration tooling; Pixoo #34 owns installed-provider and final
 acceptance. Transport and visible-device evidence remain separate.
+
+The private state database uses SQLite WAL with `synchronous=FULL` and automatic
+checkpointing. The separate owner database retains its exclusive lifetime lock.
+WAL reduces commit synchronization work while keeping durable commits; see the
+[SQLite WAL documentation](https://sqlite.org/wal.html). Export/import remains the
+only supported transfer boundary. Do not copy a live database without its WAL.

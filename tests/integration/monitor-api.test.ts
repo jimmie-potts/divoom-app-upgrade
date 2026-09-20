@@ -41,10 +41,25 @@ it('preserves origin/header protections, scopes, privacy, filtering and command 
   const send=(payload:Record<string,unknown>)=>app.inject({method:'POST',url:url+'/commands',headers,payload});
   expect((await send(label)).json()).toMatchObject({ok:true,revision:2});expect((await send(label)).json()).toMatchObject({ok:true,revision:2});
   expect((await send({...label,label:'Other'})).statusCode).toBe(409);
-  expect((await app.inject({url:url+'/sessions?q=Chosen&provider=claude',headers})).json().snapshot.sessions).toHaveLength(1);
-  expect((await app.inject({url:url+'/sessions?q=Other',headers})).json().snapshot.sessions).toHaveLength(0);
+  expect((await app.inject({url:url+'/sessions?q=Chosen&provider=claude',headers})).json().matches).toHaveLength(1);
+  expect((await app.inject({url:url+'/sessions?q=Other',headers})).json().matches).toHaveLength(0);
   view=(await app.inject({url:url+'/sessions',headers})).json();
   expect((await send({operation:'acknowledge',requestId:view.nextRequestId,identity,consumerId:'pixoo',noticeId:view.snapshot.sessions[0].notices[0].id})).json().ok).toBe(true);
   const after=(await app.inject({url:url+'/sessions',headers})).json();expect(after.snapshot.sessions[0].read).toBe('unknown');expect(after.snapshot.sessions[0].notices[0].acknowledgedBy).toEqual(['pixoo']);
+ }finally{await app.close();await rm(directory,{recursive:true,force:true});}
+});
+it('keeps parent/child snapshots valid when a filter selects only the parent',async()=>{
+ const {validateSnapshot}=await import('@jimmie-potts/agent-state');
+ const directory=await mkdtemp(join(tmpdir(),'monitor-child-'));await mkdir(join(directory,'agent-monitor'));
+ await writeFile(join(directory,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));
+ const token=await provisionCredential(join(directory,'agent-monitor'),'writer',['control']);const headers={authorization:`Bearer ${token}`,'x-pixoo-request':'1'};
+ const app=createApp({dataDir:directory,monitorEnabled:true}),parent={provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'parent'};
+ try{
+  for(const sessionId of ['parent','child']){
+   const result=await app.inject({method:'POST',url:'/api/monitor/v1/events',headers,payload:{apiVersion:'1.0',identity:{...parent,sessionId},turn:{status:'known',id:'turn'},parent:sessionId==='parent'?{status:'unknown'}:{status:'known',identity:parent},event:{kind:'turn.started'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:Date.now()}});
+   expect(result.json().ok).toBe(true);
+  }
+  const filtered=(await app.inject({url:'/api/monitor/v1/sessions?q=parent',headers})).json();
+  expect(filtered.matches).toEqual([parent]);expect(filtered.snapshot.sessions).toHaveLength(2);expect(validateSnapshot(filtered.snapshot).ok).toBe(true);
  }finally{await app.close();await rm(directory,{recursive:true,force:true});}
 });

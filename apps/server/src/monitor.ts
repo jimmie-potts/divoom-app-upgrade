@@ -15,8 +15,12 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string):Promis
  const close=async()=>{if(closed)return;closed=true;clearInterval(timer);events?.close();await source.close();};
  try{
   await source.refresh();
-  events=new Events(()=>{const view=source.view();return {apiVersion:view.apiVersion,ownerId:view.ownerId,connection:view.connection,admissionRejected:view.admissionRejected+rejectedMonitorRequests(app),revision:view.snapshot?.revision??null,collector:view.snapshot?.collector??null,uncertain:view.snapshot?.sessions.filter(session=>session.freshness==='uncertain').length??null};});
+  events=new Events(()=>{const view=source.view();return {apiVersion:view.apiVersion,ownerId:view.ownerId,connection:view.connection,admissionRejected:view.admissionRejected+rejectedMonitorRequests(app),revision:view.snapshot?.revision??null,lossCount:view.snapshot?.lossCount??null,collector:view.snapshot?.collector??null,uncertain:view.snapshot?.sessions.filter(session=>session.freshness==='uncertain').length??null};});
   const delivery=events;
+  let notificationPending=false;
+  // Snapshot delivery is independent of producer response completion. Coalesce
+  // one event-loop burst; clients fetch current state, not replayed effects.
+  const publish=()=>{if(notificationPending)return;notificationPending=true;setImmediate(()=>{notificationPending=false;if(!closed)delivery.publish();});};
   await app.register(async monitor=>{
    monitor.addHook('onRequest',async request=>{
     const auth=request.headers.authorization;
@@ -28,17 +32,17 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string):Promis
     const filter=z.object({q:z.string().max(120).optional(),provider:z.enum(['codex','claude']).optional()}).strict().safeParse(request.query);
     if(!filter.success)throw new ApiError('invalid-input');
     await source.refresh();const view=source.view();view.admissionRejected+=rejectedMonitorRequests(app);
-    if(view.snapshot&&(filter.data.q!==undefined||filter.data.provider!==undefined))view.snapshot={...view.snapshot,sessions:view.snapshot.sessions.filter(session=>(!filter.data.provider||session.identity.provider===filter.data.provider)&&(!filter.data.q||(session.label??session.identity.sessionId).toLowerCase().includes(filter.data.q.toLowerCase())))};
-    return view;
+    const matches=view.snapshot?.sessions.filter(session=>(!filter.data.provider||session.identity.provider===filter.data.provider)&&(!filter.data.q||(session.label??session.identity.sessionId).toLowerCase().includes(filter.data.q.toLowerCase()))).map(session=>session.identity)??[];
+    return {...view,matches};
    });
-   monitor.post(`${prefix}/events`,{bodyLimit:2048},async request=>{const result=await source.ingest(request.body);delivery.publish();return result;});
+   monitor.post(`${prefix}/events`,{bodyLimit:2048},async request=>{const result=await source.ingest(request.body);publish();return result;});
    monitor.post(`${prefix}/commands`,async request=>{
     const checked=monitorCommand.safeParse(request.body);if(!checked.success)throw new ApiError('invalid-input');
-    const result=await source.command(checked.data);await source.refresh();delivery.publish();return result;
+    const result=await source.command(checked.data);await source.refresh();publish();return result;
    });
    delivery.register(monitor,`${prefix}/changes`);
   });
-  timer=setInterval(()=>{void source.refresh().then(()=>{if(!closed)delivery.publish();}).catch(()=>{});},1000);timer.unref();
+  timer=setInterval(()=>{void source.refresh().then(()=>{if(!closed)publish();}).catch(()=>{});},1000);timer.unref();
   app.addHook('preClose',close);return close;
  }catch(error){await close();throw error;}
 }
