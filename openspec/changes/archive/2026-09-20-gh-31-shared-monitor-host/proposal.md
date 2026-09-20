@@ -6,7 +6,7 @@
 
 - Pin the verified release and compose private durable storage, authenticated bounded HTTP admission and the existing SSE implementation.
 - Add a selected session-source facade for embedded and remote ownership, labels, filters and acknowledgment.
-- Add explicit quiesce/export/import and rollback tooling, documented source examples and isolated failure/performance checks.
+- Add explicit quiesce/export/import and rollback tooling, documented source examples and isolated failure checks. Retain diagnostic performance receipts; numeric qualification follows in [hardening #61](https://github.com/jimmie-potts/divoom-app-upgrade/issues/61) and does not gate this feature or downstream feature delivery.
 - Preserve simulator defaults and existing explicit device activation, as confirmed by the user. Monitoring never invokes device services.
 
 ## Capabilities

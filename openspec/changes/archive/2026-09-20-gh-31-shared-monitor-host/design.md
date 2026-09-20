@@ -16,7 +16,7 @@ Non-goals: install hooks, migrate personal data, implement monitor rendering/UI,
 - Generalize the existing Events route registration for monitor SSE. Bound clients/history/backpressure with the existing policy; each consumer is isolated. Remote reads refresh from the selected owner and retain visibly stale snapshots on failure; mutations never retry with new identities.
 - Quiesce drains admitted work before export and persists a restart fence. Import requires an empty destination and retains identity, revision, labels and notices. Release old ownership before activating a new host. Rollback requires stopping the new owner and using its latest export if it accepted writes.
 - Keep provider normalization/emission in the released package. Authentication and private configuration are host glue; the package's unauthenticated example hook is not a production admission path.
-- Consume Hub #30's frozen Linux source budgets and bounded queue limits. Its later Linux-only decision supersedes historical Windows forwarding measurements; existing repository CI remains unchanged.
+- Preserve bounded queues, isolated consumers and hard fail-open deadlines. The owner's September 20 decision moves measurement, optimization and numeric performance qualification to Pixoo #61, following this feature without blocking dependent feature delivery. Hub #30's frozen Linux limits and failed receipts remain unchanged; this source delivery does not claim performance acceptance. Linux-only qualification supersedes historical Windows forwarding measurements; existing repository CI remains unchanged.
 
 ## Risks / Trade-offs
 

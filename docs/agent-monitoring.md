@@ -259,10 +259,16 @@ WAL reduces commit synchronization work while keeping durable commits; see the
 [SQLite WAL documentation](https://sqlite.org/wal.html). Export/import remains the
 only supported transfer boundary. Do not copy a live database without its WAL.
 
-Source qualification remains incomplete. The retained
+Performance qualification remains incomplete. The retained
 [local performance receipts](performance/gh-31-embedded-host.json) fail the frozen
-Linux percentile budgets. Do not treat the hook example as qualified for personal
-installation. The shared Hub #30 integrated qualification also remains open.
+Linux percentile budgets. The owner moved measurement, diagnosis, optimization
+and numeric acceptance to [hardening #61](https://github.com/jimmie-potts/divoom-app-upgrade/issues/61).
+It follows #31 and does not block feature source delivery or dependent features.
+Frozen limits and failed receipts remain unchanged. Correctness, security,
+durability, bounded resources, failure isolation and hard fail-open deadlines
+remain required. The measurement helper is partial diagnostic tooling, not a
+complete qualification suite. Do not treat the hook example as qualified for
+personal installation. Hub #30 still owns integrated qualification.
 
 The source-only guide companion is
 [Hub PR #112](https://github.com/jimmie-potts/agent-device-hub/pull/112).

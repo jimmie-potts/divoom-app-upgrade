@@ -49,8 +49,10 @@ Every downstream snapshot, change, filter, label and acknowledgment operation SH
 - **THEN** identities, labels, revisions and notices remain intact, occupied destinations reject import, and rollback requires releasing the replacement owner first
 
 ### Requirement: Source-only activation and evidence
-Startup SHALL retain its simulator default and existing explicit device activation. Monitoring SHALL NOT activate device control or install hooks. Source examples and isolated fake-clock, privacy, migration, retention and Linux budget checks SHALL document their evidence limits.
+Startup SHALL retain its simulator default and existing explicit device activation. Monitoring SHALL NOT activate device control or install hooks. Source examples and isolated fake-clock, privacy, migration, retention and bounded-failure checks SHALL document their evidence limits.
 
 #### Scenario: Monitoring activation
 - **WHEN** monitoring is explicitly enabled with valid private configuration
 - **THEN** the existing backend hosts it without another server, player or writer and no physical effect follows from an agent event
+
+Numeric performance measurement and qualification are deferred to [hardening #61](https://github.com/jimmie-potts/divoom-app-upgrade/issues/61) by the September 20 owner decision. They do not gate this feature or dependent feature delivery. Existing failed receipts remain diagnostic evidence, and frozen limits remain unchanged.
