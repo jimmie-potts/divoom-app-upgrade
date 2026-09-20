@@ -1,4 +1,4 @@
-# ADR 0015: One selected shared monitor owner
+# ADR 0016: One selected shared monitor owner
 
 Status: Accepted for issue #31 implementation.
 

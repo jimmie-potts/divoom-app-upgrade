@@ -28,7 +28,7 @@ decisions have not been finalized by the repository bootstrap.
 
 - [ADR 0012: Opt-in physical application adapter](decisions/0012-physical-application-adapter.md) records immutable startup configuration, smoke limits and uncertainty pause.
 
-- [ADR 0015: One selected shared monitor owner](decisions/0015-shared-monitor-host.md) records durable hosting, source selection and migration.
+- [ADR 0016: One selected shared monitor owner](decisions/0016-shared-monitor-host.md) records durable hosting, source selection and migration.
 
 - [ADR 0013: Shared controller API](decisions/0013-hub-controller-api.md) records native admission and feed ownership.
 
