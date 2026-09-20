@@ -129,3 +129,112 @@ response text. Upload-ready times are estimates. A completed receipt is labeled
 `http-complete-observation-pending`, never hardware pass. Save receipts outside
 source, review before sharing, and record source revision and user observations
 in [hardware-validation.md](hardware-validation.md).
+
+## Dashboard qualification (#30)
+
+`npm run device:dashboard -- --help` describes a separate synthetic experiment.
+Build first with Node 24 `npm ci` and `npm run build`. Default execution uses
+the fake adapter even when `PIXOO_DEVICE_IP` or application device mode is set.
+
+```bash
+npm run device:dashboard -- --preview /absolute/private/new-dashboard-preview.html
+npm run device:dashboard -- --cadence-ms 1000 --duration-ms 15000
+```
+
+The preview destination must be new, absolute and outside Git. Open it in a
+browser. Each canvas contains the exact 64×64 upload RGB bytes, enlarged with
+nearest-neighbor presentation. Browser pixel tests establish payload fidelity,
+not physical color, timing or readability. The original synthetic 3×5 bitmap
+alphabet is not a reproduction of firmware fonts or the future production renderer.
+
+### Candidate evidence, checked September 20, 2026
+
+The [vendor guide](https://divoom.com/blogs/app-guide/pixoo-64-api-beginner-guide)
+describes community local-HTTP control and firmware sensitivity. The
+[vendor portal](https://docin.divoom-gz.com/web/#/5/23) again exposed only its shell;
+command-page contents remain unavailable. Community source descriptions below
+are not qualified limits of the owner's device.
+
+| Candidate | Source evidence | Limits and disposition |
+| --- | --- | --- |
+| Complete frame | Existing pinned [toolkit implementation](https://github.com/cyanheads/pixoo-toolkit/blob/29065f1e6dcff0e1cd3ac873759b4fbbb9f5a89d/src/client.ts) supplies the existing `Draw/SendHttpGif` fields | One 64×64 RGB picture is 12,288 raw bytes, 16,384 base64 characters plus JSON fields. This experiment uses one frame, offset 0, queried ID and 500 ms placeholder. Device maximum payload/frame rate is unknown. Eligible for bounded physical qualification, not yet selected from measurements. |
+| Text overlay | The [same client](https://github.com/cyanheads/pixoo-toolkit/blob/29065f1e6dcff0e1cd3ac873759b4fbbb9f5a89d/src/client.ts) emits `Draw/SendHttpText` with `TextId`, `x`, `y`, `dir`, `font`, `TextWidth`, `speed`, `TextString`, `color` and optional `align` | Font assets, metrics, clipping, scrolling, encoding and string-length bounds are unqualified. Client-side ID clamps are not firmware limits. Unavailable because exact browser reproduction is not established. |
+| Item list | [pixoo-rest payload](https://github.com/4ch1m/pixoo-rest/blob/ef6819605ca2da24bcf51bd46b486fa4d25c4258/pixoo_rest/resources/passthrough_payloads/draw_send_http_item_list.json) and [changelog](https://github.com/4ch1m/pixoo-rest/blob/ef6819605ca2da24bcf51bd46b486fa4d25c4258/CHANGELOG.md) describe `Draw/SendHttpItemList` | Numeric item types, supported firmware, count/payload limits and layout semantics are not established. Unavailable; no guessed item commands are exposed. |
+| Text clear | [pixoo-rest clear payload](https://github.com/4ch1m/pixoo-rest/blob/ef6819605ca2da24bcf51bd46b486fa4d25c4258/pixoo_rest/resources/passthrough_payloads/draw_clear_http_text.json) has no fields; the toolkit sends `TextId` | Per-ID versus global clearing is unresolved. No clear or reset command is sent by this experiment. |
+
+Full-frame replacement clears the pixels of removed synthetic rows. It does not
+prove that an existing firmware overlay is cleared. Unknown overlays or unexpected
+output require stopping and reassessment. No SD-card storage, firmware changes,
+font probing or crash-limit testing is part of the tool. The source-only
+text/item exclusion is not an observation that these commands fail on hardware.
+
+### Bounds and sequence
+
+The default cadence is a provisional 3000 ms, configurable from 1000 to 10000 ms.
+The default duration is 15000 ms, configurable from 1000 to 60000 ms. At most
+20 single-frame uploads occur, with zero retries. Each upload queries the ID
+then sends one frame, so physical traffic is at most 42 HTTP requests including
+the two-request initial probe. The probe has a separate 5000 ms timeout; the
+run deadline starts after that probe. Each upload is bounded by the smaller of
+5000 ms and remaining run time. Transport shutdown may take additional time
+to settle local request closure; a deadline cannot recall an applied write.
+
+Events occur at 0, 250, 500, 750, 4000, 7000, 10000 and 12500 ms. They exercise
+four rows, state/provider symbols, A–F labels, subagent and attention counts,
+rapid state changes, removed rows, page 2 and a final clear. They are synthetic
+fixtures, not real agent metadata. The runner selects the latest due picture
+when cadence permits. It awaits each upload; obsolete pictures are counted and
+never replayed. Slow runs or short durations can omit cases, which the receipt
+reveals. Use the preview and case IDs to assess what was actually submitted.
+
+### Before physical execution
+
+Record privately the test owner, exact authorized target, clean built source
+revision, Pixoo64 model, firmware version or explicit unknown, cadence, duration,
+sequence, current visible content, and permission to replace it. Stop the normal
+backend and other native/WSL, phone, cloud and network writers. Both protocol
+CLIs now acquire the same native-user target lock as the backend before any
+request and hold it through adapter closure. This cannot exclude another host,
+native user or Windows/WSL environment; the operator confirms that exclusion.
+Do not reuse old smoke-test consent.
+
+Only after that separate authorization, use the documented flags with the actual
+values. `PIXOO_DEVICE_IP` remains the sole target source:
+
+```bash
+npm run device:dashboard -- --device --allow-display-change --confirm-exclusive-writer \
+  --owner OWNER --model Pixoo64 --firmware VERSION_OR_unknown \
+  --source-revision FULL_COMMIT_SHA --cadence-ms 3000 --duration-ms 15000
+```
+
+The tool rejects a mismatched revision or dirty checkout. Its initial probe must
+return known brightness and screen state before replacement. It never changes
+those settings and cannot restore unknown original artwork. The last sent image
+may remain after completion, failure or Ctrl+C. No automatic recovery, text clear,
+screen toggle or ID reset runs. On error, stop, retain the receipt and assess
+possible prior effects before any separately authorized repeat.
+
+### Measurements and decision
+
+Receipts omit the IP, owner and firmware metadata and record settings, case IDs,
+RGB hashes, event/submission times, completion intervals and adapter outcomes.
+The completion interval includes failures and is not a visible-latency estimate.
+`http-complete-observation-pending` identifies the transport evidence class;
+inspect `status` and every operation outcome before calling transport successful.
+`bounded` means the deadline or cap omitted remaining events. Fake receipts say
+`simulator-only`. Store receipts outside Git and redact before publication.
+
+For each cadence, record a bounded sample with event ID and event time, HTTP
+completion, first-visible time with observation method and uncertainty, loading
+or blanking duration, four-row readability, stale-pixel/overlay clearing,
+burst ordering and final visible picture. A video synchronized to the event
+timeline is preferable for latency; unsynchronized impressions cannot provide
+an event-to-visible measurement. Record sample count, median/range and every
+failure, not a universal frame-rate limit. Exercise recovery only through a
+separately authorized repeat after a failed run; never manufacture a device fault.
+
+Record dated observations in hardware-validation.md and update ADR 0015 with
+the measured selection and configurable default. If full frames do not meet
+requirements and text/items remain unqualified for exact preview, #30 stays
+blocked for a product decision. Source merge cannot select a measured cadence
+or close that issue.
