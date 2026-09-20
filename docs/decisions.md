@@ -28,4 +28,6 @@ decisions have not been finalized by the repository bootstrap.
 
 - [ADR 0012: Opt-in physical application adapter](decisions/0012-physical-application-adapter.md) records immutable startup configuration, smoke limits and uncertainty pause.
 
+- [ADR 0013: Shared controller API](decisions/0013-hub-controller-api.md) records native admission and feed ownership.
+
 - [ADR 0015: Dashboard transport qualification](decisions/0015-dashboard-qualification.md) records the source experiment and pending measured decision.

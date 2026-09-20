@@ -80,3 +80,10 @@ Keep source/CI, installation, real-client, transport and visible-device evidence
 separate. Existing physical smoke evidence does not authorize further tests.
 [ADR 0010](decisions/0010-shared-agent-device-hub.md) records local adoption;
 the [monitoring consumer capability](../openspec/specs/shared-monitor-contract/spec.md) records source adoption. Runtime hosting, UI and installed acceptance retain their own gates.
+
+## Native controller adoption
+
+The opt-in [shared controller API](hub-controller-api.md) adopts controller
+contract 1.0.0 for identity, snapshots, commands and resumable feeds. It composes
+the existing backend services and writer. Monitor/Media and filter extensions
+remain unavailable pending #33; no dependency on that implementation is added.
