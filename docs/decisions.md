@@ -31,3 +31,5 @@ decisions have not been finalized by the repository bootstrap.
 - [ADR 0015: One selected shared monitor owner](decisions/0015-shared-monitor-host.md) records durable hosting, source selection and migration.
 
 - [ADR 0013: Shared controller API](decisions/0013-hub-controller-api.md) records native admission and feed ownership.
+
+- [ADR 0015: Dashboard transport qualification](decisions/0015-dashboard-qualification.md) records the source experiment and pending measured decision.

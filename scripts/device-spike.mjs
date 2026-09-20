@@ -2,15 +2,18 @@ import { createHash } from 'node:crypto';
 import { createDeviceTransport } from '../packages/device/dist/http-transport.js';
 import { HttpDeviceAdapter, SPIKE_PROFILE } from '@pixoo/device';
 import { parseSpikeArgs, runSpike } from '../packages/device/dist/spike.js';
+import { acquireDeviceOwner } from '../apps/server/dist/device-owner.js';
 
 if (process.argv.includes('--help')) {
   console.log('Set PIXOO_DEVICE_IP explicitly. Use probe, static, gif, transitions, controls or reset. Mutations require --allow-display-change; transitions also require --confirm-prior-stages. See docs/protocol-spike.md.');
 } else {
   let device;
+  let release;
   const controller = new AbortController();
   const stop = () => { controller.abort(); device?.invalidateGeneration(); };
   try {
     const config = parseSpikeArgs(process.argv.slice(2), process.env);
+    release = await acquireDeviceOwner(config.ip);
     const exchanges = [];
     const transport = createDeviceTransport(config.ip);
     device = new HttpDeviceAdapter({ ip: config.ip, profile: SPIKE_PROFILE }, async (body, signal) => {
@@ -37,5 +40,8 @@ if (process.argv.includes('--help')) {
     process.exitCode = report.status === 'http-complete-observation-pending' ? 0 : 1;
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Device experiment failed'); process.exitCode = 1;
-  } finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
+  } finally {
+    try { await device?.close(); }
+    finally { release?.(); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop); }
+  }
 }

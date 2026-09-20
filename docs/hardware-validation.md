@@ -1,5 +1,28 @@
 # Hardware validation
 
+## Dashboard qualification preparation, September 20, 2026
+
+No physical dashboard experiment was performed for #30 during source preparation.
+The offline tool, payload previews and injected transport tests provide software
+evidence only. Device-rendered text/item commands remain unqualified for exact
+preview and are not sent. Neither a measured method nor a default cadence has
+been selected. Earlier smoke/playback authorizations do not apply.
+
+For a future authorized session, follow [the bounded procedure](protocol-spike.md#dashboard-qualification-30)
+and retain this record separately from the transport receipt:
+
+| Observation | Required record |
+| --- | --- |
+| Authority and identity | Date, test owner, source revision, privately authorized IP, model/firmware source, approved sequence and content replacement |
+| Initial and final state | Visible artwork, brightness, screen state, other-writer exclusion and restoration limits |
+| Per-case timing | Event ID, event time, acknowledgment, first-visible time, measurement method and uncertainty |
+| Display behavior | Loading/blanking duration, readable rows/icons/counts, stale pixels/overlays, overflow and burst order |
+| Failure and recovery | Receipt status, possible prior effects, stop outcome and separately authorized repeat observations |
+| Bounded conclusion | Cadence, duration, submitted/omitted samples, distributions, limitations, accepted or rejected candidate with reasons |
+
+Unknown values must remain unknown. Update ADR 0015 after the measured decision;
+keep issue #30 open until its physical acceptance is satisfied.
+
 ## Local playback acceptance, September 8, 2026 UTC
 
 **Accepted with recorded limitations** for the current uniform-500-ms profile in
