@@ -27,3 +27,5 @@ decisions have not been finalized by the repository bootstrap.
 - [0011: Offline local recovery](decisions/0011-offline-local-recovery.md) records consistent backup and fresh-directory restore.
 
 - [ADR 0012: Opt-in physical application adapter](decisions/0012-physical-application-adapter.md) records immutable startup configuration, smoke limits and uncertainty pause.
+
+- [ADR 0015: Dashboard transport qualification](decisions/0015-dashboard-qualification.md) records the source experiment and pending measured decision.
