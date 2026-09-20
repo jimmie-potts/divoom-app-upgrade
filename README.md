@@ -96,6 +96,10 @@ The [hub work guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/
 map, delivery history and architecture diagrams. This project maintains its
 portion through a linked hub PR under the SDLC completion gate.
 
+[Shared agent monitoring](docs/agent-monitoring.md) is an explicit backend option.
+It embeds the pinned shared engine or selects a remote owner, with separate
+private storage and credentials. Enabling it does not install hooks or write to a device.
+
 The opt-in [shared controller API](docs/hub-controller-api.md) lets native hub
 clients use the same backend and writer. `npm run test:controller` verifies its
 released-contract and fake-backed compatibility without a device.

@@ -81,6 +81,14 @@ separate. Existing physical smoke evidence does not authorize further tests.
 [ADR 0010](decisions/0010-shared-agent-device-hub.md) records local adoption;
 the [monitoring consumer capability](../openspec/specs/shared-monitor-contract/spec.md) records source adoption. Runtime hosting, UI and installed acceptance retain their own gates.
 
+## Shared monitor host candidate
+
+Issue #31 composes the released agent-state 1.0.0 package behind the selected
+session-source facade. See [agent monitoring](agent-monitoring.md) for private
+configuration, authentication, API/feeds and explicit owner handoff. The shared
+engine remains in the hub; no source delivery installs hooks or starts a second
+host. Monitor renderer/UI and installed-device acceptance keep their separate issues.
+
 ## Native controller adoption
 
 The opt-in [shared controller API](hub-controller-api.md) adopts controller

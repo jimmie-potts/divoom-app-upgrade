@@ -5,14 +5,24 @@ import type {FastifyInstance,FastifyRequest} from 'fastify';
 export class ApiError extends Error {
  constructor(readonly code:string,readonly status=400,readonly details?:Record<string,unknown>){super(code);this.name='ApiError';}
 }
+const monitorRejections=new WeakMap<object,number>();
+export const rejectedMonitorRequests=(app:FastifyInstance):number=>monitorRejections.get(app.server)??0;
 export type Authenticate=(request:FastifyRequest)=>boolean|Promise<boolean>;
 export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabled=false,controllerEnabled=false):void {
- const requests=new Set<FastifyRequest>();
- app.addHook('onResponse',async request=>{requests.delete(request);});
- app.addHook('onRequestAbort',async request=>{requests.delete(request);});
+ const requests=new Set<FastifyRequest>(),streams=new Set<FastifyRequest>();
+ app.addHook('onResponse',async request=>{requests.delete(request);streams.delete(request);});
+ app.addHook('onRequestAbort',async request=>{requests.delete(request);streams.delete(request);});
  app.addHook('onRequest',async(request,reply)=>{
-  if(requests.size>=32)throw new ApiError('busy',503);requests.add(request);
-  const release=()=>{requests.delete(request);reply.raw.off('finish',release);reply.raw.off('close',release);};
+  if(requests.size>=32){
+   if(request.method==='POST'&&request.url.split('?')[0]==='/api/monitor/v1/events')monitorRejections.set(app.server,Math.min(Number.MAX_SAFE_INTEGER,rejectedMonitorRequests(app)+1));
+   throw new ApiError('busy',503);
+  }
+  const path=request.url.split('?')[0];
+  if(['GET','HEAD'].includes(request.method)&&['/api/events','/api/monitor/v1/changes','/controller/v1/events'].includes(path!)){
+   if(streams.size>=16)throw new ApiError('busy',503);streams.add(request);
+  }
+  requests.add(request);
+  const release=()=>{requests.delete(request);streams.delete(request);reply.raw.off('finish',release);reply.raw.off('close',release);};
   reply.raw.once('finish',release);reply.raw.once('close',release);
   const address=app.server.address(),port=typeof address==='object'&&address?address.port:80;
   const host=request.headers.host;

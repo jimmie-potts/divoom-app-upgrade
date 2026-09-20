@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-20T18:09:08.356137+00:00",
+  "artifact": "@jimmie-potts/agent-state",
+  "version": "1.0.0",
+  "archiveSha256": "ae589d311e282c3356579c85507a3aa973ab7990e06e062143aeb08d8d2dcc99",
+  "releasedSource": "f550bcd6b7d3b7da0f34c90c622b343afe2b25fb",
+  "acceptedMain": "ed5024e94da08009f313b08a0dd0e5a1af687a25",
+  "productAndPackageInputsUnchanged": true,
+  "ciChange": "PR #108 / issue #107 delivered the owner-approved five-job Ubuntu matrix and refreshed apt indexes before Linux hook dependency installation. Agent-state tests and package consumers are retained.",
+  "configuredJobs": 5,
+  "successfulJobs": 5,
+  "runs": [
+    {
+      "id": 35527760360,
+      "attempt": 1,
+      "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760360",
+      "event": "push",
+      "head": "ed5024e94da08009f313b08a0dd0e5a1af687a25",
+      "jobs": [
+        {
+          "id": 106122807128,
+          "name": "MCP on ubuntu-latest",
+          "result": "success",
+          "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760360/job/106122807128"
+        },
+        {
+          "id": 106122807227,
+          "name": "Contracts and state Python 3.14 on ubuntu-latest",
+          "result": "success",
+          "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760360/job/106122807227"
+        },
+        {
+          "id": 106122807272,
+          "name": "Contracts and state Python 3.12 on ubuntu-latest",
+          "result": "success",
+          "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760360/job/106122807272"
+        },
+        {
+          "id": 106122807276,
+          "name": "Workflow checks on ubuntu-latest",
+          "result": "success",
+          "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760360/job/106122807276"
+        }
+      ]
+    },
+    {
+      "id": 35527760350,
+      "attempt": 1,
+      "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760350",
+      "event": "push",
+      "head": "ed5024e94da08009f313b08a0dd0e5a1af687a25",
+      "jobs": [
+        {
+          "id": 106122807262,
+          "name": "Work guide build and browser checks",
+          "result": "success",
+          "url": "https://github.com/jimmie-potts/agent-device-hub/actions/runs/35527760350/job/106122807262"
+        }
+      ]
+    }
+  ],
+  "issue": {
+    "number": 3,
+    "state": "closed",
+    "reason": "completed",
+    "closedAt": "2026-09-20T18:06:51Z"
+  },
+  "history": "The source receipt retains the initial failed CI attempt. This acceptance receipt supersedes its pending-CI status without changing source/archive bytes.",
+  "scope": "Source package acceptance. Production storage integration, installed hooks, public guide publication and physical devices remain separate."
+}

@@ -26,6 +26,8 @@
     "restore": "node apps/server/dist/operations-cli.js restore",
     "diagnostics": "node apps/server/dist/operations-cli.js diagnostics",
     "mcp:credentials": "node apps/server/dist/mcp-cli.js",
+    "monitor:manage": "node apps/server/dist/monitor-cli.js",
+    "monitor:hook": "node scripts/monitor-hook.mjs",
     "test:controller": "npm run build && vitest run tests/integration/hub-controller.test.ts tests/integration/hub-controller-compatibility.test.ts tests/integration/hub-controller-events.test.ts tests/integration/hub-contract-package.test.ts"
   },
   "devDependencies": {
