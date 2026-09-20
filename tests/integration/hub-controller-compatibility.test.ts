@@ -184,3 +184,23 @@ it.each(['uploading','playing'])('keeps %s media within the shared 32-request ad
   expect(commands.nextRequestId).toBe(id);
  }finally{await player.close();await Promise.all(pending);state.close();}
 });
+
+it('retains the playback request when an external health probe triggers recovery',async()=>{
+ const store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter();
+ const player=await Player.open({store,device,retryBaseMs:10}),commands=new Commands();
+ const library={queryPlaylists:async()=>({items:[{id:store.playlist.id,revision:1}]})} as unknown as Library;
+ const service=new ControlService(player,commands,'simulator',library),state=new ControllerState(service,{controllerId:'pixoo-controller',deviceId:'pixoo-local',sourceId:'pixoo',controllerEpoch:commands.epoch});
+ try{
+  await state.refreshCatalog();const initial=state.snapshot(),requestId=initial.nextRequestId;
+  await state.execute({apiVersion:'1.0',controllerId:initial.identity.controllerId,deviceId:initial.identity.deviceId,requestId,expectedConfigurationRevision:initial.configurationRevision,expectedGeneration:initial.generation,command:{kind:'media.start',playlistId:store.playlist.id}});
+  await vi.waitFor(()=>expect(player.getState().state).toBe('playing'));
+  const first=state.snapshot().state.lastSuccessfulSend;expect(first.status).toBe('known');if(first.status!=='known')throw new Error('missing first send');
+  device.setOnline(false);await player.probe();device.setOnline(true);
+  await vi.waitFor(()=>{
+   const latest=state.snapshot().state.lastSuccessfulSend;
+   expect(latest).toMatchObject({status:'known',requestId});if(latest.status!=='known')throw new Error('missing recovered send');
+   expect(latest.clock.sampledAtMs).toBeGreaterThan(first.clock.sampledAtMs);
+  });
+  expect(validate('snapshot',state.snapshot())).toBe(true);
+ }finally{await player.close();state.close();}
+});

@@ -100,7 +100,9 @@ the existing player. Current snapshots separate desired values, pending native
 and representable local commands, last successful transmission and last outcome.
 Upload observers retain pending preparation and writes until they settle, including after
 generation retirement. Request context follows browser, MCP and native playback
-through retries and automatic traversal. Completion events carry the original
+through retries and automatic traversal. Recovery triggered by a health probe
+uses the retained playback owner when no command callback is active.
+Completion events carry the original
 request and generation; pause and stop cannot acquire an older upload. The
 original queued receipt remains immutable, while snapshots and feeds report
 the later transport outcome. Local rendition-only tools have no command form

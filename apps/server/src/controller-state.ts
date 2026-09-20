@@ -23,7 +23,7 @@ export class ControllerState {
  private lastSuccessfulSend:Snapshot['state']['lastSuccessfulSend']={status:'unknown'};
  private mediaOperations=new Map<number,{receipt:Receipt;release:()=>void;pending?:Snapshot['state']['pending'][number]}>();
  private earlyMediaOutcomes=new Map<string,Receipt>();
- private playbackOwner:{requestId:string;release:()=>void}|undefined;
+ private playbackOwner:{requestId:string;body:NonNullable<ControlService['playbackRequest']>;release:()=>void}|undefined;
  private playlists=new Map<string,number>();
  private catalogSignature:string|undefined;
  private refreshWork:Promise<void>|undefined;
@@ -64,11 +64,11 @@ export class ControllerState {
   // Keep one slot between uploads so retries and automatic traversal cannot
   // exceed the shared bound while foreground commands occupy the other slots.
   this.playbackOwner?.release();
-  this.playbackOwner={requestId:body.requestId,release:this.service.commands.retainPending(body.requestId)};
+  this.playbackOwner={requestId:body.requestId,body,release:this.service.commands.retainPending(body.requestId)};
  }
  private observeMedia(event:MediaOperationEvent):void{
   if(event.phase==='pending'){
-   const body=this.service.playbackRequest;if(!body)return;
+   const body=this.service.playbackRequest??this.playbackOwner?.body;if(!body)return;
    const receipt=this.base(ticket(body.requestId));receipt.generation={epoch:this.identity.controllerEpoch,sequence:event.generation};
    const existing=this.pending.get(body.requestId);
    const command:Command|undefined=existing?.command??(body.command==='start'?{kind:'media.start',playlistId:body.playlistId}:['resume','next','previous'].includes(body.command)?{kind:'media.control',action:body.command as 'resume'}:undefined);
