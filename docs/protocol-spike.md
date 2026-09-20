@@ -157,7 +157,7 @@ are not qualified limits of the owner's device.
 
 | Candidate | Source evidence | Limits and disposition |
 | --- | --- | --- |
-| Complete frame | Existing pinned [toolkit implementation](https://github.com/cyanheads/pixoo-toolkit/blob/29065f1e6dcff0e1cd3ac873759b4fbbb9f5a89d/src/client.ts) supplies the existing `Draw/SendHttpGif` fields | One 64×64 RGB picture is 12,288 raw bytes, 16,384 base64 characters plus JSON fields. This experiment uses one frame, offset 0, queried ID and 500 ms placeholder. Device maximum payload/frame rate is unknown. Eligible for bounded physical qualification, not yet selected from measurements. |
+| Complete frame | Existing pinned [toolkit implementation](https://github.com/cyanheads/pixoo-toolkit/blob/29065f1e6dcff0e1cd3ac873759b4fbbb9f5a89d/src/client.ts) supplies the existing `Draw/SendHttpGif` fields | One 64×64 RGB picture is 12,288 raw bytes, 16,384 base64 characters plus JSON fields. This experiment uses one frame, offset 0, queried ID and 500 ms placeholder. Device maximum payload/frame rate is unknown. Selected for the bounded dashboard profile in ADR 0015; see the dated physical observations. |
 | Text overlay | The [same client](https://github.com/cyanheads/pixoo-toolkit/blob/29065f1e6dcff0e1cd3ac873759b4fbbb9f5a89d/src/client.ts) emits `Draw/SendHttpText` with `TextId`, `x`, `y`, `dir`, `font`, `TextWidth`, `speed`, `TextString`, `color` and optional `align` | Font assets, metrics, clipping, scrolling, encoding and string-length bounds are unqualified. Client-side ID clamps are not firmware limits. Unavailable because exact browser reproduction is not established. |
 | Item list | [pixoo-rest payload](https://github.com/4ch1m/pixoo-rest/blob/ef6819605ca2da24bcf51bd46b486fa4d25c4258/pixoo_rest/resources/passthrough_payloads/draw_send_http_item_list.json) and [changelog](https://github.com/4ch1m/pixoo-rest/blob/ef6819605ca2da24bcf51bd46b486fa4d25c4258/CHANGELOG.md) describe `Draw/SendHttpItemList` | Numeric item types, supported firmware, count/payload limits and layout semantics are not established. Unavailable; no guessed item commands are exposed. |
 | Text clear | [pixoo-rest clear payload](https://github.com/4ch1m/pixoo-rest/blob/ef6819605ca2da24bcf51bd46b486fa4d25c4258/pixoo_rest/resources/passthrough_payloads/draw_clear_http_text.json) has no fields; the toolkit sends `TextId` | Per-ID versus global clearing is unresolved. No clear or reset command is sent by this experiment. |
@@ -170,7 +170,9 @@ text/item exclusion is not an observation that these commands fail on hardware.
 
 ### Bounds and sequence
 
-The default cadence is a provisional 3000 ms, configurable from 1000 to 10000 ms.
+The qualification CLI retains its historical 3000 ms default, configurable from
+1000 to 10000 ms. ADR 0015 selects 1000 ms for downstream dashboard integration;
+pass it explicitly to reproduce the accepted experiment.
 The default duration is 15000 ms, configurable from 1000 to 60000 ms. At most
 20 single-frame uploads occur, with zero retries. Each upload queries the ID
 then sends one frame, so physical traffic is at most 42 HTTP requests including
@@ -204,7 +206,7 @@ values. `PIXOO_DEVICE_IP` remains the sole target source:
 ```bash
 npm run device:dashboard -- --device --allow-display-change --confirm-exclusive-writer \
   --owner OWNER --model Pixoo64 --firmware VERSION_OR_unknown \
-  --source-revision FULL_COMMIT_SHA --cadence-ms 3000 --duration-ms 15000
+  --source-revision FULL_COMMIT_SHA --cadence-ms 1000 --duration-ms 18000
 ```
 
 The tool rejects a mismatched revision or dirty checkout. Its initial probe must
@@ -233,8 +235,11 @@ an event-to-visible measurement. Record sample count, median/range and every
 failure, not a universal frame-rate limit. Exercise recovery only through a
 separately authorized repeat after a failed run; never manufacture a device fault.
 
-Record dated observations in hardware-validation.md and update ADR 0015 with
-the measured selection and configurable default. If full frames do not meet
-requirements and text/items remain unqualified for exact preview, #30 stays
-blocked for a product decision. Source merge cannot select a measured cadence
-or close that issue.
+The [September 20 observations](hardware-validation.md#dashboard-acceptance-september-20-2026-utc)
+record the authorized 3000/1000 ms comparison, cancellation with an applied
+in-flight picture, and separately authorized successful restart.
+[ADR 0015](decisions/0015-dashboard-qualification.md) selects complete RGB frames
+and a configurable 1000 ms minimum interval for downstream integration. The
+small sample and uncalibrated cross-clock estimates do not qualify sustained
+1 Hz or other firmware. New physical runs still require the authorization and
+bounds above; the dated acceptance does not provide standing device permission.
