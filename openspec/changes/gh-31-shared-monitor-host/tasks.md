@@ -14,7 +14,7 @@
 
 - [x] 3.1 Document architecture/operation decisions and source-only setup in docs/agent-monitoring.md; inspect examples and link guide companion evidence.
 - [ ] 3.2 Run Node 24 npm run check and npm run test:browser, synchronize/archive the exact change and run both workflow checks; record actual inventory/results.
-- [ ] 3.3 Reconcile the Hub guide companion and link its reviewed evidence.
+- [x] 3.3 Reconcile the Hub guide companion and link its reviewed evidence.
 
 ## External delivery gates
 
@@ -31,3 +31,6 @@ failed-spawn cleanup regressions pass. Guide companion: https://github.com/jimmi
 The frozen Linux performance limits remain unmet; see
 `docs/performance/gh-31-embedded-host.json`. Task 2.4 and specification archive
 remain blocked on performance acceptance. No budget or requirement is waived.
+
+Guide companion #112 merged at `ee1f4405798ea1c6645cec1f9d17b288f5feffd3`
+with independent reviews and the verified guide-only CI exception.

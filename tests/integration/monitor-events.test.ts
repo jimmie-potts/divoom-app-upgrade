@@ -49,8 +49,9 @@ it('disconnects a backpressured monitor socket while admitting events and servin
  try{
   const url=await app.listen({host:'127.0.0.1',port:0}),headers={authorization:`Bearer ${token}`};
   incoming=await new Promise((resolve,reject)=>{const request=get(url+'/api/monitor/v1/changes',{headers},res=>{res.on('error',()=>{});res.pause();resolve(res);});request.on('error',reject);});
-  // Fill the actual socket buffer before monitor publication tests its drain result.
-  response!.write(':'+ 'x'.repeat(32*1024*1024)+'\n\n');expect(response!.writableNeedDrain).toBe(true);
+  // Hold the actual writable stream so OS receive-buffer sizes cannot clear the
+  // induced backpressure before the asynchronous monitor notification arrives.
+  response!.cork();response!.write(':'+ 'x'.repeat(1024*1024)+'\n\n');expect(response!.writableNeedDrain).toBe(true);
   const closed=new Promise<void>(resolve=>response!.once('close',resolve));
   for(let sequence=1;sequence<=2;sequence++){
    const event={apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'activity.observed'},ordering:{status:'known',epoch:'epoch',sequence},observedAtMs:1000};
