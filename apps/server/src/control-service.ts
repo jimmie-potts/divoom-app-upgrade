@@ -2,7 +2,7 @@ import type {Player} from '@pixoo/playback';
 import type {OperationResult} from '@pixoo/device';
 import type {Library} from '@pixoo/library';
 import type {MediaProfile} from '@pixoo/media';
-import {displayCommand,playerCommand,catalogQuery} from '@pixoo/core';
+import {displayCommand,playerCommand,catalogQuery,type PlayerCommand} from '@pixoo/core';
 import {Commands} from './commands.js';
 import {parse} from './validation.js';
 import {ApiError} from './security.js';
@@ -17,13 +17,16 @@ export class ControlService {
  async playback(input:unknown){
   const body=parse(playerCommand,input);
   const retained=await this.commands.execute(body.requestId,['player',body],async()=>{
-   if(body.command==='start')await this.player.start(body.playlistId,body.revision);
-   else if(body.command==='show-media')await this.player.showMedia(body.renditionId,body.playback);
-   else if(body.command==='restart-with-changes')await this.player.restartWithChanges();
-   else await this.player[body.command]();
-   return this.snapshot();
+   this.commands.changed();return this.applyPlayback(body);
   });
   return structuredClone(retained);
+ }
+ async applyPlayback(body:PlayerCommand){
+  if(body.command==='start')await this.player.start(body.playlistId,body.revision);
+  else if(body.command==='show-media')await this.player.showMedia(body.renditionId,body.playback);
+  else if(body.command==='restart-with-changes')await this.player.restartWithChanges();
+  else await this.player[body.command]();
+  return this.snapshot();
  }
  async catalog(kind:'media'|'playlists',input:unknown){
   const query=parse(catalogQuery,input);
@@ -33,10 +36,13 @@ export class ControlService {
  async display(input:unknown){
   const body=parse(displayCommand,input);
   const retained=await this.commands.execute(body.requestId,['display',body],async()=>{
-   const operation=body.screenOn!==undefined?await this.player.setScreen(body.screenOn):await this.player.setBrightness(body.brightness!);
-   return {requestId:body.requestId,operation:operation??null,snapshot:this.snapshot()};
+   this.commands.changed();return this.applyDisplay(body);
   });
   return structuredClone(retained);
+ }
+ async applyDisplay(body:{requestId:string;screenOn?:boolean|undefined;brightness?:number|undefined}){
+  const operation=body.screenOn!==undefined?await this.player.setScreen(body.screenOn):await this.player.setBrightness(body.brightness!);
+  return {requestId:body.requestId,operation:operation??null,snapshot:this.snapshot()};
  }
 }
 export function requireDisplaySuccess(value:OperationResult<void>|null):void{

@@ -95,3 +95,7 @@ Source delivery, app installation, and physical acceptance remain separate.
 The [hub work guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md) contains the shared remaining-work
 map, delivery history and architecture diagrams. This project maintains its
 portion through a linked hub PR under the SDLC completion gate.
+
+The opt-in [shared controller API](docs/hub-controller-api.md) lets native hub
+clients use the same backend and writer. `npm run test:controller` verifies its
+released-contract and fake-backed compatibility without a device.
