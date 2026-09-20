@@ -88,3 +88,10 @@ session-source facade. See [agent monitoring](agent-monitoring.md) for private
 configuration, authentication, API/feeds and explicit owner handoff. The shared
 engine remains in the hub; no source delivery installs hooks or starts a second
 host. Monitor renderer/UI and installed-device acceptance keep their separate issues.
+
+## Native controller adoption
+
+The opt-in [shared controller API](hub-controller-api.md) adopts controller
+contract 1.0.0 for identity, snapshots, commands and resumable feeds. It composes
+the existing backend services and writer. Monitor/Media and filter extensions
+remain unavailable pending #33; no dependency on that implementation is added.

@@ -7,17 +7,17 @@ import {provisionCredential} from '../../apps/server/src/mcp-config.js';
 it('shares the stream capacity budget, preserves admission and resyncs expired monitor cursors',async()=>{
  const dataDir=await mkdtemp(join(tmpdir(),'monitor-events-')),directory=join(dataDir,'agent-monitor');await mkdir(directory);
  await writeFile(join(directory,'config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true},{id:'nanoleaf',clearOnNewTurn:false}]}));
- const token=await provisionCredential(directory,'reader',['control']);const app=createApp({dataDir,monitorEnabled:true}),connections:AbortController[]=[];
+ const token=await provisionCredential(directory,'reader',['control']),controllerToken=await provisionCredential(dataDir,'controller',['read','control']);const app=createApp({dataDir,monitorEnabled:true,controllerEnabled:true}),connections:AbortController[]=[];
  try{
   const address=await app.listen({host:'127.0.0.1',port:0}),headers={authorization:`Bearer ${token}`};
   const connect=async(path:string,last?:string)=>{
    const controller=new AbortController();connections.push(controller);
-   const response=await fetch(address+path,{signal:controller.signal,headers:{...headers,...(last?{'last-event-id':last}:{})}});
+   const response=await fetch(address+path,{signal:controller.signal,headers:{...headers,...(path.startsWith('/controller/')?{authorization:`Bearer ${controllerToken}`} : {}),...(last?{'last-event-id':last}:{})}});
    expect(response.status).toBe(200);const reader=response.body!.getReader();return {reader,first:new TextDecoder().decode((await reader.read()).value),close:()=>controller.abort()};
   };
   const first=await connect('/api/monitor/v1/changes');expect(first.first).toContain('event: resync');
   const healthy=await connect('/api/monitor/v1/changes');
-  for(let i=0;i<14;i++)await connect('/api/events');
+  for(let i=0;i<14;i++)await connect(i%2?'/controller/v1/events':'/api/events');
   expect((await fetch(address+'/api/monitor/v1/changes',{headers})).status).toBe(503);
   const response=await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{...headers,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000})});
   expect(response.status).toBe(200);expect(new TextDecoder().decode((await healthy.reader.read()).value)).toContain('"revision":1');

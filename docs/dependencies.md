@@ -94,3 +94,12 @@ SHA-256 `ae589d311e282c3356579c85507a3aa973ab7990e06e062143aeb08d8d2dcc99`.
 It bundles the lifecycle contract; its exact public dependency is Ajv 8.20.0.
 The archive retains its upstream licenses. Pixoo owns the production storage
 adapter and authenticated host transport; the shared reducer remains upstream.
+
+## Shared controller contract
+
+The server pins `@jimmie-potts/device-contracts` 1.0.0 from the private
+`controller-contracts-v1.0.0` release. Its archive SHA-256 is
+`5e0b30ac92e6e8e1e38d8249b740b565de66e3cc810a04bc6fac23e182e84e87`.
+The adjacent vendor receipt records immutable source revision and release
+provenance. Ajv 8.20.0 is its MIT-licensed schema validator. Consumer checks
+verify the archive, every installed manifest hash and all 220 shared fixtures.

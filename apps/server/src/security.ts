@@ -8,16 +8,21 @@ export class ApiError extends Error {
 const monitorRejections=new WeakMap<object,number>();
 export const rejectedMonitorRequests=(app:FastifyInstance):number=>monitorRejections.get(app.server)??0;
 export type Authenticate=(request:FastifyRequest)=>boolean|Promise<boolean>;
-export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabled=false):void {
- const requests=new Set<FastifyRequest>();
- app.addHook('onResponse',async request=>{requests.delete(request);});
- app.addHook('onRequestAbort',async request=>{requests.delete(request);});
+export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabled=false,controllerEnabled=false):void {
+ const requests=new Set<FastifyRequest>(),streams=new Set<FastifyRequest>();
+ app.addHook('onResponse',async request=>{requests.delete(request);streams.delete(request);});
+ app.addHook('onRequestAbort',async request=>{requests.delete(request);streams.delete(request);});
  app.addHook('onRequest',async(request,reply)=>{
   if(requests.size>=32){
    if(request.method==='POST'&&request.url.split('?')[0]==='/api/monitor/v1/events')monitorRejections.set(app.server,Math.min(Number.MAX_SAFE_INTEGER,rejectedMonitorRequests(app)+1));
    throw new ApiError('busy',503);
-  }requests.add(request);
-  const release=()=>{requests.delete(request);reply.raw.off('finish',release);reply.raw.off('close',release);};
+  }
+  const path=request.url.split('?')[0];
+  if(request.method==='GET'&&['/api/events','/api/monitor/v1/changes','/controller/v1/events'].includes(path!)){
+   if(streams.size>=16)throw new ApiError('busy',503);streams.add(request);
+  }
+  requests.add(request);
+  const release=()=>{requests.delete(request);streams.delete(request);reply.raw.off('finish',release);reply.raw.off('close',release);};
   reply.raw.once('finish',release);reply.raw.once('close',release);
   const address=app.server.address(),port=typeof address==='object'&&address?address.port:80;
   const host=request.headers.host;
@@ -27,16 +32,21 @@ export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabl
   const origin=request.headers.origin;
   if(origin!==undefined&&origin!==new URL(`http://${host}`).origin)throw new ApiError('forbidden',403);
   if(request.headers['sec-fetch-site']==='cross-site')throw new ApiError('forbidden',403);
-  if(!(mcpEnabled&&request.url==='/mcp')&&!['GET','HEAD','OPTIONS'].includes(request.method)&&origin===undefined&&request.headers['x-pixoo-request']!=='1')throw new ApiError('forbidden',403);
+  const nativeController=controllerEnabled&&request.url.split('?')[0]==='/controller/v1/commands';
+  if(!(mcpEnabled&&request.url==='/mcp')&&!nativeController&&!['GET','HEAD','OPTIONS'].includes(request.method)&&origin===undefined&&request.headers['x-pixoo-request']!=='1')throw new ApiError('forbidden',403);
   if((request.routeOptions.url?.startsWith('/api/')||request.url.split('?')[0]!.startsWith('/api/'))&&authenticate&&!(await authenticate(request)))throw new ApiError('unauthorized',401);
  });
  app.addHook('onSend',async(_request,reply,payload)=>{reply.header('x-content-type-options','nosniff');reply.header('cache-control','no-store');return payload;});
- app.setErrorHandler((error,_request,reply)=>{
+ app.setErrorHandler((error,request,reply)=>{
   const value=error as {code?:string;statusCode?:number;details?:Record<string,unknown>};
   let code='internal-error',status=500,details:Record<string,unknown>|undefined;
   if(error instanceof ApiError){code=error.code;status=error.status;details=error.details;}
   else if(error instanceof LibraryError||error instanceof MediaError||error instanceof PlaybackError){code=error.code;status=knownErrors[code]??500;if(error instanceof LibraryError)details=error.details;}
   else if(value.code?.startsWith('FST_')){status=value.statusCode===413?413:400;code=status===413?'upload-limit':'invalid-input';}
+  if(controllerEnabled&&['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events'].includes(request.url.split('?')[0]!)){
+   if(code==='busy'||code==='upload-limit'){code='capacity';status=429;}
+   else if(code==='invalid-input')code='invalid-request';
+  }
   reply.code(status).send({error:{code,message:messages[code]??'The request could not be completed.',...(details?{details}: {})}});
  });
  app.setNotFoundHandler((_request,reply)=>reply.code(404).send({error:{code:'not-found',message:'The requested resource does not exist.'}}));

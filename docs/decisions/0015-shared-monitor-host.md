@@ -18,7 +18,7 @@ embedded owner or one authenticated numeric-loopback remote endpoint.
 
 Every monitor read and operation uses that selected source. Reuse HTTP admission,
 credential validation, command receipts and SSE delivery. Monitor credentials
-have a separate store. Controller and monitor streams share the 16-client cap
+have a separate store. Browser, native-controller and monitor streams share the 16-client cap
 so streams cannot occupy the complete request-admission budget.
 
 Quiesce produces a versioned export and restart fence. Explicit process shutdown

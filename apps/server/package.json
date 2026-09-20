@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@jimmie-potts/device-contracts": "file:../../vendor/jimmie-potts-device-contracts-1.0.0.tgz",
     "@fastify/multipart": "10.1.1",
     "@fastify/static": "10.1.3",
     "@pixoo/core": "0.0.0",

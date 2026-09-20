@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {loadRuntimeSelection,type RuntimeSelection} from './device-settings.js';
+import {controllerIdentity,type ControllerIdentity} from './controller.js';
 
 export const sourceRoot = fileURLToPath(new URL('../../../', import.meta.url));
 export interface RuntimeConfig extends RuntimeSelection {
@@ -11,6 +12,8 @@ export interface RuntimeConfig extends RuntimeSelection {
   dataDir: string;
   mcpEnabled?:boolean;
   monitorEnabled?:boolean;
+  controllerEnabled?:boolean;
+  controllerIdentity?:ControllerIdentity;
 }
 interface ConfigContext { root?: string; home?: string; platform?: string }
 
@@ -63,6 +66,8 @@ export async function loadConfig(
   }
   if(env.PIXOO_MCP_ENABLED!==undefined&&env.PIXOO_MCP_ENABLED!=='1')throw new Error('PIXOO_MCP_ENABLED must be 1 or absent');
   if(env.PIXOO_MONITOR_ENABLED!==undefined&&env.PIXOO_MONITOR_ENABLED!=='1')throw new Error('PIXOO_MONITOR_ENABLED must be 1 or absent');
+  if(env.PIXOO_CONTROLLER_ENABLED!==undefined&&env.PIXOO_CONTROLLER_ENABLED!=='1')throw new Error('PIXOO_CONTROLLER_ENABLED must be 1 or absent');
+  const identity=controllerIdentity({deviceId:env.PIXOO_CONTROLLER_DEVICE_ID??'pixoo-local',controllerId:env.PIXOO_CONTROLLER_ID??'pixoo-controller',sourceId:env.PIXOO_CONTROLLER_SOURCE_ID??'pixoo'});
   const rawPort = env.PIXOO_PORT ?? '8787';
   if (!/^\d+$/.test(rawPort) || Number(rawPort) > 65535) {
     throw new Error('PIXOO_PORT must be an integer from 0 through 65535');
@@ -84,5 +89,5 @@ export async function loadConfig(
   const probe = await mkdtemp(join(dataDir, '.pixoo-write-check-'));
   try { await writeFile(join(probe, 'probe'), ''); }
   finally { await rm(probe, { recursive: true, force: true }); }
-  return Object.freeze({ host: '127.0.0.1', port: Number(rawPort), dataDir, ...(env.PIXOO_MONITOR_ENABLED==='1'?{monitorEnabled:true}:{}), ...(env.PIXOO_MCP_ENABLED==='1'?{mcpEnabled:true}:{}), ...await loadRuntimeSelection(dataDir,env.PIXOO_MODE??'simulator') });
+  return Object.freeze({ host: '127.0.0.1', port: Number(rawPort), dataDir, ...(env.PIXOO_MONITOR_ENABLED==='1'?{monitorEnabled:true}:{}), ...(env.PIXOO_MCP_ENABLED==='1'?{mcpEnabled:true}:{}), ...(env.PIXOO_CONTROLLER_ENABLED==='1'?{controllerEnabled:true,controllerIdentity:identity}:{}), ...await loadRuntimeSelection(dataDir,env.PIXOO_MODE??'simulator') });
 }

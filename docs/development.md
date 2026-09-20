@@ -135,3 +135,10 @@ on the existing Linux/Windows application CI jobs. It checks the committed
 archive/source receipt and installed manifest, then runs the original upstream
 validation/deduplication corpus. No provider session or device is invoked.
 This check establishes source contract compatibility only.
+
+## Shared controller compatibility
+
+`npm run test:controller` builds the application and runs the released contract
+fixtures and fake-backed native controller compatibility suite. It is suitable
+for hub CI after a Node 24 `npm ci`; it needs no device or installed credential.
+The full `npm run check` includes the same tests. See [native API](hub-controller-api.md).
