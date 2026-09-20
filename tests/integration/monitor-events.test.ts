@@ -1,4 +1,4 @@
-import {expect,it} from 'vitest';
+import {expect,it,vi} from 'vitest';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -61,4 +61,22 @@ it('disconnects a backpressured monitor socket while admitting events and servin
   expect(response!.destroyed).toBe(true);
   expect(await(await fetch(url+'/api/monitor/v1/sessions',{headers})).json()).toMatchObject({connection:'current',snapshot:{revision:2}});
  }finally{incoming?.destroy();await app.close();await rm(dataDir,{recursive:true,force:true});}
+},10000);
+it('counts HEAD feed connections against the shared stream admission limit',async()=>{
+ const {connect}=await import('node:net');
+ const dataDir=await mkdtemp(join(tmpdir(),'monitor-head-')),directory=join(dataDir,'agent-monitor');await mkdir(directory);
+ await writeFile(join(directory,'config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));
+ const token=await provisionCredential(directory,'monitor',['control']),controllerToken=await provisionCredential(dataDir,'controller',['read','control']);
+ const app=createApp({dataDir,monitorEnabled:true,controllerEnabled:true}),sockets:import('node:net').Socket[]=[];
+ let admitted=0;app.addHook('onRequest',async request=>{if(request.method==='HEAD')admitted++;});
+ try{
+  const address=await app.listen({host:'127.0.0.1',port:0}),url=new URL(address);
+  for(let i=0;i<16;i++){
+   const path=['/api/events','/api/monitor/v1/changes','/controller/v1/events'][i%3]!;
+   await new Promise<void>((resolve,reject)=>{const socket=connect({host:'127.0.0.1',port:Number(url.port)},()=>socket.write(`HEAD ${path} HTTP/1.1\r\nHost: ${url.host}\r\nAuthorization: Bearer ${path.startsWith('/controller/')?controllerToken:token}\r\n\r\n`,()=>resolve()));sockets.push(socket);socket.on('error',reject);});
+   await vi.waitFor(()=>expect(admitted).toBe(i+1));
+  }
+  expect((await fetch(address+'/api/monitor/v1/changes',{headers:{authorization:`Bearer ${token}`}})).status).toBe(503);
+  expect((await fetch(address+'/api/health')).status).toBe(200);
+ }finally{for(const socket of sockets)socket.destroy();await app.close();await rm(dataDir,{recursive:true,force:true});}
 },10000);

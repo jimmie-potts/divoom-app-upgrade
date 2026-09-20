@@ -18,7 +18,7 @@ export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabl
    throw new ApiError('busy',503);
   }
   const path=request.url.split('?')[0];
-  if(request.method==='GET'&&['/api/events','/api/monitor/v1/changes','/controller/v1/events'].includes(path!)){
+  if(['GET','HEAD'].includes(request.method)&&['/api/events','/api/monitor/v1/changes','/controller/v1/events'].includes(path!)){
    if(streams.size>=16)throw new ApiError('busy',503);streams.add(request);
   }
   requests.add(request);
