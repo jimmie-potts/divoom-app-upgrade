@@ -1,27 +1,95 @@
 # Hardware validation
 
-## Dashboard qualification preparation, September 20, 2026
+## Dashboard acceptance, September 20, 2026 UTC
 
-No physical dashboard experiment was performed for #30 during source preparation.
-The offline tool, payload previews and injected transport tests provide software
-evidence only. Device-rendered text/item commands remain unqualified for exact
-preview and are not sent. Neither a measured method nor a default cadence has
-been selected. Earlier smoke/playback authorizations do not apply.
+[Issue #30](https://github.com/jimmie-potts/divoom-app-upgrade/issues/30) qualifies
+complete single-frame RGB updates for the bounded synthetic dashboard below.
+[ADR 0015](decisions/0015-dashboard-qualification.md) selects a
+configurable 1000 ms minimum submission interval for downstream integration.
+This does not qualify sustained one-frame-per-second traffic or other firmware.
 
-For a future authorized session, follow [the bounded procedure](protocol-spike.md#dashboard-qualification-30)
-and retain this record separately from the transport receipt:
+The owner supplied the target privately and explicitly authorized replacement of
+random GIFs, the two cadence runs, cancellation, and the later recorded restart.
+The owner confirmed that no other writers were active and recorded the display
+beside a UTC browser clock. The configured model was Pixoo64; firmware was
+explicitly unknown, not queried or inferred. Each run used clean source
+`6a424e3298adf19a756745208d5f3606e23fc37b`, whose tree equals the source merge
+`df9c37d836df78ecd7e26d4fa2c2934b829055e6` from PR #59. One standalone process
+held the normal target lock and serialized queue per run. Each initial probe
+reported channel 1, brightness 100%, and screen on. These settings were unchanged.
+Unknown original artwork could not be restored, as disclosed before replacement.
+No firmware, router, firewall, reset, screen toggle or competing writer was used.
 
-| Observation | Required record |
-| --- | --- |
-| Authority and identity | Date, test owner, source revision, privately authorized IP, model/firmware source, approved sequence and content replacement |
-| Initial and final state | Visible artwork, brightness, screen state, other-writer exclusion and restoration limits |
-| Per-case timing | Event ID, event time, acknowledgment, first-visible time, measurement method and uncertainty |
-| Display behavior | Loading/blanking duration, readable rows/icons/counts, stale pixels/overlays, overflow and burst order |
-| Failure and recovery | Receipt status, possible prior effects, stop outcome and separately authorized repeat observations |
-| Bounded conclusion | Cadence, duration, submitted/omitted samples, distributions, limitations, accepted or rejected candidate with reasons |
+| Run | Bounds and transport result | Recorded display result |
+| --- | --- | --- |
+| A, 22:47 UTC | 3000 ms interval, 15000 ms cap; bounded after 15.002 s; five acknowledged uploads, two obsolete burst pictures coalesced, one final event omitted | Cases 0, 3, 4, 5, 6 appeared in order; removed rows cleared, overflow page replaced labels, page 1 remained at the cap. Final all-row clearing was not tested in A |
+| B, 22:58 UTC | 1000 ms interval, 18000 ms cap; complete after 12.788 s; six acknowledged uploads, two pictures coalesced, none remaining | Cases 0, 3, 4, 5, 6, 7 appeared in order; both partial and final row clearing succeeded. The owner confirmed, "Yes, readability looks good." |
+| C, 23:06 UTC | Same 1000/18000 ms settings; SIGINT five seconds after process launch, 4.229 s into the post-probe run; two acknowledged uploads and one cancelled upload with possible prior effects; three events remaining | The in-flight rows-cleared picture applied and remained for about 19 seconds of subsequent recording and in the supplied still. No later case appeared. Cancellation did not undo that write |
+| D, 23:13 UTC | Explicitly authorized restart after C's receipt and picture were inspected; 1000/18000 ms; complete after 12.766 s; six acknowledged uploads, two pictures coalesced, none remaining | The retained two-row picture was replaced. Cases 0, 3, 4, 5, 6, 7 appeared in order, ending with all four rows removed |
 
-Unknown values must remain unknown. Update ADR 0015 after the measured decision;
-keep issue #30 open until its physical acceptance is satisfied.
+Across these runs, 19 uploads were acknowledged and one reported cancellation
+with possible effects. C's wrapper withheld its planned restart after that
+uncertain result. D was a later explicit restart, not an automatic retry. C's
+process exited approximately 16 ms after SIGINT; that is local process timing,
+not a promise that a device write stops within 16 ms. No outage, firmware crash,
+network failure or long-running soak was induced.
+
+### Visible timing and observation limits
+
+Receipt monotonic submission times were mapped to UTC using Node's recorded
+`performance.timeOrigin`. Synthetic event times use the runner's event offsets.
+The recording contains the display and the browser's UTC clock in the same
+frame. A was recorded at 30 fps and B at 60 fps; transition windows were
+inspected at 30 fps, with one-frame-per-second overviews of complete recordings.
+Clock digits blend during camera exposure and display refresh. Allow roughly
+0.1 s for reading uncertainty, not a calibrated error bound. The Windows browser
+clock and WSL Node clock offset were not independently calibrated. The following
+cross-clock latency estimates are approximate and could have systematic offset.
+
+Each cell gives event / submission / HTTP acknowledgment / observed change,
+as UTC seconds within the stated minute. A uses first appearance, which can
+include a mixed scan frame; B uses the first inspected settled picture. They
+are observation estimates, not exact transition timestamps.
+
+| Case | A, 22:47 UTC, five samples | B, six samples, 22:58 UTC except marked 22:59 |
+| --- | --- | --- |
+| Four rows | 02.337 / 02.337 / 02.605 / 02.744 | 56.574 / 56.574 / 56.911 / 56.894 |
+| Latest burst | 03.087 / 05.340 / 05.581 / 05.544 | 57.324 / 57.576 / 57.829 / 57.808 |
+| Rows cleared | 06.337 / 08.342 / 08.601 / 08.577 | 22:59: 00.574 / 00.579 / 00.881 / 00.894 |
+| Overflow page 2 | 09.337 / 11.344 / 11.586 / 11.577 | 22:59: 03.574 / 03.578 / 03.865 / 03.808 |
+| Return page 1 | 12.337 / 14.344 / 14.592 / 14.577 | 22:59: 06.574 / 06.576 / 06.886 / 06.888 |
+| Final row clear | Omitted by cap | 22:59: 09.074 / 09.075 / 09.363 / 09.388 |
+
+Using those readings, A's approximate event-to-visible median was 2.24 s,
+range 0.41–2.46 s; B's was 0.32 s, range 0.23–0.48 s. Submission-to-visible
+medians were about 0.23 s and 0.31 s respectively, with ranges 0.20–0.41 s
+and 0.23–0.32 s. Different appearance/settling endpoints and clock uncertainty
+prevent a claim that transport itself became faster. The smaller interval
+reduced the fixture's queue delay, particularly the burst's 2.46 s versus
+0.48 s event-to-visible estimate. Sparse six-picture runs do not establish
+sustained 1 Hz, a device throughput ceiling, thermal behavior or general limits.
+
+No loading screen or blank frame appeared in the inspected A/B transition
+windows. Interruption duration was therefore below what this inspection could
+resolve, not proven zero. Camera sampling, scan/exposure artifacts and reflections
+prevent claims about sub-frame interruptions or physical color accuracy.
+Four-row labels, icons, counts and page indicators were distinguishable; the
+owner confirmed readability. Removed rows left no visible stale row pixels.
+Page 2 showed E/F labels and page 1 returned. Final clear intentionally retains
+the summary strip, page indicator and case marker 7; it is not a blank panel.
+No pre-existing firmware overlay was identified, so clearing such overlays
+remains unqualified.
+
+The source browser tests compare the exact 64×64 RGB payload with canvas pixels.
+That establishes preview/payload equality separately from physical readability.
+The synthetic bitmap alphabet is locally rasterized. Device text/items remain
+excluded for unqualified fonts, layout and clearing semantics, as documented in
+[the candidate comparison](protocol-spike.md#candidate-evidence-checked-september-20-2026).
+The selected interval is configurable and applies to downstream #33 integration;
+#32's production renderer and #34's real-client physical acceptance remain
+separate work. Original recordings, clock anchors, receipts and device identity
+remain private outside Git. D exited and released its writer; the final synthetic
+cleared-row picture may remain. No application installation was performed.
 
 ## Local playback acceptance, September 8, 2026 UTC
 

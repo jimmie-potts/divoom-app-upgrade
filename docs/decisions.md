@@ -32,4 +32,4 @@ decisions have not been finalized by the repository bootstrap.
 
 - [ADR 0013: Shared controller API](decisions/0013-hub-controller-api.md) records native admission and feed ownership.
 
-- [ADR 0015: Dashboard transport qualification](decisions/0015-dashboard-qualification.md) records the source experiment and pending measured decision.
+- [ADR 0015: Dashboard transport and cadence](decisions/0015-dashboard-qualification.md) selects complete RGB frames and a configurable 1000 ms interval for downstream integration, with bounded physical evidence and recovery limits.
