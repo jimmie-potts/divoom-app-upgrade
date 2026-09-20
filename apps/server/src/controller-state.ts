@@ -21,18 +21,19 @@ export class ControllerState {
  private pending=new Map<string,Snapshot['state']['pending'][number]>();
  private lastOutcome:Snapshot['state']['lastOutcome']={status:'unknown'};
  private lastSuccessfulSend:Snapshot['state']['lastSuccessfulSend']={status:'unknown'};
- private mediaOperations=new Map<number,{receipt:Receipt;pending?:Snapshot['state']['pending'][number]}>();
+ private mediaOperations=new Map<number,{receipt:Receipt;release:()=>void;pending?:Snapshot['state']['pending'][number]}>();
  private earlyMediaOutcomes=new Map<string,Receipt>();
+ private playbackOwner:{requestId:string;release:()=>void}|undefined;
  private playlists=new Map<string,number>();
  private catalogSignature:string|undefined;
  private refreshWork:Promise<void>|undefined;
  private unsubscribe:()=>void;
  onChange=()=>{};
  constructor(readonly service:ControlService,readonly identity:Identity){
-  const commands=service.commands.subscribe(event=>this.observe(event)),media=service.player.subscribeMediaOperations(event=>this.observeMedia(event));
-  this.unsubscribe=()=>{commands();media();};
+  const commands=service.commands.subscribe(event=>this.observe(event)),media=service.player.subscribeMediaOperations(event=>this.observeMedia(event)),playback=service.player.subscribe(()=>this.observePlaybackOwner());
+  this.unsubscribe=()=>{commands();media();playback();};
  }
- close(){this.unsubscribe();}
+ close(){this.unsubscribe();this.playbackOwner?.release();this.playbackOwner=undefined;for(const operation of this.mediaOperations.values())operation.release();this.mediaOperations.clear();}
  private generation=():Ticket=>({epoch:this.identity.controllerEpoch,sequence:this.service.player.getState().generation});
  private clock=(sampledAtMs=performance.now())=>({domain:'controller-monotonic' as const,epoch:this.identity.controllerEpoch,sampledAtMs});
  async refreshCatalog():Promise<void>{
@@ -56,16 +57,25 @@ export class ControllerState {
     observation:this.service.mode==='simulator'||!observed.length?{status:'unknown'}:{status:'known',clock:this.clock(Math.min(...observed)),evidenceAgeMs:Math.max(0,performance.now()-Math.min(...observed)),power:display.screen.observed?{status:'known',value:display.screen.observed.value}:{status:'unknown'},brightness:display.brightness.observed?{status:'known',value:display.brightness.observed.value}:{status:'unknown'}}}};
  }
  private base(requestId:Ticket):Receipt{return {apiVersion:'1.0',controllerId:this.identity.controllerId,deviceId:this.identity.deviceId,requestId,configurationRevision:this.service.commands.configurationRevision,generation:this.generation(),outcome:'queued',priorEffects:'none',completedOperations:[],uncertainOperations:[]};}
+ private observePlaybackOwner():void{
+  if(this.service.player.getState().intent!=='active'){this.playbackOwner?.release();this.playbackOwner=undefined;return;}
+  const body=this.service.playbackRequest;
+  if(!body||this.playbackOwner?.requestId===body.requestId)return;
+  // Keep one slot between uploads so retries and automatic traversal cannot
+  // exceed the shared bound while foreground commands occupy the other slots.
+  this.playbackOwner?.release();
+  this.playbackOwner={requestId:body.requestId,release:this.service.commands.retainPending(body.requestId)};
+ }
  private observeMedia(event:MediaOperationEvent):void{
   if(event.phase==='pending'){
    const body=this.service.playbackRequest;if(!body)return;
    const receipt=this.base(ticket(body.requestId));receipt.generation={epoch:this.identity.controllerEpoch,sequence:event.generation};
    const existing=this.pending.get(body.requestId);
    const command:Command|undefined=existing?.command??(body.command==='start'?{kind:'media.start',playlistId:body.playlistId}:['resume','next','previous'].includes(body.command)?{kind:'media.control',action:body.command as 'resume'}:undefined);
-   this.mediaOperations.set(event.operationId,{receipt,...(command?{pending:{requestId:receipt.requestId,command,generation:receipt.generation}}:{})});
+   this.mediaOperations.set(event.operationId,{receipt,release:this.service.commands.retainPending(body.requestId),...(command?{pending:{requestId:receipt.requestId,command,generation:receipt.generation}}:{})});
   }else{
    const operation=this.mediaOperations.get(event.operationId);if(!operation)return;
-   this.mediaOperations.delete(event.operationId);
+   this.mediaOperations.delete(event.operationId);operation.release();
    const {receipt}=operation,result=event.result;
    if(result.ok){receipt.outcome='sent';receipt.priorEffects='confirmed-transmission';receipt.completedOperations=['media'];this.lastSuccessfulSend={status:'known',requestId:receipt.requestId,clock:this.clock(result.timing.completedAtMs),operationIds:['media']};}
    else{receipt.outcome=result.priorEffects==='possible'?'uncertain':result.code==='cancelled'||result.code==='stale-generation'?'cancelled':'failed';receipt.priorEffects=result.priorEffects;receipt.failure={code:result.priorEffects==='possible'?'uncertain-result':receipt.outcome==='cancelled'?'stale-generation':'transport-failure'};if(result.priorEffects==='possible')receipt.uncertainOperations=['media'];}

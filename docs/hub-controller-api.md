@@ -98,7 +98,7 @@ cancellation rules. A historical receipt cannot restore retired output.
 receipts initially acknowledge context work as `queued`; uploads happen through
 the existing player. Current snapshots separate desired values, pending native
 and representable local commands, last successful transmission and last outcome.
-Upload observers retain pending work until the adapter returns, including after
+Upload observers retain pending preparation and writes until they settle, including after
 generation retirement. Request context follows browser, MCP and native playback
 through retries and automatic traversal. Completion events carry the original
 request and generation; pause and stop cannot acquire an older upload. The
@@ -115,6 +115,11 @@ old identity only for its exact original request. Never manufacture a fresh
 identity to retry an ambiguous write automatically. Restart changes request,
 clock and feed epochs and restores the existing player context paused.
 
+Active playback keeps one request slot between uploads, so automatic traversal
+and retries share the same bound as foreground commands. Completed or cancelled
+media work releases its slot; active playback releases its reservation when its
+intent stops or pauses.
+
 ## Feed and admission bounds
 
 SSE uses `id: <cursor epoch>:<sequence>`, `event: change` or `event: resync`, and a
@@ -124,7 +129,7 @@ unknown-epoch cursors receive full resync. Reconnect produces no commands.
 Snapshot clocks describe the controller process; do not subtract them from a
 client process clock. Replayed snapshots retain historical evidence times.
 
-Bounds are 64 KiB JSON bodies, 32 total HTTP requests, 32 pending commands,
+Bounds are 64 KiB JSON bodies, 32 total HTTP requests, 32 pending request slots,
 256 command receipts, 32 feed events and 16 native stream clients. Authentication
 waits time out after one second. Stream delivery queues hold at most 32 messages;
 a stalled writer is disconnected, with a five-second drain ceiling. Streams

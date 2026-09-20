@@ -1,3 +1,11 @@
+import {ControllerState} from '../../apps/server/src/controller-state.js';
+import {ControlService} from '../../apps/server/src/control-service.js';
+import {Commands} from '../../apps/server/src/commands.js';
+import {Player} from '@pixoo/playback';
+import {FakeDeviceAdapter} from '../../packages/device/src/index.js';
+import type {Library} from '@pixoo/library';
+import {MemoryPlaybackStore} from '../helpers/playback-store.js';
+import {ManualClock} from '../helpers/manual-clock.js';
 import {expect,it,vi} from 'vitest';
 import {mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -156,3 +164,23 @@ it('keeps media pending and preserves possible effects when a browser stop retir
   expect((await f.post(body)).json()).toEqual(queued);
  }finally{release();await f.close();}
 },15000);
+
+
+it.each(['uploading','playing'])('keeps %s media within the shared 32-request admission limit',async phase=>{
+ const clock=new ManualClock(),store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter({clock,latencyMs:1000});
+ const player=await Player.open({store,device,clock}),commands=new Commands();
+ const library={queryPlaylists:async()=>({items:[{id:store.playlist.id,revision:1}]})} as unknown as Library;
+ const service=new ControlService(player,commands,'simulator',library),state=new ControllerState(service,{controllerId:'pixoo-controller',deviceId:'pixoo-local',sourceId:'pixoo',controllerEpoch:commands.epoch});
+ const request=(command:Command)=>{const s=state.snapshot();return {apiVersion:'1.0',controllerId:s.identity.controllerId,deviceId:s.identity.deviceId,requestId:s.nextRequestId,expectedConfigurationRevision:s.configurationRevision,expectedGeneration:s.generation,command};};
+ const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();},pending:Promise<unknown>[]=[];
+ try{
+  await state.refreshCatalog();await state.execute(request({kind:'media.start',playlistId:store.playlist.id}));await flush();
+  if(phase==='playing'){for(let i=0;i<2;i++){clock.advance(1000);await flush();}clock.advance(0);await flush();expect(player.getState().state).toBe('playing');}
+  for(let i=0;i<31;i++){pending.push(state.execute(request({kind:'brightness.set',percent:i})));await flush();}
+  expect(state.snapshot().state.pending).toHaveLength(phase==='playing'?31:32);expect(validate('snapshot',state.snapshot())).toBe(true);
+  const id=commands.nextRequestId;
+  const overflow=state.execute(request({kind:'brightness.set',percent:32}));pending.push(overflow.catch(()=>{}));
+  await expect(Promise.race([overflow,new Promise(resolve=>setTimeout(()=>resolve('still pending'),50))])).rejects.toMatchObject({code:'capacity'});
+  expect(commands.nextRequestId).toBe(id);
+ }finally{await player.close();await Promise.all(pending);state.close();}
+});
