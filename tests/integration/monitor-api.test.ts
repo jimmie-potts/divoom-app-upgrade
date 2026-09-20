@@ -63,3 +63,19 @@ it('keeps parent/child snapshots valid when a filter selects only the parent',as
   expect(filtered.matches).toEqual([parent]);expect(filtered.snapshot.sessions).toHaveLength(2);expect(validateSnapshot(filtered.snapshot).ok).toBe(true);
  }finally{await app.close();await rm(directory,{recursive:true,force:true});}
 });
+it('serves authenticated exact dashboard renditions without taking over the simulator',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'monitor-rendition-'));await mkdir(join(directory,'agent-monitor'));
+ await writeFile(join(directory,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));
+ const token=await provisionCredential(join(directory,'agent-monitor'),'reader',['read']);
+ const app=createApp({dataDir:directory,monitorEnabled:true});
+ try{
+  expect((await app.inject('/api/monitor/v1/rendition')).statusCode).toBe(401);
+  const response=await app.inject({url:'/api/monitor/v1/rendition',headers:{authorization:`Bearer ${token}`}});
+  expect(response.statusCode).toBe(200);const result=response.json();
+  expect(result.state).toBe('current');expect(result.rendition.rgb).toHaveLength(12288);
+  expect(result.rendition.layout).toMatchObject({ownerId:'owner',rows:[],connection:'current'});
+  const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
+  expect(result.rendition.rgb).toEqual(Array.from(renderDashboard(result.rendition.layout)));
+  expect((await app.inject('/api/health')).json().mode).toBe('simulator');
+ }finally{await app.close();await rm(directory,{recursive:true,force:true});}
+});

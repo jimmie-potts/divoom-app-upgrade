@@ -1,4 +1,5 @@
 import {expect,it} from 'vitest';
+import {DashboardPager} from '../../apps/server/src/agent-dashboard.js';
 import {mkdtemp,mkdir,writeFile,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -24,6 +25,7 @@ it('routes remote reads, labels and acknowledgment to the owner, reports host lo
   expect(await remote.command(command)).toMatchObject({ok:true,revision:2});
   await expect(remote.command({...command,label:'Conflict'})).rejects.toMatchObject({code:'request-conflict',status:409});
   await remote.refresh();expect(remote.view().snapshot?.sessions[0]?.label).toBe('Mine');
+  expect(new DashboardPager().layout(remote.view(),0).rows[0]?.label).toBe('Mine');
   const ended=await fetch(url+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity,turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'turn.ended'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:1001})});expect(ended.status).toBe(200);
   await remote.refresh();const notice=remote.view().snapshot!.sessions[0]!.notices[0]!;
   const acknowledgment={operation:'acknowledge' as const,requestId:remote.view().nextRequestId!,identity,noticeId:notice.id,consumerId:'pixoo'};
@@ -31,6 +33,7 @@ it('routes remote reads, labels and acknowledgment to the owner, reports host lo
   expect(await remote.command(acknowledgment)).toMatchObject({ok:true,revision:4});
   await remote.refresh();expect(remote.view().snapshot!.sessions[0]!.notices[0]!.acknowledgedBy).toEqual(['pixoo']);
   await app.close();await remote.refresh();expect(remote.view()).toMatchObject({connection:'stale',nextRequestId:null,snapshot:{revision:4}});
+  expect(new DashboardPager().layout(remote.view(),0)).toMatchObject({connection:'stale',collector:'running',rows:[{uncertain:true,noticeIds:[]}]});
   await expect(remote.command(command)).rejects.toThrow();expect(await readdir(remoteDir)).toEqual([]);
  }finally{await remote?.close();await app.close();await rm(dataDir,{recursive:true,force:true});await rm(remoteDir,{recursive:true,force:true});}
 });

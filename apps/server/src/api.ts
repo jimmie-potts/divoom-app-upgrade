@@ -21,6 +21,7 @@ export interface ApiRuntimeOptions {
  controllerIdentity?:ControllerIdentity;
  mcpEnabled?:boolean;
  monitorEnabled?:boolean;
+ monitorRenderCadenceMs?:number;
  mode?:RuntimeMode;
  runtime?:RuntimeSelection;
  transportForTests?:DeviceTransport;
@@ -53,7 +54,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   let changed=()=>{};
   const commands=new Commands(),service=new ControlService(active,commands,runtime.mode,library,profile,runtime.mode==='device'?500:100),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
-  if(options.monitorEnabled){const {registerMonitor}=await import('./monitor.js');closeMonitor=await registerMonitor(app,dataDir);}
+  if(options.monitorEnabled){const {registerMonitor}=await import('./monitor.js');closeMonitor=await registerMonitor(app,dataDir,options.monitorRenderCadenceMs);}
   if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
   if(options.controllerEnabled)await registerController(app,dataDir,service,options.controllerIdentity);
   app.addHook('preClose',async()=>{
