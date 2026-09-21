@@ -9,7 +9,7 @@ reduction, deduplication, child rollup, freshness, retention and migration valid
 
 Monitoring is disabled by default. Enabling it does not activate hardware.
 Simulator remains the default; existing explicit device mode remains available.
-There is no monitor renderer or mode switch in this change. Monitoring never calls
+The rendition renderer below adds no mode switch. Monitoring never calls
 the player, device adapter or writer, and does not depend on a browser being open.
 
 ## Required-client matrix
@@ -272,3 +272,81 @@ personal installation. Hub #30 still owns integrated qualification.
 
 The source-only guide companion is
 [Hub PR #112](https://github.com/jimmie-potts/agent-device-hub/pull/112).
+
+## Dashboard rendition
+
+Issue #32 adds a pure Pixoo renderer over the selected SessionSource. It neither
+interprets provider payloads nor changes Media/Monitor ownership. The shared
+browser belongs to Hub #6, and Pixoo #33 owns the monitor panel and device writer
+integration. The renderer never sends a physical command.
+
+`GET /api/monitor/v1/rendition` uses the same bearer read authorization and request
+protections as sessions. It accepts no query parameters and uses `Cache-Control:
+no-store`. The response contains `state`, `active`, `pending`, `cadenceMs`, and
+`rendition`. State is `pending`, `current`, `error`, or `closed`; only `current`
+contains pixels. A rendition has version 1, generation, width/height 64, format
+`rgb888`, layout metadata and exactly 12288 row-major RGB bytes as a JSON array.
+Consumers must discard their previous preview when state is not current and
+fetch current state on SSE resync. The generation is scoped to this renderer's
+process; it is not a shared-state revision or durable device generation.
+
+The layout includes source owner/revision/as-of, connection, collector, matching
+and total session counts, attention count, page and page count, and full row
+details. Row details retain full labels, identities, exact observed/evidence
+millisecond timestamps, shared freshness/unavailable evidence, child counts and
+consumer-visible notice IDs. Reading this metadata does not acknowledge notices.
+The endpoint shows the canonical unfiltered projection. Consumers needing their
+own filters use `DashboardPager` or `DashboardService` with a bounded query/provider
+filter, preserving the complete source snapshot rather than removing child state.
+
+| Area | Pixels and meaning |
+| --- | --- |
+| Summary, y=1 | `S` matching top-level sessions, `!` total top-level sessions with approval/input/questions across all pages and filters, current/total pages |
+| Four rows, y=14/24/34/44 | Provider at x=0; activity at 4; attention at 8; six-character label at 12; children at 40; uncertainty at 56; notice at 60 |
+| Provider | `C` Codex, `L` Claude |
+| Activity | `>` active, `=` idle, `X` interrupted, `]` runtime ended, `?` unknown |
+| Attention | `A` approval, `!` blocking input, `?` continuing question, blank none; activity is separate |
+| Children | `+0` through `+9`; `+9+` means more than nine; suffix `?` indicates incomplete/uncertain relationship or activity evidence; full count stays in metadata |
+| Row flags | `?` uncertain/stale/unknown evidence; `T` retained turn-ended notice, never successful task completion |
+| Footer, y=57 | `F` source: C current / S stale / ? unavailable. `C` collector: R running / Q quiesced / F faulted / X closed / ? unknown |
+
+The original 3x5 font supports ASCII A-Z, digits, space and `._+!?/-`. Lowercase
+ASCII becomes uppercase; each unsupported Unicode code point becomes `?`.
+Labels longer than six code points become five display characters followed by
+`+`. Full labels remain unchanged in layout metadata. Icons differ in shape as
+well as color. Empty pages retain summary and health with `EMPTY` in the body.
+
+Blocking approval/input comes first, then continuing questions, retained notices,
+and other sessions. Full provider/client/host/source/session identity breaks ties
+ordinally, so reversed input order cannot shuffle a priority group. Known children
+are omitted from top-level rows; ambiguous parent evidence remains visible.
+Unknown parent relationships make child counts explicitly incomplete.
+Acknowledged notices disappear only for that consumer. New turns use the core's
+consumer policy. Restart uncertainty remains visible independently of collector
+health and source connection.
+
+Pagination rotates at ten-second intervals using an injectable monotonic clock.
+Membership/order/filter changes clamp the page and restart its interval. Evidence
+refreshes with unchanged ordering preserve the deadline. Delayed ticks account
+for complete elapsed intervals. Rendering coalesces to one active job and one
+newest pending input; superseded and closed generations cannot publish. Failed
+renders retry on a later eligible tick without exposing partial pixels.
+
+`createApp({monitorEnabled:true, monitorRenderCadenceMs:3000, dataDir})` configures
+the minimum rendering cadence, independently of pagination. The 3000 ms default
+is an experiment value, not physical timing acceptance. The host refresh tick is
+one second; requests can also refresh. Cadences over ten seconds can omit pages.
+No cadence option changes the device writer or qualification limits.
+
+After `npm run build`, generate the standalone synthetic browser preview:
+
+```sh
+node scripts/dashboard-preview.mjs /tmp/agent-dashboard-preview.html
+```
+
+The [committed synthetic examples](examples/agent-dashboard.html) show native
+64x64 and nearest-neighbor 4x previews with full row details. They include blocked
+approval, a continuing question, a retained notice, overflow, unknown/unsupported
+labels, stale source and empty state. The browser checks compare every canvas
+byte to renderer RGB; fake-device tests verify the same frames. These tests do
+not prove native-font fidelity, physical readability, installed hooks or timing.
