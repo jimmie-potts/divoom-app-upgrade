@@ -101,3 +101,25 @@ it('holds the sole HTTP writer through an uncertain retired picture without repl
   expect(monitor.status()).toMatchObject({configuration:{mode:'media'},participating:false,lastOutcome:{status:'uncertain'}});
  }finally{release({error_code:0});await monitor.close();await player.close();await device.close();}
 });
+it.each(['stop','pause','clear'] as const)('immediately cancels a pending Media selection on %s with monitoring enabled',async command=>{
+ const {ControlService}=await import('../../apps/server/src/control-service.js');const {Commands}=await import('../../apps/server/src/commands.js');
+ const store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter(),player=await Player.open({store,device}),commands=new Commands(),service=new ControlService(player,commands,'simulator');
+ const monitor=new MonitorPresentation(player,{save:async()=>{}});service.monitor=monitor;
+ const capture=store.capture.bind(store);let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});store.capture=async(...args)=>{await gate;return capture(...args);};
+ try{
+  const starting=service.playback({command:'start',playlistId:store.playlist.id,requestId:commands.nextRequestId}).then(()=>null,error=>error.code);
+  for(let i=0;i<100;i++)await Promise.resolve();const stopping=service.playback({command,requestId:commands.nextRequestId});for(let i=0;i<100;i++)await Promise.resolve();
+  release();expect(await starting).toBe('cancelled');await stopping;for(let i=0;i<100;i++)await Promise.resolve();
+  expect(player.getSession()).toBeNull();expect(device.operations.filter(x=>x.kind==='uploadAnimation')).toHaveLength(0);
+ }finally{release();await monitor.close();await player.close();}
+});
+it('a stop during pending Media persistence cancels the deferred start',async()=>{
+ const player=await Player.open({store:new MemoryPlaybackStore(),device:new FakeDeviceAdapter()});let hold=false,release=()=>{};
+ const monitor=new MonitorPresentation(player,{save:async()=>{if(hold)await new Promise<void>(resolve=>{release=resolve;});}});
+ try{
+  await monitor.configure({operation:'mode',mode:'monitor'});hold=true;
+  let started=false;const media=monitor.media(async()=>{started=true;},true).then(()=>null,error=>error.code);
+  for(let i=0;i<100;i++)await Promise.resolve();await monitor.media(()=>player.stop(),false);release();
+  expect(await media).toBe('cancelled');expect(started).toBe(false);expect(monitor.status().participating).toBe(false);
+ }finally{release();await monitor.close();await player.close();}
+});

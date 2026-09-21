@@ -19,6 +19,7 @@ export class MonitorPresentation {
  private lastOutcome:PresentationStatus['lastOutcome']=null;
  private tail:Promise<unknown>=Promise.resolve();
  private closed=false;
+ private interrupts=0;
  private clock:()=>number;
  private unsubscribe:()=>void;
  onChange=()=>{};
@@ -38,7 +39,9 @@ export class MonitorPresentation {
   const result=this.tail.then(()=>{if(this.closed)throw new ApiError('closed',503);return work();});this.tail=result.catch(()=>{});return result;
  }
  async configure(action:IntegrationAction,admit:()=>void=()=>{}):Promise<void>{
+  const interrupts=this.interrupts;
   return this.enqueue(async()=>{
+   if(interrupts!==this.interrupts)throw new ApiError('cancelled',409);
    admit();const wasActive=this.active;
    const next=presentationConfiguration.parse(action.operation==='mode'?{...this.configuration,mode:action.mode}:{...this.configuration,filter:action.filter,cadenceMs:action.cadenceMs});
    this.suspend();this.pendingMode=next.mode;this.onChange();
@@ -52,13 +55,25 @@ export class MonitorPresentation {
   });
  }
  async media<T>(action:()=>Promise<T>,starts:boolean):Promise<T>{
-  return this.enqueue(async()=>{
+  if(this.closed)throw new ApiError('closed',503);
+  if(!starts){
+   // Player cancels capture synchronously before its persistence queue drains.
+   // Keep that boundary even while a presentation transition is awaiting I/O.
+   this.interrupts++;this.suspend();return action();
+  }
+  const interrupts=this.interrupts;
+  const check=()=>{if(this.closed||interrupts!==this.interrupts)throw new ApiError('cancelled',409);};
+  const pending=await this.enqueue(async()=>{
+   check();
    if(this.configuration.mode==='monitor'){
-    this.suspend();await this.player.pause();
-    if(starts){const next={...this.configuration,mode:'media' as const};await this.options.save(next);this.configuration=next;this.onChange();}
+    this.suspend();await this.player.pause();check();
+    const next={...this.configuration,mode:'media' as const};await this.options.save(next);this.configuration=next;this.onChange();check();
    }
-   return action();
+   // Release the presentation queue after invoking Player, not after its
+   // asynchronous capture. Later mode/media intent must reach Player's guard.
+   return {result:action()};
   });
+  return pending.result;
  }
  tick(){
   if(this.closed)return;

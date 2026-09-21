@@ -32,3 +32,13 @@ candidate narrative and monitoring-diagram changes. Generation, five maintenance
 checks and nine diagram validations pass. Final source pins/status, guide browser
 checks, publication and independent source/guide reviews remain delivery gates;
 this archive does not claim those gates passed.
+
+Independent round-one reviews identified delayed cancellation during capture,
+loss of ambiguous remote command identity, and stale browser-read failures.
+Regression fixtures reproduced the defects before fixes. Stop/pause/clear now
+reach Player cancellation immediately, deferred Media starts respect interruption,
+uncertain requests retain their original identity, and retired read errors are
+ignored. Revised Node 24 checks pass 586 tests and 10 workflow fixtures; the
+complete browser suite passes 64 checks, including retry, stale-read and competing
+client scenarios. Round-two independent review and current-head hosted checks
+remain required outside this archive.

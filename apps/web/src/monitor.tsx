@@ -13,7 +13,7 @@ function useMonitor(enabled:boolean){
    const value=await request<MonitorRead>(prefix+'/view');checkIntegration(value.integration);
    if(!alive.current||version!==serial.current)return null;
    setView(value);setDisabled(false);return value;
-  }catch(e){if(alive.current&&version===serial.current){setError(explain(e));if(e instanceof RequestError&&e.code==='not-found')setDisabled(true);}throw e;}
+  }catch(e){if(!alive.current||version!==serial.current)return null;setError(explain(e));if(e instanceof RequestError&&e.code==='not-found')setDisabled(true);throw e;}
  },[]);
  useEffect(()=>{
   if(!enabled)return;alive.current=true;let stopped=false,source:EventSource|null=null,timer:number|undefined,failures=0;
@@ -21,14 +21,14 @@ function useMonitor(enabled:boolean){
   const disconnect=()=>{ready.current=false;setConnected(false);serial.current++;};
   function connect(){
    if(stopped)return;const current=new EventSource('/api'+prefix+'/changes');source=current;
-   const resync=()=>{void refresh().then(value=>{if(!stopped&&current===source&&value){failures=0;ready.current=true;setConnected(true);}}).catch(()=>{disconnect();});};
+   const resync=()=>{void refresh().then(value=>{if(!stopped&&current===source&&value){failures=0;ready.current=true;setConnected(true);}}).catch(()=>{if(!stopped&&current===source)disconnect();});};
    current.onopen=resync;
    const receive=(event:MessageEvent)=>{if(!stopped&&source===current&&cursor.accept(event.lastEventId))resync();};
    current.addEventListener('state',receive);current.addEventListener('resync',receive);
    current.onerror=()=>{if(stopped||source!==current)return;disconnect();current.close();if(failures<3){timer=window.setTimeout(connect,500*2**failures);failures++;}else setError('Monitor connection stopped after three retries. Reconnect to read current state.');};
   }
   connect();void refresh().catch(()=>{});
-  const poll=window.setInterval(()=>{if(ready.current)void refresh().catch(()=>{disconnect();});},1000);
+  const poll=window.setInterval(()=>{if(ready.current)void refresh().catch(()=>{if(!stopped)disconnect();});},1000);
   return()=>{stopped=true;alive.current=false;ready.current=false;serial.current++;window.clearInterval(poll);if(timer)window.clearTimeout(timer);source?.close();};
  },[enabled,refresh,attempt]);
  async function execute(action:Pending){
@@ -36,7 +36,7 @@ function useMonitor(enabled:boolean){
   try{
    const result=await request<{ok?:boolean;code?:string}>(action.path,'POST',action.body);
    if(result?.ok===false)throw new RequestError(result.code??'monitor-unavailable');setPending(null);await refresh();
-  }catch(e){if(e instanceof RequestError){setPending(null);await refresh().catch(()=>{});}setError(explain(e));}
+  }catch(e){if(e instanceof RequestError&&['invalid-input','invalid-request','forbidden','unauthorized','request-conflict','request-expired','request-order','revision-conflict','stale-generation','cancelled','unknown-session','unknown-notice'].includes(e.code)){setPending(null);await refresh().catch(()=>{});}setError(explain(e));}
  }
  async function guarded(action:()=>Promise<void>){if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await action();}catch(e){setError(explain(e));}finally{lock.current=false;setBusy(false);}}
  const send=(action:Pending)=>{if(!ready.current||pending)return;void guarded(()=>execute(action));};
