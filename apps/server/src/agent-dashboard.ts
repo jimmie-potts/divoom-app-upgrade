@@ -1,7 +1,8 @@
 import type {Identity, SessionSnapshot} from '@jimmie-potts/agent-state';
+import type {MonitorFilter} from '@pixoo/core';
 import type {MonitorView} from './monitor-source.js';
 
-export type DashboardFilter = {q?:string; provider?:'codex'|'claude'};
+export type DashboardFilter = MonitorFilter;
 export type DashboardRow = {
  identity:Identity; label:string; shortLabel:string; activity:SessionSnapshot['activity'];
  attention:'approval'|'input'|'question'|'none'; uncertain:boolean;
@@ -39,10 +40,10 @@ export class DashboardPager {
   const now=Math.max(this.lastNow,nowMs);this.lastNow=now;
   const all=view.snapshot?.sessions??[];
   const top=all.filter(s=>s.parent.status!=='known'||s.unavailable.some(u=>u.dimension==='parent'&&u.reason==='ambiguous'));
-  const ordered=top.filter(s=>(!filter.provider||s.identity.provider===filter.provider)&&(!filter.q||(s.label??s.identity.sessionId).toLowerCase().includes(filter.q.toLowerCase())))
+  const ordered=top.filter(s=>(!filter.projectId||s.projectId===filter.projectId)&&(!filter.session||key(s.identity)===key(filter.session))&&(!filter.provider||s.identity.provider===filter.provider)&&(!filter.q||(s.label??s.identity.sessionId).toLowerCase().includes(filter.q.toLowerCase())))
    .sort((a,b)=>rank(a,this.consumer)-rank(b,this.consumer)||compare(key(a.identity),key(b.identity)));
   const pages=Math.max(1,Math.ceil(ordered.length/4));
-  const membership=JSON.stringify([view.ownerId,filter.q??'',filter.provider??'',ordered.map(s=>key(s.identity))]);
+  const membership=JSON.stringify([view.ownerId,filter,ordered.map(s=>key(s.identity))]);
   if(membership!==this.membership){this.membership=membership;this.page=Math.min(this.page,pages-1);this.deadline=now+10000;}
   else if(now>=this.deadline){const steps=Math.floor((now-this.deadline)/10000)+1;this.page=(this.page+steps)%pages;this.deadline+=steps*10000;}
   const unknownChildren=all.some(s=>s.parent.status==='unknown'||s.unavailable.some(u=>u.dimension==='parent'));

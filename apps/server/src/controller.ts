@@ -4,6 +4,9 @@ import {authenticateCredential,validateMcpConfiguration,MCP_DEVICE_ID} from './m
 import type {ControlService} from './control-service.js';
 import {ApiError} from './security.js';
 import {ControllerState,failureStatus} from './controller-state.js';
+import {integrationPaths,nativeIntegrationRequest} from '@pixoo/core';
+import {Events} from './events.js';
+import {parse} from './validation.js';
 import {ControllerEvents} from './controller-events.js';
 
 export type ControllerIdentity=Pick<Identity,'deviceId'|'controllerId'|'sourceId'>;
@@ -12,7 +15,7 @@ export function controllerIdentity(value:ControllerIdentity=defaultControllerIde
  if(!validate('identity',{...value,controllerEpoch:'validation'}))throw new Error('Invalid controller identity');
  return Object.freeze({...value});
 }
-export const controllerPaths=new Set(['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events']);
+export const controllerPaths=new Set<string>(['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events',...integrationPaths]);
 export async function registerController(app:FastifyInstance,directory:string,service:ControlService,configured?:ControllerIdentity):Promise<void>{
  await validateMcpConfiguration(directory);
  const identity={...controllerIdentity(configured),controllerEpoch:service.commands.epoch};
@@ -28,6 +31,18 @@ export async function registerController(app:FastifyInstance,directory:string,se
   }finally{if(timer)clearTimeout(timer);}
  }
  app.addHook('onRequest',async request=>{if(controllerPaths.has(request.url.split('?')[0]!))await authenticate(request);});
+ if(service.monitor){
+  const snapshot=()=>({...service.integrationSnapshot(),identity:{controllerId:identity.controllerId,deviceId:identity.deviceId,sourceId:identity.sourceId}});
+  const extensionEvents=new Events(snapshot,authenticate),previous=service.monitor.onChange;
+  service.monitor.onChange=()=>{previous();extensionEvents.publish();};
+  app.get(integrationPaths[0],snapshot);
+  app.post(integrationPaths[1],async request=>{
+   const {controllerId,deviceId,...body}=parse(nativeIntegrationRequest,request.body);
+   if(controllerId!==identity.controllerId||deviceId!==identity.deviceId)throw new ApiError('unknown-device',404);
+   return service.integration(body).finally(()=>extensionEvents.publish());
+  });
+  extensionEvents.register(app,integrationPaths[2]);app.addHook('preClose',async()=>extensionEvents.close());
+ }
  const events=new ControllerEvents(state,authenticate);
  state.onChange=()=>events.publish();
  const unsubscribe=service.player.subscribe(()=>events.publish());
