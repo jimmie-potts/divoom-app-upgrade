@@ -88,7 +88,7 @@ and status. [Product direction](docs/product.md) links the preserved handoff,
 and future work. [Decisions](docs/decisions.md) records accepted architecture.
 Source delivery, app installation, and physical acceptance remain separate.
 
-[Shared monitoring contracts](docs/agent-monitoring-vocabulary.md) pin the released Hub schema and fixtures. [Consumer requirements](docs/agent-monitoring.md) define task, attention, freshness and ownership behavior. Runtime monitoring and its UI remain planned under the [integration sequence](docs/hub-integration.md).
+[Shared monitoring contracts](docs/agent-monitoring-vocabulary.md) pin the released Hub schema and fixtures. [Consumer requirements](docs/agent-monitoring.md) define task, attention, freshness and ownership behavior. The opt-in backend and Monitor tab implement selected-source monitoring and explicit Monitor/Media ownership. Installed acceptance remains separate in the [integration sequence](docs/hub-integration.md).
 
 ## Cross-project work guide
 

@@ -76,7 +76,7 @@ discovered playlist revision into the existing atomic capture operation.
 Wire v1 has no direct rendition-selection command or saved playlist revision
 field. Local browser/MCP rendition selection remains available. Native rendition
 IDs are empty; restart-with-changes, scenes, zones, preview and Monitor/Media
-modes are unavailable. Issue #33 owns the future mode extension. Clients must
+modes are unavailable. The Pixoo-specific extension below supplies monitor operations. Clients must
 consult capabilities, not infer them from local API features.
 
 ## Replay, concurrency and evidence
@@ -153,3 +153,29 @@ owning HTTP/MCP/browser-service tests using synthetic credentials and injected
 transports. `npm run check` also includes these tests. Run browser checks for
 API/startup regression coverage. These checks establish source compatibility;
 installed hub clients, host routing and physical output need separate evidence.
+
+
+## Pixoo integration extension
+
+With both monitor and native-controller options enabled, the finite routes
+`GET /controller/pixoo-integration/v1/snapshot`,
+`POST /controller/pixoo-integration/v1/commands` and
+`GET /controller/pixoo-integration/v1/events` expose `pixoo-integration/1.0`.
+They use the same scoped bearer credentials, Host/Origin checks and target
+identity as controller v1. Read scope is required for reads, control for writes.
+Streams recheck credentials before delivery and at least once per second while
+idle; revocation closes them. History retains 32 snapshots and the existing
+shared admission limit is 16 streams. Slow clients are disconnected.
+
+The snapshot advertises finite mode/filter capabilities, selected and pending
+mode, effective participation, cadence, revisions and generation-tagged upload
+outcomes. It includes the configured controller/device/source identity and no
+credential, source endpoint or private filesystem path. Shared controller v1
+continues to advertise modes unsupported; its released schemas are untouched.
+
+Commands add `controllerId` and `deviceId` to the strict
+[browser integration envelope](agent-monitoring.md#browser-and-native-integration-api).
+Mismatched targets reject before admission. Browser and native requests with the
+same normalized envelope share receipts and conflicts. Mode/view changes do not
+add generic device commands or new MCP tools. Hub #6 can consume the exported
+`@pixoo/core` contracts and frontend adapter; its own overview remains separate.

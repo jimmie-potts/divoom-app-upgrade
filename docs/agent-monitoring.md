@@ -9,8 +9,9 @@ reduction, deduplication, child rollup, freshness, retention and migration valid
 
 Monitoring is disabled by default. Enabling it does not activate hardware.
 Simulator remains the default; existing explicit device mode remains available.
-The rendition renderer below adds no mode switch. Monitoring never calls
-the player, device adapter or writer, and does not depend on a browser being open.
+The Monitor panel selects Monitor or Media through the existing player and
+serialized adapter. Collection does not depend on the selected mode or an open
+browser. Startup never activates monitor presentation.
 
 ## Required-client matrix
 
@@ -295,9 +296,9 @@ and total session counts, attention count, page and page count, and full row
 details. Row details retain full labels, identities, exact observed/evidence
 millisecond timestamps, shared freshness/unavailable evidence, child counts and
 consumer-visible notice IDs. Reading this metadata does not acknowledge notices.
-The endpoint shows the canonical unfiltered projection. Consumers needing their
-own filters use `DashboardPager` or `DashboardService` with a bounded query/provider
-filter, preserving the complete source snapshot rather than removing child state.
+The endpoint shows the selected monitor projection. Provider, project ID, full
+session identity and label/session search filters apply to both preview and
+display. Filtering preserves the complete source snapshot and child rollup.
 
 | Area | Pixels and meaning |
 | --- | --- |
@@ -332,11 +333,13 @@ for complete elapsed intervals. Rendering coalesces to one active job and one
 newest pending input; superseded and closed generations cannot publish. Failed
 renders retry on a later eligible tick without exposing partial pixels.
 
-`createApp({monitorEnabled:true, monitorRenderCadenceMs:3000, dataDir})` configures
-the minimum rendering cadence, independently of pagination. The 3000 ms default
-is an experiment value, not physical timing acceptance. The host refresh tick is
-one second; requests can also refresh. Cadences over ten seconds can omit pages.
-No cadence option changes the device writer or qualification limits.
+The runtime renders at a minimum 1000 ms interval and refreshes its source every
+second. `monitorRenderCadenceMs` is a rendering test/embedding option, independent
+of the operator-selected upload cadence. The pure renderer retains its 3000 ms
+standalone fallback. Upload starts use the selected 1000–10000 ms interval,
+defaulting to 1000 ms under [ADR 0015](decisions/0015-dashboard-qualification.md).
+Slower settings can omit intermediate pictures; the writer always takes the
+latest completed rendition.
 
 After `npm run build`, generate the standalone synthetic browser preview:
 
@@ -350,3 +353,85 @@ approval, a continuing question, a retained notice, overflow, unknown/unsupporte
 labels, stale source and empty state. The browser checks compare every canvas
 byte to renderer RGB; fake-device tests verify the same frames. These tests do
 not prove native-font fidelity, physical readability, installed hooks or timing.
+
+
+## Monitor panel and display ownership
+
+The Monitor tab shows full chosen labels, provider/activity/attention/freshness,
+source and collector health, exact timestamps, observation age, children and
+retained notices. Save label is an explicit owner command. No prompt, title,
+tool output or private path is copied. Dismissal acknowledges only Pixoo's
+retained notice; it cannot mark a chat read, approve work or change a tracker.
+Projects use the shared optional neutral `projectId`; sessions use all five
+identity fields. Unlabeled sessions retain their neutral ID.
+
+Apply monitor view saves the provider/project/session/search selection and
+cadence. Counts distinguish matching top-level rows from the total. Empty views
+retain health and summary pixels. The 64×64 canvas uses the renderer's exact RGB
+bytes, enlarged with nearest-neighbor scaling. The latest preview may lead a
+pending upload. It is desired content, not evidence that a physical display
+shows those pixels. Full labels remain visible beside the truncated glyphs.
+
+Show monitor pauses playlist advancement while preserving its captured context,
+persists Monitor mode and explicitly activates presentation. Select Media
+retires monitor work and leaves playback paused. Start, show-media, restart and
+resume select Media through the same service used by browser, native HTTP and
+existing MCP tools. Editing filters in Media leaves playback running. Agent
+questions, approvals, errors and turn ends keep updating the source and preview
+but cannot select Monitor or send unsolicited display pictures.
+
+`MonitorPresentation` owns mode/filter/cadence and a logical transition queue.
+`Player.uploadDashboard` accepts complete RGB pictures only for its current
+paused generation. Player owns the sole adapter; the adapter owns the serialized
+operation queue. A mode switch, screen-off or shutdown retires pending work.
+An already-started physical request can still have effects. Its late receipt
+retains its original generation and cannot reactivate Monitor. There is at most
+one dashboard upload in flight and one latest rendered picture to consider.
+Failed or uncertain writes suspend presentation without automatic retries.
+Screen-on alone never activates either monitor presentation or playback.
+
+`agent-monitor/presentation.json` stores version 1 mode, filter and cadence in
+the private data directory with atomic replacement. Invalid configuration fails
+startup. Restart restores selection and paused playback context, marks prior
+active sessions uncertain through the selected state owner, and waits for an
+explicit Show monitor or media command before display writes. Changing the
+selected owner preserves presentation configuration. Labels/notices follow the
+owner's cutover/export/import/rollback procedure above; remote mode creates no
+second reducer. Rollback must use current state, not a stale exported copy.
+
+## Browser and native integration API
+
+Browser routes under `/api/integration/v1` share the existing Host, Origin,
+fetch-metadata and mutation-header rules. `GET /view` returns integration state,
+selected-source state and the exact dashboard rendition. `/snapshot`, `/sessions`
+and `/rendition` expose those parts; `/changes` provides bounded sequence-aware
+SSE with replay or resync. `/commands` accepts only mode and view operations.
+`/shared-actions` accepts only explicit label or Pixoo notice acknowledgment and
+uses the selected owner's separate `nextRequestId`.
+
+Mode/view commands carry `apiVersion: "pixoo-integration/1.0"`, `requestId`,
+`expectedConfigurationRevision`, `expectedGeneration` and a strict `action`.
+Mode actions are `{operation:"mode", mode:"monitor"|"media"}`. View actions are
+`{operation:"view", filter:{q?,provider?,projectId?,session?}, cadenceMs}`.
+Unknown fields, unsupported values and stale revisions/generations are rejected.
+Duplicate request IDs replay the retained result; conflicting content rejects.
+The common command ledger also serves existing media and display clients.
+
+Snapshots distinguish persisted `configuration.mode`, `pendingMode`, effective
+`participating`, `inFlight`, source revision/connection, rendition generation and
+last upload outcome. Mode generation and source revision are separate. A
+configuration receipt never proves physical presentation. Native clients use
+the [protected finite extension](hub-controller-api.md#pixoo-integration-extension).
+The released shared controller v1 schema remains unchanged.
+
+The browser fetches current state after reconnect and ignores duplicate/stale
+SSE IDs. It makes at most three consecutive reconnect attempts before requiring
+Reconnect monitor. Interrupted commands retain their original request for an
+explicit retry or reconciliation. Stale/conflicting commands refresh state and
+require a new user action; no mode transition or missed picture is replayed.
+
+[ADR 0018](decisions/0018-monitor-display-ownership.md) and the
+[agent-monitor-controls specification](../openspec/specs/agent-monitor-controls/spec.md)
+record these boundaries. Source fixtures cover simulator pixels, delayed/cancelled
+work, owner migration and browser/native controls. Installed-client and integrated
+physical acceptance remain [#34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34).

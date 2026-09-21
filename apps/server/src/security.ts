@@ -1,3 +1,4 @@
+import {integrationPaths} from '@pixoo/core';
 import {LibraryError} from '@pixoo/library';
 import {MediaError} from '@pixoo/media';
 import {PlaybackError} from '@pixoo/playback';
@@ -18,7 +19,7 @@ export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabl
    throw new ApiError('busy',503);
   }
   const path=request.url.split('?')[0];
-  if(['GET','HEAD'].includes(request.method)&&['/api/events','/api/monitor/v1/changes','/controller/v1/events'].includes(path!)){
+  if(['GET','HEAD'].includes(request.method)&&['/api/events','/api/monitor/v1/changes','/controller/v1/events','/api/integration/v1/changes',integrationPaths[2]].includes(path!)){
    if(streams.size>=16)throw new ApiError('busy',503);streams.add(request);
   }
   requests.add(request);
@@ -32,7 +33,7 @@ export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabl
   const origin=request.headers.origin;
   if(origin!==undefined&&origin!==new URL(`http://${host}`).origin)throw new ApiError('forbidden',403);
   if(request.headers['sec-fetch-site']==='cross-site')throw new ApiError('forbidden',403);
-  const nativeController=controllerEnabled&&request.url.split('?')[0]==='/controller/v1/commands';
+  const nativeController=controllerEnabled&&['/controller/v1/commands',integrationPaths[1]].includes(request.url.split('?')[0]!);
   if(!(mcpEnabled&&request.url==='/mcp')&&!nativeController&&!['GET','HEAD','OPTIONS'].includes(request.method)&&origin===undefined&&request.headers['x-pixoo-request']!=='1')throw new ApiError('forbidden',403);
   if((request.routeOptions.url?.startsWith('/api/')||request.url.split('?')[0]!.startsWith('/api/'))&&authenticate&&!(await authenticate(request)))throw new ApiError('unauthorized',401);
  });
@@ -43,7 +44,7 @@ export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabl
   if(error instanceof ApiError){code=error.code;status=error.status;details=error.details;}
   else if(error instanceof LibraryError||error instanceof MediaError||error instanceof PlaybackError){code=error.code;status=knownErrors[code]??500;if(error instanceof LibraryError)details=error.details;}
   else if(value.code?.startsWith('FST_')){status=value.statusCode===413?413:400;code=status===413?'upload-limit':'invalid-input';}
-  if(controllerEnabled&&['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events'].includes(request.url.split('?')[0]!)){
+  if(controllerEnabled&&['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events',...integrationPaths].includes(request.url.split('?')[0]!)){
    if(code==='busy'||code==='upload-limit'){code='capacity';status=429;}
    else if(code==='invalid-input')code='invalid-request';
   }
