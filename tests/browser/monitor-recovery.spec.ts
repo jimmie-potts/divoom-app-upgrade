@@ -26,7 +26,7 @@ test('retains the original shared request after an ambiguous owner failure and r
   await page.route('**/api/integration/v1/shared-actions',async route=>{bodies.push(route.request().postDataJSON());const response=await route.fetch();if(interrupt){interrupt=false;await route.fulfill({status:503,json:{error:{code:'monitor-unavailable',message:'Unavailable'}}});}else await route.fulfill({response});});
   await page.goto(f.address);await page.getByRole('button',{name:'Monitor',exact:true}).click();await expect(page.getByText('Monitor state connected',{exact:true})).toBeVisible();
   await page.getByRole('textbox',{name:'Label for chosen',exact:true}).fill('Chosen label');await page.getByRole('button',{name:'Save label for chosen'}).click();
-  await expect(page.getByRole('button',{name:'Retry monitor command'})).toBeVisible();await expect(page.getByText('Chosen label',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Retry monitor command'})).toBeVisible();await expect(page.getByRole('heading',{name:'Chosen label',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Retry monitor command'}).click();await expect(page.getByRole('button',{name:'Retry monitor command'})).toHaveCount(0);expect(bodies).toHaveLength(2);expect(bodies[1]).toEqual(bodies[0]);
  }finally{await page.context().close();await f.close();}
 });

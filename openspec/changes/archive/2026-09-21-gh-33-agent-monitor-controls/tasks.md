@@ -42,3 +42,13 @@ ignored. Revised Node 24 checks pass 586 tests and 10 workflow fixtures; the
 complete browser suite passes 64 checks, including retry, stale-read and competing
 client scenarios. Round-two independent review and current-head hosted checks
 remain required outside this archive.
+
+Round two found a screen-off/on race during deferred Media persistence and an
+ambiguous label-display test locator. A failing screen regression now passes:
+screen-off interrupts queued presentation intent, and Player generation is
+rechecked across persistence before invoking media. The browser assertion now
+selects the session heading rather than a form label. Node 24 checks pass 587
+tests and 10 workflow fixtures; all 64 browser checks pass. The second-round
+hosted browser failure matched that locator and is superseded by the new scoped
+fix, not an unchanged rerun. Independent round-three review and new-head CI
+remain required before merge.

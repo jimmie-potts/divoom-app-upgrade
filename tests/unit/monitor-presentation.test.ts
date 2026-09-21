@@ -113,13 +113,15 @@ it.each(['stop','pause','clear'] as const)('immediately cancels a pending Media 
   expect(player.getSession()).toBeNull();expect(device.operations.filter(x=>x.kind==='uploadAnimation')).toHaveLength(0);
  }finally{release();await monitor.close();await player.close();}
 });
-it('a stop during pending Media persistence cancels the deferred start',async()=>{
+it.each(['stop','screen-off/on'] as const)('%s during pending Media persistence cancels the deferred start',async control=>{
  const player=await Player.open({store:new MemoryPlaybackStore(),device:new FakeDeviceAdapter()});let hold=false,release=()=>{};
  const monitor=new MonitorPresentation(player,{save:async()=>{if(hold)await new Promise<void>(resolve=>{release=resolve;});}});
  try{
   await monitor.configure({operation:'mode',mode:'monitor'});hold=true;
   let started=false;const media=monitor.media(async()=>{started=true;},true).then(()=>null,error=>error.code);
-  for(let i=0;i<100;i++)await Promise.resolve();await monitor.media(()=>player.stop(),false);release();
+  for(let i=0;i<100;i++)await Promise.resolve();
+  if(control==='stop')await monitor.media(()=>player.stop(),false);else{await player.setScreen(false);await player.setScreen(true);}
+  release();
   expect(await media).toBe('cancelled');expect(started).toBe(false);expect(monitor.status().participating).toBe(false);
  }finally{release();await monitor.close();await player.close();}
 });

@@ -69,7 +69,7 @@ export class ControlService {
   return structuredClone(retained);
  }
  async applyDisplay(body:{requestId:string;screenOn?:boolean|undefined;brightness?:number|undefined}){
-  if(body.screenOn===false)this.monitor?.suspend();
+  if(body.screenOn===false)this.monitor?.interrupt();
   const operation=body.screenOn!==undefined?await this.player.setScreen(body.screenOn):await this.player.setBrightness(body.brightness!);
   return {requestId:body.requestId,operation:operation??null,snapshot:this.snapshot()};
  }
