@@ -436,6 +436,64 @@ record these boundaries. Source fixtures cover simulator pixels, delayed/cancell
 work, owner migration and browser/native controls. Installed-client and integrated
 physical acceptance remain [#34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34).
 
+## Small installed setup accepted on September 22, 2026
+
+Issue #34 now covers one Codex Desktop task path through Ubuntu WSL. The owner
+confirmed a readable dashboard and the amber `T` turn-ended marker on the Pixoo.
+The actual shared feed recorded active → idle → active and automatic clearing
+of the previous notice. Explicit Pixoo dismissal preserved other consumers'
+acknowledgments. See the [dated receipt](hardware-validation.md#issue-34-monitoring-acceptance).
+
+The installed Pixoo source is `37031be56007b6b890ec7a2098aa6e283d9d01fa`.
+Its remote source is Hub 0.2.0 / agent-state 2.0.0 from
+`013b829a851277cd0cfbaeaba6d6d0dfc32727c7`. The older development-only SDK pin
+below remains the source rehearsal dependency; it is not the running remote
+owner. No second hook installation or shared-state owner is needed.
+
+Best-effort current status is the accepted v1 policy. An unseen delayed start
+can select the wrong turn; provider ordering remains unknown. Independent
+attention can remain uncertain even while activity is working. A `T` means
+turn ended, not successful work or readership. Reliable history and per-task
+reset are separate Hub features, not #34 prerequisites.
+
+### Start, stop and disconnect
+
+For the one-off installed layout, the foreground launcher is
+`~/.local/share/pixoo-playlist-controller-runtime/start.sh`. Run:
+
+```sh
+PIXOO_MODE=simulator ~/.local/share/pixoo-playlist-controller-runtime/start.sh
+# For the already configured and explicitly authorized device:
+PIXOO_MODE=device ~/.local/share/pixoo-playlist-controller-runtime/start.sh
+```
+
+Stop with Ctrl+C and wait for exit before restarting. Keep the terminal open;
+closing the browser does not stop the backend. The shared monitor runs separately
+as `codex-nanoleaf-monitor.service`; stopping Pixoo does not remove shared hooks
+or stop Nanoleaf. Monitor remains the selected display mode after this trial;
+startup itself remains passive until explicit activation. Returning to Media
+leaves playback paused until Resume or Start.
+
+To disconnect monitoring while retaining normal Pixoo use, stop Pixoo, remove
+only `export PIXOO_MONITOR_ENABLED=1` from this installation's launcher, and
+restart with `PIXOO_MONITOR_ENABLED` unset in the calling shell. Keep the private
+configuration and media. This disables Pixoo monitoring routes and remote
+polling; it does not revoke the shared credential or uninstall shared hooks.
+Do not run the shared producer-removal procedure to disconnect just Pixoo.
+
+If the app cannot reach the feed, check that the shared monitor service is active
+and the private connection still matches its owner. Hub 0.1.0 leaves successive
+unordered turns ambiguous; follow the
+[0.2.0 update instructions](https://github.com/jimmie-potts/agent-device-hub/blob/013b829a851277cd0cfbaeaba6d6d0dfc32727c7/apps/hub/SETUP.md#update-the-current-status-package)
+without resetting the database. The installed version and private paths are in
+the local source receipts. A retained synthetic blue still/playlist was used for
+the pause/resume check and is ordinary local test media.
+
+The broader multi-client sequence below is retained as reference, not the
+current issue's closure checklist. CLI/Claude trials, migration, frontend
+qualification, long failure matrices and reliable history are outside #34's
+approved reduced scope.
+
 ## Reversible setup package and rehearsal
 
 Pixoo consumes Hub #8's shared setup SDK through the development dependency

@@ -382,28 +382,46 @@ and unrelated installations were preserved.
 
 ## Issue #34 monitoring acceptance
 
-September 21, 2026. Source packaging is in progress under
-[#34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34). The
-[operator sequence](agent-monitoring.md#installed-and-physical-acceptance-sequence)
-maps every issue criterion to required observations. The shared setup source is
-Hub `f6bee907e06177c6dc8abde0075d73cc391784e9`; its
-[package receipt](../vendor/hub-0.1.0-source-receipt.json) records provenance.
-This entry records no installed or visible-device pass.
+September 22, 2026. The owner selected a small Codex Desktop → Ubuntu WSL →
+Pixoo64 setup and authorized the short content-replacement sequence. The exact
+address, credentials, task identities and private runtime files remain outside
+Git. The selected final mode is Monitor; no previous artwork restoration is
+claimed. Model is Pixoo64; firmware and exact Desktop app version were not
+available from the restricted task environment. The installed Node runtime is
+24.20.0. Those unknowns are recorded rather than inferred from the CLI version.
 
-| Evidence stage | Dated result and next action |
+| Evidence | Result |
 | --- | --- |
-| Source setup rehearsal | Candidate fixture uses synthetic configuration and the real simulator. Final source revision, checks, independent reviews and PR/main CI belong in the delivery PR. |
-| Personal installation | Blocked pending named owner, exact client versions/paths, private diff/backup, rollback and explicit authorization. No personal settings changed by this stage. |
-| Codex-first installed milestone | Blocked. Desktop hook route/version and actual Desktop/CLI Windows/WSL behavior remain unqualified. Record separately from Claude coverage. |
-| Claude installed acceptance | Blocked. Actual WSL client signals remain unobserved; native Windows setup is unsupported by this shared SDK. |
-| Failure, durability and privacy | Live-client outage, duplicate/delayed delivery, concurrent sessions, five-minute uncertainty, restart, journal cleanup and canary sequence remain unobserved for the installed profile. Source fixtures are separate evidence. |
-| Physical transport and visible display | Blocked pending exact IP, owner, model/firmware, explicit sequence/display-replacement consent and restoration limits. Earlier hardware receipts do not authorize this sequence. |
-| Nanoleaf coexistence/cutover | Installed enabled/unavailable/removed compatibility and any separately authorized shared-input/rollback sequence remain pending. Preserve legacy selection. |
-| Shared frontend | Blocked by Hub #6 and later concrete trial authorization. No frontend or cross-device visible acceptance is claimed. |
-| Performance | Physical event-to-visible measurement is pending. Hub #30 and Pixoo #61 source/performance work cannot substitute for it. |
+| Pixoo source | PR #65 merged as `37031be56007b6b890ec7a2098aa6e283d9d01fa`; both independent reviews and all five PR plus all five merged-main checks passed. |
+| Shared fix | Hub PR #144, `013b829a851277cd0cfbaeaba6d6d0dfc32727c7`; merged-main workflows passed. Hub 0.2.0 archive SHA-256 `47c6a23564652fe2d8ec72d48f45fb639decb2846664898935dc0f3cfe5b94a2`; bundled state 2.0.0. All six packaged hook tests passed before update. |
+| Installation | Owner ran the one-off installation and shared-host update in an ordinary Ubuntu terminal because task writes/service-manager access were restricted. Installed manifests/source receipt and authenticated current feed were read back. Same owner, credentials and consumer configuration retained; no database reset or duplicate hooks. |
+| Real Desktop lifecycle | An observation-only watcher recorded active, matching-turn idle with a retained completion notice, then active for the next ordinary user turn with that notice cleared for Pixoo. All five watcher predicates passed. Existing ambiguous state recovered and all 15 older notices were cleared according to policy while retained in shared state. Provider ordering remains unknown. |
+| Visible dashboard | Owner confirmed: "Yes, dashboard is visible and readable" and later "Yes, I see the T." The amber T is a turn-ended notice, not successful task completion. HTTP sent receipts are separate from these observations. |
+| Dismissal | One actual completed notice from this delivery task was explicitly acknowledged for Pixoo; shared state returned applied, and other consumers' acknowledgment sets were unchanged. |
+| Monitor/Media | Active synthetic-still playlist playback was paused by Monitor. The current item stayed unchanged beyond its four-second dwell. Returning to Media retained paused playback; explicit Resume resumed playing. Monitor was restored, with the player paused. Earlier shared notice activity while Media was selected did not activate Monitor. |
 
-For each future observation append a dated redacted receipt with owner,
-immutable source revisions and CI, actual client/OS/device profile, approved
-scope, expected/observed result, pass/fail/blocked verdict, restoration result
-and remaining gaps. Keep private identifiers, tokens, configuration, payloads
-and runtime files outside Git. Missing required observations keep #34 open.
+The first media helper failed before any request because its local image-library
+import path was wrong. After correcting the path, the first immediate Resume
+sample was taken before asynchronous playback reached playing; its item-position
+check also used an absent field and is not accepted as evidence. A corrected
+bounded poll observed playing, and the repeated pause check compared actual
+nonempty item IDs. No failures were relabeled as passes.
+
+The original installed state 1.0.0 test failed: successive turns remained unknown
+and notices accumulated. The isolated provider/reducer reproduction and live
+failure are retained in the [issue diagnosis](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34#issuecomment-5769993937).
+The owner accepted best-effort current status and Hub #137 supplied the fix.
+Unseen delayed starts can still select incorrectly; independent attention
+uncertainty is not a task-status failure or an approval grant.
+
+This is bounded real-client, transport and owner-observed display acceptance.
+It does not certify precise optical timing, firmware variants, reliable history,
+CLI/Claude, shared frontend, Nanoleaf physical behavior, long-duration outages or
+migration. Those are outside the owner-approved #34 scope. No router, firewall,
+firmware, brightness or screen-power changes were made. Synthetic local test
+media remains available; originals and unrelated playlists were preserved.
+
+Restart and monitor-disconnection instructions are in the
+[operator note](agent-monitoring.md#start-stop-and-disconnect). Issue closure
+still requires the reviewed documentation/guide delivery and its applicable
+checks; this receipt does not predict that merge.
