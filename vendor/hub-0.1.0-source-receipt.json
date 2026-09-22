@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "artifact": {
+    "name": "@jimmie-potts/hub",
+    "version": "0.1.0",
+    "archive": "jimmie-potts-hub-0.1.0.tgz",
+    "sha256": "a7a451b8a6eacfec1d89ec8e82accdc4edc1453293dd7fce1407bc61f5ac9c31",
+    "bytes": 3543696
+  },
+  "source": {
+    "repository": "https://github.com/jimmie-potts/agent-device-hub",
+    "commit": "f6bee907e06177c6dc8abde0075d73cc391784e9",
+    "pullRequest": 129
+  },
+  "build": {
+    "node": "24.21.0",
+    "commands": [
+      "npm ci",
+      "npm run package:hub"
+    ],
+    "reproducible": true,
+    "scope": "Unchanged upstream archive; two generated packs have identical bytes."
+  },
+  "sourceCI": {
+    "checkedAt": "2026-09-21",
+    "runs": [
+      {
+        "id": 35659013909,
+        "conclusion": "success"
+      },
+      {
+        "id": 35659013921,
+        "conclusion": "success"
+      }
+    ]
+  },
+  "limits": [
+    "Development-only Linux/WSL setup SDK; not loaded by normal application startup.",
+    "Synthetic packaging evidence does not qualify installed clients or physical devices."
+  ]
+}
