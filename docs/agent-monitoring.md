@@ -435,3 +435,189 @@ require a new user action; no mode transition or missed picture is replayed.
 record these boundaries. Source fixtures cover simulator pixels, delayed/cancelled
 work, owner migration and browser/native controls. Installed-client and integrated
 physical acceptance remain [#34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34).
+
+## Reversible setup package and rehearsal
+
+Pixoo consumes Hub #8's shared setup SDK through the development dependency
+`@jimmie-potts/hub` 0.1.0. [The source receipt](../vendor/hub-0.1.0-source-receipt.json)
+pins the unchanged archive and source revision. `npm ci` installs it for source
+rehearsal; ordinary Pixoo startup does not import it or install hooks. The
+[upstream setup runbook](https://github.com/jimmie-potts/agent-device-hub/blob/f6bee907e06177c6dc8abde0075d73cc391784e9/apps/hub/SETUP.md)
+owns setup, credential adapters and migration. This integration supplies no
+second installer.
+
+Use Linux Node 24.5 or later in the Node 24 line. From this checkout:
+
+```sh
+npm ci
+npm run build
+npx vitest run tests/integration/monitor-setup.test.ts
+```
+
+The fixture uses private temporary files and an ephemeral simulator listener.
+It invokes the shared SDK and hook executable, preserves synthetic legacy
+Nanoleaf and unrelated hooks, rejects a changed plan, checks idempotence,
+leaves an unqualified source disabled, and confirms removal revokes access.
+It does not invoke Codex, Claude or a physical worker. The test is explicitly
+skipped on native Windows because this SDK is qualified only as Linux/WSL
+source tooling. A green Windows job is not Windows setup acceptance.
+
+### Prepare a concrete installation request
+
+Before personal changes, record a named owner, the Pixoo and Hub source
+revisions with successful CI, actual Node/client versions, execution OS and
+client configuration layers. Inventory existing producers and Nanoleaf hooks.
+Select exactly one state owner and one receipt per provider/source. Record
+absolute Linux executable, package, client JSON, runtime and receipt paths
+privately. Keep receipt directories and immediate configuration parents mode
+0700 and regular, single-link files mode 0600, outside Git and `/mnt`.
+
+Identify the actual client trust/approval process without changing permission
+policies. Preserve managed-only hook restrictions. A client ignoring an
+untrusted hook supplies no monitoring evidence; do not relax the restriction.
+The historical version matrix above is not permission to set `qualified: true`.
+Record missing signals and the exact accepted degraded mode, if any; otherwise
+leave the producer disabled. Codex Desktop version and hook route remain a
+required gap. Native Windows Claude setup is not provided by this package.
+
+The owner reviews the full private before/after diff, credential principal,
+backup location, intended service startup and rollback. Obtain explicit
+installation and client-test authorization for that concrete plan. Never paste
+full configuration diffs, bearer tokens, payloads or private paths into GitHub.
+
+### Compose the shared SDK for an embedded Pixoo owner
+
+The following is an API sequence for a separately authorized owner process,
+not a script to run against discovered personal paths. Resolve imports from
+this checkout's installed package. `input` names the explicit paths described
+above; its `source` contains neutral `provider`, `client`, `hostId`, `sourceId`
+and `hook: 'SessionStart'`. Use the provider/client pairs in the matrix.
+
+```js
+import {
+  producerPrincipal, planSetup, applySetup, inspectSetup,
+  planRemoval, removeSetup,
+} from '@jimmie-potts/hub/setup';
+import {pixooSetupAuthority} from '@jimmie-potts/hub/setup-authority';
+
+const input = {
+  directory: receiptDirectory, target: clientJson,
+  source, endpoint: monitorEndpoint + '/events',
+  node: absoluteLinuxNode, hook: installedSharedHook,
+  owner: installationOwner, qualified: false, credentialFile,
+};
+const principal = producerPrincipal(input);
+```
+
+Provision that exact principal using Pixoo's built owning CLI before monitor
+startup: `node <monitor-cli.js> add-control <private-data-directory> <principal>`.
+Capture its one-time token privately in `credentialFile`, mode 0600. Embedded
+Pixoo requires read/control scope; do not substitute an MCP/device credential
+or claim an ingest-only scope. This credential grants monitor control as well
+as ingestion. Use a separate read principal for status consumers. Configure
+the private embedded owner as described above, then start it in simulator mode
+for the initial trial with `PIXOO_MONITOR_ENABLED=1`, its explicit data directory
+and loopback port. Stop through its named process owner using normal SIGINT or
+SIGTERM; keep it running through removal so revocation can be confirmed.
+
+```js
+const authority = pixooSetupAuthority({
+  dataDirectory, endpoint: monitorEndpoint,
+  node: absoluteLinuxNode, managementEntrypoint: absoluteMonitorCli,
+});
+const plan = await planSetup(input);
+// Review plan.before, plan.after and plan.digest privately before applying.
+await applySetup(input, plan.digest, authority);
+const status = await inspectSetup(input.directory);
+// Review a fresh removal diff when removal is authorized.
+const removal = await planRemoval(input.directory);
+await removeSetup(input.directory, removal.digest, authority);
+```
+
+`monitorEndpoint` is the active owner's numeric IPv4 loopback URL ending
+`/api/monitor/v1`. `installedSharedHook` is the absolute resolved
+`@jimmie-potts/hub/monitor-hook` export, not Pixoo's earlier example hook.
+Inspect is local status only; it does not prove client emission. Plan digests
+bind the current configuration and receipt. Applying a stale plan fails.
+Removal disables the producer, confirms credential revocation through the
+owning CLI and HTTP, then removes only exact owned hook entries from the latest
+configuration. Retain the private receipt and backup. Never restore the entire
+backup over newer unrelated changes. Use a fresh receipt directory for a later
+installation after confirmed removal.
+
+For a standalone Hub owner, compose `hubSetupAuthority` with the exact running
+host and its persisted configuration, following the pinned runbook. Do not use
+Pixoo's remote facade as the ingestion target. Do not start a second owner or
+share a database to make setup work.
+
+### Host routing, trust and recovery
+
+For WSL clients, the hook and owner use Linux loopback. For a Windows Codex
+client, the shared `windowsDistribution` option constructs an explicit
+`wsl.exe --distribution ... --exec ...` command using Linux paths. It assumes
+no Windows-to-WSL TCP forwarding. Verify that client's actual command selection,
+trust, distribution startup and bounded failure before qualification. Do not
+silently move a Windows workflow to WSL. The option is unsupported for Claude;
+its supplied setup path runs inside WSL. No router/firewall edits are part of
+setup.
+
+A silent hook exit is deliberate fail-open behavior, not evidence of delivery.
+Inspect qualification/enabled state, exact executable availability, receipt
+state, target ownership and owner reachability. The shared hook has a 2.9-second
+process deadline once Node starts; distribution/executable startup is a separate
+unqualified measurement. Inspect current authenticated snapshots and timestamps;
+collector health cannot refresh a stale session.
+
+On apply failure, retain the `applying` receipt and disabled producer, resolve
+the conflict, and re-plan with the same input. On removal failure, retain
+`removing` intent and restore access to the owner to verify revocation before
+retrying. An edited or duplicated owned entry requires explicit reconciliation.
+Never delete a receipt or restore a whole settings file to bypass the conflict.
+For abandoned locks, establish that the recorded setup coordinator has exited
+and no concurrent setup owns the target before the named owner removes only
+the corresponding empty lock. See the upstream runbook for all three lock
+locations and interrupted credential recovery.
+
+Keep legacy Nanoleaf selected throughout packaging and initial Pixoo trials.
+The earlier embedded example's Nanoleaf `clearOnNewTurn: false` policy is not
+compatible with the released shared Nanoleaf consumer, which requires `true`.
+If that policy exists in live state, stop for an explicit service-owned policy
+migration; never edit an export or database to force cutover. Shared selection
+can start Nanoleaf's physical worker and needs its own authorization.
+
+Owner migration uses Hub's supervised quiesce/export/exit, fresh fenced import,
+producer/consumer readiness and explicit activation. After accepted writes,
+rollback exports the latest state into another empty host store. It does not
+restart the occupied old embedded store. Preserve labels, notices, source
+identities and consumer acknowledgment. Restore legacy Nanoleaf through its
+owning `rollbackNanoleaf` operation when authorized, without resurrecting
+unrelated deleted hooks. Mode restoration remains explicit and playback paused.
+
+## Installed and physical acceptance sequence
+
+[Issue #34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34) remains
+the completion authority. Use the dated [hardware acceptance record](hardware-validation.md#issue-34-monitoring-acceptance)
+for redacted results. For each case record pass/fail/blocked, timestamp, owner,
+source revisions, actual client/device profile, expected/observed behavior and
+limitations. Record Codex-first installed progress separately from required
+Claude completion.
+
+| Stage and issue criteria | Required observation and gate |
+| --- | --- |
+| Setup/removal, criteria 1–3 | Approved diff and private backup; repeated setup; unrelated hooks/trust intact; fresh removal after unrelated edits; exact credential revoked; ordinary app use continues. Source fixtures do not replace installed observations. |
+| Each required client, criterion 4 | New turn, working, supported continuing-question/blocking-input/approval distinctions, turn-ended notice, new-turn clearing, explicit dismissal, interruption/runtime end and available child rollup. Preserve unknown/unsupported distinctions from the capability matrix. |
+| Isolation and failure, criterion 5 | Two concurrent sessions in one project remain separate; collector outage, failed hook delivery, duplicate/delayed events, five-minute uncertainty and backend restart. Measure agent progress independently of monitor success; a healthy collector cannot refresh stale observations. |
+| Durability and privacy, criterion 6 | Current labels/state/notices survive restart and 24-hour/10,000-event journal cleanup. Synthetic canaries for prompts, transcripts, tool arguments/output, copied titles and secrets are absent from transmitted payloads, state, logs and dashboard. Keep real payloads out of receipts. |
+| Physical preflight, criterion 7 | Exact device IP, named test owner, model/firmware, approved sequence and display replacement, prior screen/brightness and restoration limits. Earlier rendering consent does not authorize this test. |
+| Display, criterion 8 | Four rows, icons/short labels, attention total on every page, ten-second overflow, uncertainty/notices, native-size readability and exact preview. Record visible loading/timing separately from HTTP acknowledgment. |
+| Mode/writer, criterion 9 | Monitor pauses advancement; hooks cannot select Monitor from Media; return leaves playback paused. Exercise mode changes during uploads, disconnect/reconnect and screen-off/on without stale replay or a second writer. |
+| Nanoleaf/removal, criterion 10 | Legacy hooks work with monitor enabled, unavailable and removed. Only after separate cutover authorization verify shared input and rollback without duplicates. Revoke owned access, preserve other hooks and restore known display settings within limits. |
+| Evidence, criterion 11 | Dated redacted receipt with exact profiles and separate source/CI, installation, real-client, transport and visible-device verdicts. Missing required observations keep the issue open. |
+| Codex-first milestone, added criterion 1 | Qualified Desktop/CLI Windows/WSL routes and installation evidence; retain outstanding Claude gaps separately. |
+| Shared frontend, added criterion 2 | Wait for Hub #6 and trial authorization; operate labels/filters, acknowledgment and Monitor/Media through that frontend. Observe the same task in Pixoo/Nanoleaf and independent behavior when either consumer is unavailable. |
+| Physical latency, added criterion 3 | Measure event-to-visible timing separately from Hub #30 source/transport measurements; retain cadence/readability and restoration limits. |
+
+Complete the source rehearsal before proposing personal installation. Complete
+the authorized simulator/client sequence before the physical sequence. A failed
+required case stays open with its owner and next action; do not convert source,
+HTTP or preview results into visible-device passes.

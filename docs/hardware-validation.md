@@ -379,3 +379,31 @@ start an explicitly configured foreground owner, restore known settings, revoke
 its test principal, remove the temporary client entry and stop that owned host.
 Per-invocation entries disappeared with their clients; existing application data
 and unrelated installations were preserved.
+
+## Issue #34 monitoring acceptance
+
+September 21, 2026. Source packaging is in progress under
+[#34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34). The
+[operator sequence](agent-monitoring.md#installed-and-physical-acceptance-sequence)
+maps every issue criterion to required observations. The shared setup source is
+Hub `f6bee907e06177c6dc8abde0075d73cc391784e9`; its
+[package receipt](../vendor/hub-0.1.0-source-receipt.json) records provenance.
+This entry records no installed or visible-device pass.
+
+| Evidence stage | Dated result and next action |
+| --- | --- |
+| Source setup rehearsal | Candidate fixture uses synthetic configuration and the real simulator. Final source revision, checks, independent reviews and PR/main CI belong in the delivery PR. |
+| Personal installation | Blocked pending named owner, exact client versions/paths, private diff/backup, rollback and explicit authorization. No personal settings changed by this stage. |
+| Codex-first installed milestone | Blocked. Desktop hook route/version and actual Desktop/CLI Windows/WSL behavior remain unqualified. Record separately from Claude coverage. |
+| Claude installed acceptance | Blocked. Actual WSL client signals remain unobserved; native Windows setup is unsupported by this shared SDK. |
+| Failure, durability and privacy | Live-client outage, duplicate/delayed delivery, concurrent sessions, five-minute uncertainty, restart, journal cleanup and canary sequence remain unobserved for the installed profile. Source fixtures are separate evidence. |
+| Physical transport and visible display | Blocked pending exact IP, owner, model/firmware, explicit sequence/display-replacement consent and restoration limits. Earlier hardware receipts do not authorize this sequence. |
+| Nanoleaf coexistence/cutover | Installed enabled/unavailable/removed compatibility and any separately authorized shared-input/rollback sequence remain pending. Preserve legacy selection. |
+| Shared frontend | Blocked by Hub #6 and later concrete trial authorization. No frontend or cross-device visible acceptance is claimed. |
+| Performance | Physical event-to-visible measurement is pending. Hub #30 and Pixoo #61 source/performance work cannot substitute for it. |
+
+For each future observation append a dated redacted receipt with owner,
+immutable source revisions and CI, actual client/OS/device profile, approved
+scope, expected/observed result, pass/fail/blocked verdict, restoration result
+and remaining gaps. Keep private identifiers, tokens, configuration, payloads
+and runtime files outside Git. Missing required observations keep #34 open.
