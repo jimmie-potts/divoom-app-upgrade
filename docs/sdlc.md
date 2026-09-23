@@ -12,8 +12,9 @@ a second status ledger or duplicate issue acceptance criteria in OpenSpec.
 Planning and review requests are read-only, including GitHub. Explicit requests
 for planning documents authorize those documents only. A normal implementation
 or documentation-maintenance request includes issue tracking, isolated worktree,
-code/docs, tests, PR publication, independent review, an eligible merge, and main
-CI readback. A narrower user request prevails. Skill handoffs preserve existing
+code/docs, tests, PR publication, independent review, an eligible merge, main CI
+readback, and [cleanup after delivery](#cleanup-after-delivery). A narrower user
+request prevails. Skill handoffs preserve existing
 authority and return to the coordinator; they grant no extra authority.
 
 Source-only is the default delivery target. Installing the app, replacing display
@@ -105,11 +106,32 @@ unrelated improvements in separate issues.
 5. Inspect CI at the candidate revision to enumerate all jobs. Current CI requires Workflow checks on ubuntu-latest and windows-latest, Application checks on both hosts, and Simulator browser checks. Require every configured job to succeed on the latest PR run associated with the current head and PR. Missing, pending, skipped, cancelled, or failed jobs block merge. Read all result pages. An empty required-check list proves nothing.
 6. Immediately reread issue scope, dependencies, PR head, and main. If head or base changed, refresh the comparison and affected tests/reviews/CI. Require no unresolved decisions, blocking findings, or outstanding change requests. Squash-merge only the reviewed head with `gh pr merge <number> --repo jimmie-potts/divoom-app-upgrade --squash --match-head-commit <reviewed-head>`. Never use `--admin` or delete another task's worktree/branch.
 7. Read back the merged commit on main and its push CI. Every configured job must succeed. Close the issue only when all its acceptance criteria are met; remove status labels/blocked and read back closure. Keep it open and blocked if main CI fails, developer prerequisites remain unavailable, or requested installation/physical acceptance remains unfinished.
-8. After main CI passes, remove the worktree this delivery created with `git worktree remove <path>` and delete its `.local/scratch/<task>` folder. First confirm the worktree is clean and unused, and that evidence the issue needs is in the PR, the issue, or the main checkout's `.local/evidence/`. Because this repository squash-merges, judge delivery by the PR's merged state, not commit ancestry. Never force removal. A tool-managed worktree, such as a Claude Code session worktree, follows that tool's removal. For failed or abandoned work, ask the user whether to keep or remove it and keep it until they decide. Leave other tasks' worktrees, branches, and scratch alone.
+8. Clean up this delivery's own worktree and scratch as described in [Cleanup after delivery](#cleanup-after-delivery).
 
 Branch protection returned an account-plan 403 on September 5, 2026. These checks
 are procedural safeguards. Preserve private visibility and account settings;
 honor any protections introduced later. No background merge service is used.
+
+### Cleanup after delivery
+
+Start once step 7 has verified the merged revision's push CI and read back the
+issue state. Cleanup does not wait for installation or physical acceptance
+unless that work still uses the worktree. Clean up only what this delivery
+created:
+
+1. Confirm the PR is merged and the worktree's `HEAD` is the PR's merged head commit. This repository squash-merges, so judge delivery by the PR's merged state, never by commit ancestry. Commits after the merged head are unfinished work.
+2. Run `git status --short --ignored` in the worktree. `git worktree remove` deletes ignored files, including the worktree's own `.local/`, `.env`, databases, test output, and `node_modules/`. Move anything the issue still needs into the PR, the issue, or the canonical repository's `.local/evidence/gh-<issue-number>-<slug>/`, and confirm other ignored files are disposable.
+3. From the canonical repository checkout, run `git worktree remove <path>` and confirm with `git worktree list` that the path is gone. Delete the canonical repository's `.local/scratch/gh-<issue-number>-<slug>/`. Do not delete the delivery branch yourself.
+4. Remove a tool-managed worktree, such as a Claude Code session worktree under `.claude/worktrees/`, through that tool's own exit flow instead of `git worktree remove`, and still delete the scratch folder. Once steps 1 and 2 pass on a clean worktree, accepting the tool's option to discard the squash-merged commits is allowed.
+
+Keep the worktree and scratch, and report the path and reason, when the
+worktree is dirty or locked, a process or session still uses it, its `HEAD`
+differs from the merged head, evidence is not yet preserved, or
+`git worktree remove` refuses. Never force removal, and never reset, clean, or
+discard files to make a worktree removable. If main CI fails, or the work failed
+or was abandoned, ask the user whether to keep or remove it and keep it until
+they decide; discarding uncommitted work needs their explicit approval. Leave
+other tasks' worktrees, branches, and scratch alone.
 
 ## Completion evidence
 
