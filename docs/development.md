@@ -17,9 +17,14 @@ npm run simulator
 
 On Linux, Playwright may require browser system dependencies; hosted CI uses
 `npx playwright install --with-deps chromium`. Native Windows uses the same npm
-commands in a Node 24 shell. Use `npm ci --cache /tmp/pixoo-npm-cache` if the WSL
-npm cache is read-only. In a sandbox, an explicitly set PLAYWRIGHT_BROWSERS_PATH
-can place browser binaries in a writable external cache.
+commands in a Node 24 shell. If `node --version` does not report v24, prefix each
+command with `fnm exec --using=.nvmrc --` from the worktree root, for example
+`fnm exec --using=.nvmrc -- npm ci`; it needs no shell setup. Reuse one shared
+Node 24 installation instead of installing Node for each task, and report a
+missing fnm or Node 24. Use npm's default cache (`~/.npm`) and Playwright's
+default browser cache (`~/.cache/ms-playwright`), not directories under `/tmp`,
+which can be a small RAM-backed filesystem shared by every session. If a sandbox
+makes either cache read-only, report that instead of redirecting it.
 
 | Command | Evidence |
 | --- | --- |
