@@ -87,16 +87,14 @@ continue without fetching, copying, or installing it.
 
 ## Work guide maintenance
 
-For every authorized delivery or planning change, read the
+When a task intentionally updates or publishes the guide, read the
 [shared guide maintenance procedure](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md).
-The hub owns the cross-project HTML and its inputs. Coordinate a linked hub PR
-that updates affected facts and records this delivery in
-`docs/work-guide/updates.md`, or records a specific no-impact reason. Include
-that PR and synchronization status in this repository's PR and completion report.
-Pending guide synchronization remains unfinished delivery work. Read-only tasks
-do not authorize writes, and guide maintenance does not authorize devices or hosting.
-The shared skills consume that procedure at planning publication, candidate
-review, verified completion and authorized public publication. Report guide-source
-synchronization, public artifact publication and live verification separately,
-with evidence or a pending owner/next action. Tracker-only requests change only
-the tracker; a source merge does not update the public site.
+The hub owns the cross-project HTML and its inputs. A linked hub PR is required
+only when the authorized scope includes a guide update or publication, following
+that procedure. Ordinary planning and delivery need no guide refresh, hub PR or
+no-impact record and can finish without a newer guide revision.
+For guide work, report source completion, guide revision, public publication and
+live verification separately, with evidence or a pending owner and next action.
+Read-only tasks do not authorize writes; tracker-only requests change only the
+tracker. Guide maintenance does not authorize devices or hosting. A source merge
+does not update the public site.

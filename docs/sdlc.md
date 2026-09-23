@@ -54,11 +54,8 @@ or openai-docs for source-dependent facts, how for existing behavior, and
 diagnosing-bugs for unknown failures. Investigation alone does not authorize a fix.
 Read docs/development.md for provisioning; do not copy shared skills into this repo.
 
-For planning, candidate review and completion, follow the
-[Hub guide checkpoints](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md).
-The coordinator owns the Hub companion and any authorized public publication.
-Report source/tracker completion, guide synchronization, public publication and
-live verification separately. Retain pending owners and narrower user limits.
+When the authorized scope includes a guide update or publication, follow the
+[cross-project work guide procedure](#cross-project-work-guide).
 
 ## Plan and implement
 
@@ -125,18 +122,24 @@ missing CI, unresolved findings, unfinished archives, and unavailable independen
 review. Observe responses/actions; static schema validation alone does not prove
 agent routing. Fixture results do not prove real GitHub writes or host skill discovery.
 
-## Cross-project guide completion gate
+## Cross-project work guide
 
-The [hub work guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md) is the canonical remaining-work,
-history and architecture document for these projects. For every authorized
-delivery, follow its maintenance procedure and identify the coordinator of the
-companion hub PR. Review affected status, dependencies, history, architecture
-and acceptance evidence. Record changed sections or a specific no-impact reason
-in the hub maintenance history. Link the hub PR and its validation here.
+The [hub work guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md)
+is a dated view of cross-project work, history and architecture. GitHub issues
+remain authoritative for scope and status. Ordinary planning and delivery do not
+require a guide refresh, hub PR or no-impact record and can finish without a
+newer guide revision.
 
-Merge the hub adoption PR before these instructions take effect. Guide
-synchronization remains pending until its companion PR merges; include that
-status in the completion report. Reconcile post-merge facts in a follow-up when
-they were unavailable before review. Preserve source, installation, client and
-physical evidence as separate claims. These requirements do not grant authority
-for read-only tasks, tracker changes, installation or deployment.
+When a task intentionally updates or publishes the guide, follow the hub's
+maintenance procedure. Only that authorized scope requires a linked hub PR;
+the procedure allows reuse of a reviewed guide revision for publication when
+output is unchanged. The coordinator links the relevant PRs and records the
+represented source revision and guide validation. Report source completion,
+guide revision, public publication and live verification separately, with
+evidence or a pending owner and next action. A source merge does not update the
+public site.
+
+Read-only tasks do not authorize writes, and tracker-only requests change only
+the tracker. Guide maintenance does not authorize installation, device operation
+or hosting. Preserve source, installation, client and physical evidence as
+separate claims.

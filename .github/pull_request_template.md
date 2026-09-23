@@ -24,14 +24,15 @@ Record source validation, installation status, and physical verification separat
 Use Not run or Not in scope when appropriate. Simulator results do not establish
 physical display timing or authenticated phone access.
 
-## Cross-project work guide
+## Cross-project work guide (only when in scope)
 
-- [ ] Linked the coordinated hub guide PR and recorded its synchronization status.
-- [ ] Updated affected facts or recorded a specific no-impact reason in the hub maintenance history.
-- [ ] Recorded guide validation and any pending post-merge reconciliation.
+Omit this section for ordinary source or tracker work; no guide refresh, hub PR
+or no-impact record is required. For an authorized guide update or publication,
+follow the [hub procedure](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/work-guide/README.md)
+and link the relevant hub PR. A source merge does not update the public site.
 
 - Source/tracker completion and revision:
-- Guide-source synchronization, Hub companion and revision:
-- Public publication PR and revision, or pending/not applicable reason:
-- Live deployment, required URLs and served-hash verification:
+- Guide PR, revision and validation:
+- Public publication PR and revision (when authorized):
+- Live verification (when publication is in scope):
 - Pending stage owner and next action:
