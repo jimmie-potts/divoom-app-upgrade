@@ -18,7 +18,7 @@ those documents only. A normal implementation request includes issue updates,
 an isolated worktree, tests, PR publication, independent review, an eligible merge,
 and main CI readback. Narrower user instructions prevail.
 
-When drafting or picking up a story, or after a material scope change, apply
+When drafting or picking up a story, or after a material scope or assumption change, apply
 the [scope defaults](docs/sdlc.md#scope-defaults), including in ordinary work
 without `plan-work` or `deliver-work`. A read-only request reports the
 assessment without writing.
