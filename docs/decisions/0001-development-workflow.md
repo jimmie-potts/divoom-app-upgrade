@@ -32,3 +32,11 @@ is verified. Source files and CI can still be completed and reviewed.
 
 The initial commit only establishes a main branch for the setup PR. Subsequent
 changes use the [SDLC](../sdlc.md), including the remainder of bootstrap.
+
+## Update, September 24, 2026
+
+The repository is now public. Native branch protection is available, but `main`
+has no branch protection or rulesets configured, so the delivery checks remain
+procedural. The decision above is unchanged; its privacy and branch-protection
+notes record the September 5 state. The [SDLC](../sdlc.md) describes current
+settings.
