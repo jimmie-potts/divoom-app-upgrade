@@ -48,7 +48,8 @@ job includes a production build through `npm test`. Browser artifacts are
 ignored under test-results. Emulated phone sizes are not actual LAN verification.
 
 Use the root as the Codex project and worktree starting directory. AGENTS.md is
-the entrypoint. Optional local actions can use the check, browser and simulator
+the entrypoint. Claude Code reads CLAUDE.md, which imports @AGENTS.md, so both
+hosts follow the same rules. Optional local actions can use the check, browser and simulator
 commands after their prerequisites. Preserve host-managed .agents/.codex, model,
 permission, trust and hook settings. The shell examples are optional environment
 assignments, not configuration files loaded by the app.
