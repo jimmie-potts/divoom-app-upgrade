@@ -37,6 +37,7 @@ changes use the [SDLC](../sdlc.md), including the remainder of bootstrap.
 
 The repository is now public. Native branch protection is available, but `main`
 has no branch protection or rulesets configured, so the delivery checks remain
-procedural. The decision above is unchanged; its privacy and branch-protection
-notes record the September 5 state. The [SDLC](../sdlc.md) describes current
-settings.
+procedural. The workflow decision is unchanged. The private-repository approval
+and the instruction to preserve privacy describe the September 5 state and no
+longer apply; delivery work now leaves visibility and account settings
+unchanged, as the [SDLC](../sdlc.md) describes.

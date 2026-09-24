@@ -108,11 +108,12 @@ unrelated improvements in separate issues.
 7. Read back the merged commit on main and its push CI. Every configured job must succeed. Close the issue only when all its acceptance criteria are met; remove status labels/blocked and read back closure. Keep it open and blocked if main CI fails, developer prerequisites remain unavailable, or requested installation/physical acceptance remains unfinished.
 8. Clean up this delivery's own worktree and scratch as described in [Cleanup after delivery](#cleanup-after-delivery).
 
-This repository is public. Branch protection returned an account-plan 403 while
-it was private on September 5, 2026; it is now available, but `main` has no
-branch protection or rulesets configured. These checks are procedural
-safeguards. Delivery work does not change visibility or account settings; honor
-any protections introduced later. No background merge service is used.
+This repository is public. While it was private, branch protection returned an
+account-plan 403 on September 5, 2026. Protection is now available, but `main`
+has no branch protection rules or rulesets configured. These checks are
+procedural safeguards. Delivery work does not change visibility or account
+settings; honor any protections introduced later. No background merge service is
+used.
 
 ### Cleanup after delivery
 
