@@ -379,7 +379,9 @@ retires monitor work and leaves playback paused. Start, show-media, restart and
 resume select Media through the same service used by browser, native HTTP and
 existing MCP tools. Editing filters in Media leaves playback running. Agent
 questions, approvals, errors and turn ends keep updating the source and preview
-but cannot select Monitor or send unsolicited display pictures.
+but cannot select Monitor or send unsolicited display pictures. The only
+automatic Media change is the owner's opt-in now-playing setting; see
+[Now-playing cards](#now-playing-cards).
 
 `MonitorPresentation` owns mode/filter/cadence and a logical transition queue.
 `Player.uploadDashboard` accepts complete RGB pictures only for its current
@@ -416,7 +418,9 @@ selected-source state and the exact dashboard rendition. `/snapshot`, `/sessions
 and `/rendition` expose those parts; `/changes` provides bounded sequence-aware
 SSE with replay or resync. `/commands` accepts only mode and view operations.
 `/shared-actions` accepts only explicit label or Pixoo notice acknowledgment and
-uses the selected owner's separate `nextRequestId`.
+uses the selected owner's separate `nextRequestId`. `GET /view` also returns a
+`nowPlaying` object, and `POST /now-playing` takes exactly `{media}`; see
+[Now-playing cards](#now-playing-cards).
 
 Mode/view commands carry `apiVersion: "pixoo-integration/1.0"`, `requestId`,
 `expectedConfigurationRevision`, `expectedGeneration` and a strict `action`.
@@ -444,6 +448,63 @@ require a new user action; no mode transition or missed picture is replayed.
 record these boundaries. Source fixtures cover simulator pixels, delayed/cancelled
 work, owner migration and browser/native controls. Installed-client and integrated
 physical acceptance remain [#34](https://github.com/jimmie-potts/divoom-app-upgrade/issues/34).
+
+## Now-playing cards
+
+[Issue #89](https://github.com/jimmie-potts/divoom-app-upgrade/issues/89) shows
+what is playing, read from the hub's shared playback snapshot
+([agent-device-hub#38](https://github.com/jimmie-potts/agent-device-hub/issues/38)).
+[ADR 0019](decisions/0019-now-playing-cards.md) and the
+[now-playing-cards specification](../openspec/specs/now-playing-cards/spec.md)
+record the decisions.
+
+It is opt-in. Create `agent-monitor/playback.json` beside `config.json`, with a
+hub credential that has `read` scope and the playback source ID in its
+`devices`:
+
+```json
+{"version":1,"endpoint":"http://127.0.0.1:8788/api/playback/v1/snapshot","token":"<43 base64url characters>","sourceId":"ht-a9"}
+```
+
+The endpoint must be exactly that loopback route with a port. An invalid file
+fails startup; without the file, nothing is read. The backend polls every 2 s,
+one read at a time, with a 1.5 s timeout, a 64 KiB bound and no redirects. A
+response for another source, or with an invalid shape, counts as a failed read.
+
+**Card.** The card is 64×64 and has three parts:
+
+- A play triangle and `PLAYING`, or pause bars and `PAUSED`.
+- A divider.
+- The title in white on up to four rows (seven without an artist), then the
+  artist in cyan on up to three rows.
+
+Text wraps at spaces, and cut-off text ends with `.`. The album is not drawn. A
+`stale` snapshot, or a failed read, dims the card and swaps the marker for `?`.
+At 30 s since the last observation, or when the snapshot is `unavailable`,
+`stopped`, `inactive` or `unknown`, there is no card.
+
+**Monitor.** While Monitor presentation is active, a new track, or playback
+starting, shows the card for 10 s, then the dashboard. When any session holds
+approval, input or question attention, the pop-up is dropped, not replayed.
+Stale reads never start one.
+
+**Media.** The Agent monitor panel's "Now playing" group offers Off (the
+default), Pop-up for 10 seconds, and Whole song. The choice is stored in
+`agent-monitor/now-playing.json`.
+
+- Pop-up pauses an actively playing playlist for the card, then resumes it.
+- Whole song does the same for as long as a card exists.
+
+Resuming restarts the current item. Any manual player command, a mode change,
+screen-off, a failed or uncertain card upload, or shutdown cancels the
+automatic resume. Nothing happens while the playlist is paused or stopped, or
+while the screen is off.
+
+The group also shows the source state, the current track, what the display is
+showing, and an exact card preview. The preview is desired content, not
+evidence of what the device shows. Source tests use a loopback fake hub and
+the fake device. Installing the change and checking the physical Pixoo are
+separate steps that need the owner's go-ahead.
 
 ## Small installed setup accepted on September 22, 2026
 

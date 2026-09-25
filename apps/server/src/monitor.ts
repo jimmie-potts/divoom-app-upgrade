@@ -5,8 +5,9 @@ import {Events} from './events.js';
 import {ApiError,rejectedMonitorRequests} from './security.js';
 import {authenticateCredential,validateMcpConfiguration} from './mcp-config.js';
 import {loadMonitorConfig,createSessionSource,monitorCommand,type SessionSource} from './monitor-source.js';
-import {MonitorPresentation,defaultPresentation} from './monitor-presentation.js';
-import {presentationConfiguration,sharedMonitorAction} from '@pixoo/core';
+import {MonitorPresentation,defaultPresentation,defaultNowPlaying} from './monitor-presentation.js';
+import {loadPlaybackConfig,PlaybackReader} from './now-playing-source.js';
+import {nowPlayingRequest,nowPlayingSetting,presentationConfiguration,sharedMonitorAction,type NowPlayingState} from '@pixoo/core';
 import {readMonitorJson,writeMonitorJson} from './monitor-source.js';
 import type {ControlService} from './control-service.js';
 import {parse} from './validation.js';
@@ -18,11 +19,19 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string,service
  const settingsPath=join(directory,'presentation.json');
  let configuration=defaultPresentation;
  try{configuration=presentationConfiguration.parse(await readMonitorJson(settingsPath));}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw new Error('Invalid monitor presentation configuration',{cause:error});}
- const dashboard=new MonitorPresentation(service.player,{configuration,renderCadenceMs:cadenceMs,save:value=>writeMonitorJson(settingsPath,value)});
+ const nowPlayingPath=join(directory,'now-playing.json');
+ let nowPlaying=defaultNowPlaying;
+ try{nowPlaying=nowPlayingSetting.parse(await readMonitorJson(nowPlayingPath));}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw new Error('Invalid now-playing setting',{cause:error});}
+ // Opt-in: without playback.json nothing reads the hub's playback snapshot.
+ const playbackConfig=await loadPlaybackConfig(directory);
+ const dashboard=new MonitorPresentation(service.player,{configuration,renderCadenceMs:cadenceMs,save:value=>writeMonitorJson(settingsPath,value),nowPlaying,saveNowPlaying:value=>writeMonitorJson(nowPlayingPath,value)});
  service.monitor=dashboard;
- const source:SessionSource=await createSessionSource(directory,config).catch(async error=>{await dashboard.close();throw error;});
- let timer:ReturnType<typeof setInterval>|undefined,renderTimer:ReturnType<typeof setInterval>|undefined,events:Events|undefined,presentationEvents:Events|undefined,closed=false;
- const close=async()=>{if(closed)return;closed=true;clearInterval(timer);clearInterval(renderTimer);await dashboard.close();events?.close();presentationEvents?.close();await source.close();};
+ const playback=playbackConfig?new PlaybackReader(playbackConfig):undefined;
+ const readPlayback=async()=>{if(!playback)return;await playback.refresh();dashboard.submitPlayback(playback.status());};
+ const nowPlayingState=():NowPlayingState=>({configured:playback!==undefined,...dashboard.nowPlayingStatus()});
+ const source:SessionSource=await createSessionSource(directory,config).catch(async error=>{playback?.close();await dashboard.close();throw error;});
+ let timer:ReturnType<typeof setInterval>|undefined,renderTimer:ReturnType<typeof setInterval>|undefined,playbackTimer:ReturnType<typeof setInterval>|undefined,events:Events|undefined,presentationEvents:Events|undefined,closed=false;
+ const close=async()=>{if(closed)return;closed=true;clearInterval(timer);clearInterval(renderTimer);clearInterval(playbackTimer);playback?.close();await dashboard.close();events?.close();presentationEvents?.close();await source.close();};
  try{
   await source.refresh();dashboard.submit(source.view());
   events=new Events(()=>{const view=source.view();return {apiVersion:view.apiVersion,ownerId:view.ownerId,connection:view.connection,admissionRejected:view.admissionRejected+rejectedMonitorRequests(app),revision:view.snapshot?.revision??null,lossCount:view.snapshot?.lossCount??null,collector:view.snapshot?.collector??null,uncertain:view.snapshot?.sessions.filter(session=>session.freshness==='uncertain').length??null};});
@@ -62,7 +71,8 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string,service
   const uiEvents=presentationEvents;dashboard.onChange=()=>uiEvents.publish();
   app.get(`${browserPrefix}/snapshot`,service.integrationSnapshot);
   app.post(`${browserPrefix}/commands`,request=>service.integration(request.body).finally(()=>uiEvents.publish()));
-  app.get(`${browserPrefix}/view`,async()=>{await source.refresh();publish();return {integration:service.integrationSnapshot(),source:source.view(),dashboard:dashboard.rendition()};});
+  app.get(`${browserPrefix}/view`,async()=>{await Promise.all([source.refresh(),readPlayback()]);publish();return {integration:service.integrationSnapshot(),source:source.view(),dashboard:dashboard.rendition(),nowPlaying:nowPlayingState()};});
+  app.post(`${browserPrefix}/now-playing`,async request=>{const body=parse(nowPlayingRequest,request.body);await dashboard.setNowPlaying(body.media);uiEvents.publish();return nowPlayingState();});
   app.get(`${browserPrefix}/sessions`,async()=>{await source.refresh();publish();return source.view();});
   app.get(`${browserPrefix}/rendition`,async()=>{await source.refresh();publish();return dashboard.rendition();});
   app.post(`${browserPrefix}/shared-actions`,async request=>{
@@ -71,6 +81,7 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string,service
   });
   uiEvents.register(app,`${browserPrefix}/changes`);
   renderTimer=setInterval(()=>dashboard.tick(),100);renderTimer.unref();
+  if(playback){playbackTimer=setInterval(()=>{void readPlayback().then(()=>{if(!closed)uiEvents.publish();}).catch(()=>{});},2000);playbackTimer.unref();}
   timer=setInterval(()=>{void source.refresh().then(()=>{if(!closed)publish();}).catch(()=>{});},1000);timer.unref();
   // Owner decision on #77: device startup restores a saved Monitor selection.
   // Simulator startup stays passive.
