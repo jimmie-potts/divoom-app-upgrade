@@ -1,0 +1,22 @@
+# Systemd user unit for one installed Pixoo backend. See docs/local-operations.md
+# ("Run as a Linux user service"). Replace both <...> placeholders with absolute
+# paths before installing. Keep private settings in the EnvironmentFile.
+[Unit]
+Description=Pixoo playlist controller
+Documentation=https://github.com/jimmie-potts/divoom-app-upgrade/blob/main/docs/local-operations.md
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/pixoo-playlist-controller/service.env
+WorkingDirectory=%h
+ExecStart=<absolute-node-24> <absolute-installed-checkout>/apps/server/dist/main.js
+UMask=0077
+Restart=on-failure
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

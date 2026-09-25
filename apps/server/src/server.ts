@@ -13,7 +13,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env) {
   const app = createApp({ webRoot, dataDir:config.dataDir, runtime:config,mcpEnabled:config.mcpEnabled??false,monitorEnabled:config.monitorEnabled??false,controllerEnabled:config.controllerEnabled??false,...(config.controllerIdentity?{controllerIdentity:config.controllerIdentity}:{}) });
   try {
     const address = await app.listen({ host: config.host, port: config.port });
-    return { app, address };
+    return { app, address, mode: config.mode };
   } catch (error) {
     await app.close();
     throw error;

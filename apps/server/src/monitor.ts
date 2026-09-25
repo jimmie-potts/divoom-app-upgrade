@@ -72,6 +72,9 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string,service
   uiEvents.register(app,`${browserPrefix}/changes`);
   renderTimer=setInterval(()=>dashboard.tick(),100);renderTimer.unref();
   timer=setInterval(()=>{void source.refresh().then(()=>{if(!closed)publish();}).catch(()=>{});},1000);timer.unref();
+  // Owner decision on #77: device startup restores a saved Monitor selection.
+  // Simulator startup stays passive.
+  if(service.mode==='device')await dashboard.restore();
   app.addHook('preClose',close);return close;
  }catch(error){await close();throw error;}
 }

@@ -39,17 +39,6 @@ All media, monitor and display controls SHALL use the existing backend adapter a
 - **WHEN** several snapshots arrive within the cadence or while an upload is active
 - **THEN** only the newest current rendition remains eligible after the minimum interval, without replaying missed pictures
 
-### Requirement: Inactive recovery and bounded failure
-Restart SHALL retain mode, filters and paused media context, restore active sessions uncertain through the state owner, and require explicit display activation. Screen-off SHALL stop monitoring work; screen-on SHALL NOT resume playback or monitoring. Failed monitor transmission SHALL suspend monitoring until explicit activation, with no automatic retries after uncertain effects.
-
-#### Scenario: Restart and screen-on are passive
-- **WHEN** a backend restores Monitor mode or the user turns a stopped screen on
-- **THEN** snapshots and previews remain available but no monitor upload occurs before explicit activation
-
-#### Scenario: Uncertain transmission
-- **WHEN** a monitor write fails with possible prior effects
-- **THEN** the current view remains selected but participation is inactive, uncertainty is reported, and no automatic probe or retry occurs
-
 ### Requirement: Finite protected integration commands
 A versioned Pixoo integration extension SHALL expose supported operations, selected/pending mode, effective participation, selected filters, cadence and generation/configuration guards without changing released controller API 1.0. Browser and native integration operations SHALL share the backend command ledger with playback/MCP, reject unknown fields, stale revisions/generations, conflicting duplicates and old epochs, and preserve existing Host/Origin/authentication boundaries. Source label/acknowledgment commands SHALL preserve the selected owner's separate identity.
 
@@ -66,4 +55,19 @@ The browser SHALL reconcile from current snapshots after sequence-aware SSE reco
 
 #### Scenario: Reconnect or owner cutover
 - **WHEN** a client reconnects, the backend restarts, or the selected session owner is explicitly switched and rolled back
-- **THEN** the browser resyncs current mode/view and shared state without creating local agent-state authority or activating the display
+- **THEN** the browser resyncs current mode/view and shared state without creating local agent-state authority, and the reconnect itself does not activate the display
+
+### Requirement: Startup recovery and bounded failure
+Restart SHALL retain mode, filters and paused media context and restore active sessions uncertain through the state owner. In device mode, startup with a saved Monitor selection and a requested screen-on state SHALL restore Monitor presentation through the existing player generation and serialized adapter, without a client command or new request identity ([issue #77](https://github.com/jimmie-potts/divoom-app-upgrade/issues/77) owner decision). Simulator startup, a saved Media selection and a retained screen-off request SHALL remain passive until explicit activation. Screen-off SHALL stop monitoring work; screen-on SHALL NOT resume playback or monitoring. Failed monitor transmission, including the first after startup, SHALL suspend monitoring until explicit activation, with no automatic retries after uncertain effects.
+
+#### Scenario: Device startup restores Monitor
+- **WHEN** a device-mode backend starts with saved Monitor mode and the screen requested on
+- **THEN** playback context stays paused, participation becomes active and the newest complete picture is submitted through the serialized adapter without a client command
+
+#### Scenario: Simulator, Media, screen-off and screen-on stay passive
+- **WHEN** a backend starts in simulator mode, starts with saved Media mode, restarts with a retained screen-off request, or the user turns a stopped screen on
+- **THEN** snapshots and previews remain available but no monitor upload occurs before explicit activation
+
+#### Scenario: Uncertain transmission
+- **WHEN** a monitor write fails with possible prior effects, including the first write after startup
+- **THEN** the current view remains selected but participation is inactive, uncertainty is reported, and no automatic probe or retry occurs
