@@ -428,7 +428,7 @@ checks; this receipt does not predict that merge.
 
 ## Issue #77 user service installation
 
-September 24–25, 2026. The owner authorized installing the
+September 24-25, 2026. The owner authorized installing the
 [user service](local-operations.md#run-as-a-linux-user-service) on the same
 Ubuntu WSL host. The target address, backup, receipts and private settings
 remain outside Git.
@@ -436,11 +436,11 @@ remain outside Git.
 | Evidence | Result |
 | --- | --- |
 | Pixoo source | PR #84 merged as `690f14d59c1db4025404ecf6c6ff4fce611470c4`; both independent reviews, all five PR checks and all five merged-main checks passed (main attempt 2 after an unrelated Windows test timeout). |
-| Installation | Verified offline data backup and copies of the prior launcher, receipt and monitor configuration taken first. Built into a new runtime directory with Node 24.21.0; the prior `37031be` runtime was kept. Unit enabled in `default.target`; linger unchanged (off). `systemd-analyze --user verify` passed. |
+| Installation | Recorded in the install session and its private receipt. A verified offline data backup and copies of the prior launcher, receipt and monitor configuration came first. The build went into a new runtime directory with Node 24.21.0, and the prior `37031be` runtime was kept. `systemd-analyze --user verify` passed on the installed unit before it was enabled in `default.target`. Linger is unchanged (off). |
 | Startup restore | With the Pixoo unreachable, the first startup upload timed out and monitoring suspended without retry. With the Pixoo reachable, a service restart restored Monitor without a command: `sent`, `participating: true`, `connected: true`, with later frames also sent. |
-| Hub | The controller snapshot reported `serviceHealth: ready` with the hub's registered identity. Hub health reported `pixoo` as `ready`, and the owner saw BUNNY list the Pixoo controller as ready. |
+| Hub | API evidence: the controller snapshot reported `serviceHealth: ready` with the hub's registered identity, and hub health reported `pixoo` as `ready`. Owner observation: BUNNY listed the Pixoo controller as ready. |
 | Stop | `systemctl --user restart` stopped with exit status 0 and reopened the same data directory. |
-| WSL restart | Not run: `wsl --shutdown` would stop in-progress agents. The owner accepted proxy evidence: on the two previous WSL boots, the user manager started the enabled Nanoleaf services within 2 seconds, and the Pixoo unit is enabled in the same target. Revisit on the next WSL restart; see the [closing comment](https://github.com/jimmie-potts/divoom-app-upgrade/issues/77). |
+| WSL restart | Not run: `wsl --shutdown` would stop in-progress agents. The owner accepted proxy evidence: on the two previous WSL boots, the user manager started the enabled Nanoleaf services within 2 seconds, and the Pixoo unit is enabled in the same target. Revisit on the next WSL restart; see the [closing comment](https://github.com/jimmie-potts/divoom-app-upgrade/issues/77#issuecomment-5827118688). |
 
 HTTP receipts are transport evidence. No firmware, router, firewall, brightness
 or screen-power changes were made.
