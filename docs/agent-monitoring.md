@@ -453,7 +453,9 @@ The actual shared feed recorded active → idle → active and automatic clearin
 of the previous notice. Explicit Pixoo dismissal preserved other consumers'
 acknowledgments. See the [dated receipt](hardware-validation.md#issue-34-monitoring-acceptance).
 
-The installed Pixoo source is `37031be56007b6b890ec7a2098aa6e283d9d01fa`.
+The installed Pixoo source is `690f14d59c1db4025404ecf6c6ff4fce611470c4`,
+running as a user service since September 24, 2026 ([#77 receipt](hardware-validation.md#issue-77-user-service-installation)).
+The #34 acceptance above used `37031be56007b6b890ec7a2098aa6e283d9d01fa`.
 Its remote source is Hub 0.2.0 / agent-state 2.0.0 from
 `013b829a851277cd0cfbaeaba6d6d0dfc32727c7`. The older development-only SDK pin
 below remains the source rehearsal dependency; it is not the running remote
@@ -467,36 +469,33 @@ reset are separate Hub features, not #34 prerequisites.
 
 ### Start, stop and disconnect
 
-The supported setup is the [Linux user service](local-operations.md#run-as-a-linux-user-service).
-Its private `service.env` sets device mode, `PIXOO_MONITOR_ENABLED=1`,
-`PIXOO_CONTROLLER_ENABLED=1` and the stable controller identity the hub
-registered. Installing it replaces the launcher below and is a separately
-authorized step with its own backup and receipt.
-
-For the one-off installed layout, the foreground launcher is
-`~/.local/share/pixoo-playlist-controller-runtime/start.sh`. It must export
-`PIXOO_MONITOR_ENABLED=1` and `PIXOO_CONTROLLER_ENABLED=1` for the hub. A
-reinstall that drops the controller flag leaves BUNNY reporting the Pixoo
-controller unavailable. Run:
+The installation runs as the [Linux user service](local-operations.md#run-as-a-linux-user-service)
+`pixoo-playlist-controller.service`. It starts with the WSL user session, like
+the Nanoleaf services. Its private `service.env` sets device mode,
+`PIXOO_MONITOR_ENABLED=1`, `PIXOO_CONTROLLER_ENABLED=1` and the stable controller
+identity the hub registered. A reinstall that drops the controller flag leaves
+BUNNY reporting the Pixoo controller unavailable.
 
 ```sh
-PIXOO_MODE=simulator ~/.local/share/pixoo-playlist-controller-runtime/start.sh
-# For the already configured and explicitly authorized device:
-PIXOO_MODE=device ~/.local/share/pixoo-playlist-controller-runtime/start.sh
+systemctl --user status pixoo-playlist-controller.service
+systemctl --user restart pixoo-playlist-controller.service
+journalctl --user -u pixoo-playlist-controller.service -n 20
 ```
 
-Stop with Ctrl+C and wait for exit before restarting. Keep the terminal open;
-closing the browser does not stop the backend. The shared monitor runs separately
+Closing the browser does not stop the backend. If the Pixoo was unreachable when
+the service started, the dashboard stays off until Show monitor; BUNNY still
+lists the controller. The previous foreground launcher,
+`~/.local/share/pixoo-playlist-controller-runtime/start.sh`, remains only for
+rollback after the service is disabled; it still points at the older runtime.
+Never run it beside the service. The shared monitor runs separately
 as `codex-nanoleaf-monitor.service`; stopping Pixoo does not remove shared hooks
 or stop Nanoleaf. Monitor remains the selected display mode after this trial;
 device-mode startup restores it as described above. Returning to Media
 leaves playback paused until Resume or Start.
 
 To disconnect monitoring while retaining normal Pixoo use, stop Pixoo, remove
-only `PIXOO_MONITOR_ENABLED=1` from the service's `service.env` or this
-installation's launcher, and restart with `PIXOO_MONITOR_ENABLED` unset in the
-calling shell. Keep the private
-configuration and media. This disables Pixoo monitoring routes and remote
+only `PIXOO_MONITOR_ENABLED=1` from the service's `service.env`, and start the
+service again. Keep the private configuration and media. This disables Pixoo monitoring routes and remote
 polling; it does not revoke the shared credential or uninstall shared hooks.
 Do not run the shared producer-removal procedure to disconnect just Pixoo.
 
