@@ -1,7 +1,7 @@
 import {expect,it} from 'vitest';
 import type {SessionSnapshot} from '@jimmie-potts/agent-state';
 import type {MonitorView} from '../../apps/server/src/monitor-source.js';
-import {DashboardPager} from '../../apps/server/src/agent-dashboard.js';
+import {DashboardPager,shortLabel,shortSessionId} from '../../apps/server/src/agent-dashboard.js';
 
 export function session(id:string,patch:Partial<SessionSnapshot>={}):SessionSnapshot {
  return {identity:{provider:'codex',client:'cli',hostId:'h',sourceId:'s',sessionId:id},turn:{status:'unknown'},parent:{status:'top-level'},activity:'active',attention:[],notices:[],read:'unknown',unavailable:[],ordering:{status:'unknown'},lastEvidenceAtMs:1000,observedAtMs:1000,observationAgeMs:0,freshness:'current',restartUncertain:false,children:{active:0,uncertain:0},...patch};
@@ -34,7 +34,7 @@ it('keeps notices consumer-specific, full labels and timestamps, and health dime
  const state=view([session('a',{label:'résumé-long',notices:[{id:'n',kind:'turn-ended',turn:{status:'unknown'},acknowledgedBy:['other']}],children:{active:2,uncertain:1}})]);
  state.connection='stale';const layout=new DashboardPager().layout(state,0);
  expect(layout).toMatchObject({connection:'stale',collector:'running'});
- expect(layout.rows[0]).toMatchObject({label:'résumé-long',shortLabel:'R?SUM+',noticeIds:['n'],activeChildren:2,childrenUncertain:true,uncertain:true,observedAtMs:1000});
+ expect(layout.rows[0]).toMatchObject({label:'résumé-long',shortLabel:'R?S…NG',noticeIds:['n'],activeChildren:2,childrenUncertain:true,uncertain:true,observedAtMs:1000});
  state.snapshot!.sessions[0]!.notices[0]!.acknowledgedBy.push('pixoo');
  expect(new DashboardPager().layout(state,0).rows[0]?.noticeIds).toEqual([]);
 });
@@ -59,11 +59,36 @@ it('matches the synthetic RGB fixture hashes and retains attention total on over
  const {syntheticDashboardRenditions}=await import('../../apps/server/src/dashboard-examples.js');
  const cases=syntheticDashboardRenditions();
  expect(cases.map(c=>createHash('sha256').update(new Uint8Array(c.rendition.rgb)).digest('hex'))).toEqual([
-  'b8839439245323c57262fdddb2c9ecea1f883495a86f69a8c502fd51029b0047',
+  '0fa5f26fc03c181834d80af5c816e69d447b9e8cba9569bcd93b1bea5d740539',
   '900bf69b32e7305224e6729dc5ca8eb76e8526fa31aaa810780e47801591ef1d',
   '5c5556a05f1d8d95901a75565991093dfc2364d447e8400de82c0b84758827af',
-  'e9525a027c180a9cd5897fe2a16984972d902dd7a4e42aec73b7899cc222ced4'
+  'e9525a027c180a9cd5897fe2a16984972d902dd7a4e42aec73b7899cc222ced4',
+  '77f4a5bdebdd0276955bbba77afc84eec97dcb4ead62fa22f5fa62cbf4e006ef'
  ]);
+ expect(cases[4]!.rendition.layout.rows.map(row=>row.shortLabel)).toEqual(['…E8F01','…7C3B2','…09D43','…D1F54']);
  expect(cases[0]!.rendition.layout.attentionTotal).toBe(2);
  expect(cases[1]!.rendition.layout.attentionTotal).toBe(2);
+});
+const sharedPrefix=['01a0d3e2-7c4b-7f10-9a3e-5b1c2d4e8f01','01a0d3e2-7c4b-7f10-b1c4-02d9e6a7c3b2','01a0d3e2-91f0-7a22-8d05-c7e3f1a09d43','01a0d3e4-0b6a-7c31-a7f2-4e8b9c2d1f54'];
+it('shows the distinguishing end of unlabeled session IDs and both ends of long labels',()=>{
+ expect(sharedPrefix.map(shortSessionId)).toEqual(['…E8F01','…7C3B2','…09D43','…D1F54']);
+ const layout=new DashboardPager().layout(view(sharedPrefix.map(id=>session(id))),0);
+ expect(new Set(layout.rows.map(row=>row.shortLabel)).size).toBe(4);
+ expect(layout.rows.map(row=>row.label)).toEqual(sharedPrefix);
+ expect(shortLabel('pixoo-87')).toBe('PIX…87');
+ expect(shortLabel('pixoo-98')).toBe('PIX…98');
+ expect(new DashboardPager().layout(view([session('b',{label:'Build'})]),0).rows[0]).toMatchObject({label:'Build',shortLabel:'BUILD'});
+ expect([shortLabel('Review'),shortSessionId('s1')]).toEqual(['REVIEW','S1']);
+ expect([shortLabel('a…b'),shortLabel('ab…cdefg'),shortSessionId('x…y')]).toEqual(['A?B','AB?…FG','X?Y']);
+});
+it('draws the truncation marker as its own glyph, outside the label alphabet',async()=>{
+ const {glyphs,markerGlyphs}=await import('../../apps/server/src/pixel-font.js');
+ const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
+ expect(Object.keys(markerGlyphs)).toEqual(['…']);
+ expect(Object.hasOwn(glyphs,'…')).toBe(false);
+ expect(Object.values(glyphs)).not.toContain(markerGlyphs['…']);
+ const cell=(frame:Uint8Array,x:number)=>{const bits=[];for(let y=14;y<19;y++)for(let dx=0;dx<3;dx++)bits.push(frame[(y*64+x+dx)*3]!==0?'1':'0');return bits.join('');};
+ const frame=renderDashboard(new DashboardPager().layout(view([session(sharedPrefix[0]!)]),0));
+ expect(cell(frame,12)).toBe(markerGlyphs['…']);
+ expect(cell(frame,16)).toBe(glyphs.E);
 });

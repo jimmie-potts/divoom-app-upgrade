@@ -304,19 +304,37 @@ display. Filtering preserves the complete source snapshot and child rollup.
 | Area | Pixels and meaning |
 | --- | --- |
 | Summary, y=1 | `S` matching top-level sessions, `!` total top-level sessions with approval/input/questions across all pages and filters, current/total pages |
-| Four rows, y=14/24/34/44 | Provider at x=0; activity at 4; attention at 8; six-character label at 12; children at 40; uncertainty at 56; notice at 60 |
+| Four rows, y=14/24/34/44 | Provider at x=0; activity at 4; attention at 8; six-cell identifier at 12; children at 40; uncertainty at 56; notice at 60 |
 | Provider | `C` Codex, `L` Claude |
 | Activity | `>` active, `=` idle, `X` interrupted, `]` runtime ended, `?` unknown |
 | Attention | `A` approval, `!` blocking input, `?` continuing question, blank none; activity is separate |
+| Identifier | The chosen label, or the session ID when unlabeled. `…`, two dots on the baseline, marks removed characters: `PIX…87` for a label, `…E8F01` for an ID's end |
 | Children | `+0` through `+9`; `+9+` means more than nine; suffix `?` indicates incomplete/uncertain relationship or activity evidence; full count stays in metadata |
 | Row flags | `?` uncertain/stale/unknown evidence; `T` retained turn-ended notice, never successful task completion |
 | Footer, y=57 | `F` source: C current / S stale / ? unavailable. `C` collector: R running / Q quiesced / F faulted / X closed / ? unknown |
 
 The original 3x5 font supports ASCII A-Z, digits, space and `._+!?/-`. Lowercase
 ASCII becomes uppercase; each unsupported Unicode code point becomes `?`.
-Labels longer than six code points become five display characters followed by
-`+`. Full labels remain unchanged in layout metadata. Icons differ in shape as
-well as color. Empty pages retain summary and health with `EMPTY` in the body.
+Identifiers of up to six code points are shown whole. Issue #87 set the rule for
+longer ones, so rows from the same period stay distinct:
+
+- A chosen label keeps its first three and last two display characters around
+  `…`, so labels that differ only in a trailing number stay distinct.
+- An unlabeled row shows `…` and the last five display characters of its
+  session ID. Codex session IDs are time-ordered UUIDs that share their opening
+  characters across a period; their final characters are random.
+
+The `…` glyph is outside the label alphabet, so no label or ID character can
+produce it, and its position shows which part was removed. Labels still come
+only from the owner; titles, prompts and paths never become identifiers. Two
+rows can still collide when different IDs share their last five characters,
+about one chance in 175,000 for four visible UUIDs, or when different labels
+share their first three and last two characters. The layout's `label` field and
+the Monitor tab keep the full label or ID. A shared neutral alias from
+[Hub #364](https://github.com/jimmie-potts/agent-device-hub/issues/364) could
+replace the ID fallback; a layout redesign changes only the identifier width.
+Icons differ in shape as well as color. Empty pages retain summary and health
+with `EMPTY` in the body.
 
 Blocking approval/input comes first, then continuing questions, retained notices,
 and other sessions. Full provider/client/host/source/session identity breaks ties
@@ -351,7 +369,8 @@ node scripts/dashboard-preview.mjs /tmp/agent-dashboard-preview.html
 The [committed synthetic examples](examples/agent-dashboard.html) show native
 64x64 and nearest-neighbor 4x previews with full row details. They include blocked
 approval, a continuing question, a retained notice, overflow, unknown/unsupported
-labels, stale source and empty state. The browser checks compare every canvas
+labels, stale source, empty state and four unlabeled sessions whose IDs share a
+prefix. The browser checks compare every canvas
 byte to renderer RGB; fake-device tests verify the same frames. These tests do
 not prove native-font fidelity, physical readability, installed hooks or timing.
 
@@ -371,7 +390,8 @@ cadence. Counts distinguish matching top-level rows from the total. Empty views
 retain health and summary pixels. The 64×64 canvas uses the renderer's exact RGB
 bytes, enlarged with nearest-neighbor scaling. The latest preview may lead a
 pending upload. It is desired content, not evidence that a physical display
-shows those pixels. Full labels remain visible beside the truncated glyphs.
+shows those pixels. The full label or session ID remains visible beside the
+truncated glyphs.
 
 Show monitor pauses playlist advancement while preserving its captured context,
 persists Monitor mode and explicitly activates presentation. Select Media

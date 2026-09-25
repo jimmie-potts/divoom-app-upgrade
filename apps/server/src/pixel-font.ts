@@ -11,12 +11,14 @@ export const glyphs:Readonly<Record<string,string>>={
  // Punctuation common in track and artist names.
  "'":'010010000000000','&':'010100010101011',',':'000000000010100','(':'001010010010001',')':'100010010010100',':':'000010000010000'
 };
+// Drawn by drawText but outside the alphabet above, so no mapped text can produce them.
+export const markerGlyphs:Readonly<Record<string,string>>={'…':'000000000000101'};
 export type Color=readonly[number,number,number];
 /** Draw one glyph (3 wide, 5 tall, '1' lit) with its top-left corner at (x, y) on a 64×64 RGB buffer. */
 export function drawGlyph(rgb:Uint8Array,glyph:string,x:number,y:number,color:Color):void {
  for(let dy=0;dy<5;dy++)for(let dx=0;dx<3;dx++)if(glyph[dy*3+dx]==='1'&&x+dx>=0&&x+dx<64&&y+dy>=0&&y+dy<64)rgb.set(color,((y+dy)*64+x+dx)*3);
 }
-/** Draw text at a 4-pixel advance; characters outside the alphabet draw as '?'. */
+/** Draw text at a 4-pixel advance; characters outside the alphabet and markers draw as '?'. */
 export function drawText(rgb:Uint8Array,value:string,x:number,y:number,color:Color):void {
- for(const [i,char] of Array.from(value).entries())drawGlyph(rgb,glyphs[char]??glyphs['?']!,x+i*4,y,color);
+ for(const [i,char] of Array.from(value).entries())drawGlyph(rgb,glyphs[char]??markerGlyphs[char]??glyphs['?']!,x+i*4,y,color);
 }
