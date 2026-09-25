@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import type {IntegrationAction,MonitorFilter,SessionIdentity} from '@pixoo/core';
+import type {IntegrationAction,MonitorFilter,NowPlayingMedia,NowPlayingState,SessionIdentity} from '@pixoo/core';
 import {request,RequestError,explain} from './api';
 import {checkIntegration,integrationCommand,MonitorCursor,matchesMonitor,type MonitorRead,type MonitorSession} from './monitor-client';
 const prefix='/integration/v1';
@@ -43,15 +43,17 @@ function useMonitor(enabled:boolean){
  return {view,error,connected,disabled,busy,pending,refresh,
   change:(action:IntegrationAction)=>{if(view&&ready.current&&!pending)void guarded(()=>execute({path:prefix+'/commands',body:integrationCommand(view.integration,action)}));},
   shared:(action:Record<string,unknown>)=>{if(view?.source.nextRequestId)send({path:prefix+'/shared-actions',body:{...action,requestId:view.source.nextRequestId}});},
+  // The setting is idempotent, so a retried save cannot repeat a display operation.
+  nowPlaying:(media:NowPlayingMedia)=>send({path:prefix+'/now-playing',body:{media}}),
   retry:()=>{if(pending&&ready.current)void guarded(()=>execute(pending));},
   reconcile:()=>void guarded(async()=>{if(await refresh())setPending(null);}),
   reconnect:()=>{setError('');setAttempt(x=>x+1);},
  };
 }
-function Pixels({rgb}:{rgb:number[]}){
+function Pixels({rgb,label='Exact monitor preview'}:{rgb:number[];label?:string}){
  const ref=useRef<HTMLCanvasElement>(null);
  useEffect(()=>{const context=ref.current?.getContext('2d');if(!context||rgb.length!==12288)return;const image=context.createImageData(64,64);for(let i=0;i<4096;i++){image.data[i*4]=rgb[i*3]!;image.data[i*4+1]=rgb[i*3+1]!;image.data[i*4+2]=rgb[i*3+2]!;image.data[i*4+3]=255;}context.putImageData(image,0,0);},[rgb]);
- return <canvas ref={ref} width={64} height={64} className="monitor-pixels" aria-label="Exact monitor preview"/>;
+ return <canvas ref={ref} width={64} height={64} className="monitor-pixels" aria-label={label}/>;
 }
 function SessionRow({session,disabled,shared}:{session:MonitorSession;disabled:boolean;shared:(action:Record<string,unknown>)=>void}){
  const [label,setLabel]=useState(session.label??'');useEffect(()=>setLabel(session.label??''),[session.label]);
@@ -64,6 +66,23 @@ function SessionRow({session,disabled,shared}:{session:MonitorSession;disabled:b
  <button disabled={disabled} aria-label={`Save label for ${id}`} onClick={()=>shared({operation:'label',identity:session.identity,label:label||null})}>Save label</button>
  {session.notices.filter(n=>!n.acknowledgedBy.includes('pixoo')).map(n=><button key={n.id} disabled={disabled} aria-label={`Dismiss notice for ${id}`} onClick={()=>shared({operation:'acknowledge',identity:session.identity,noticeId:n.id})}>Dismiss turn-ended notice</button>)}
  </article>;
+}
+const mediaLabels:Record<NowPlayingMedia,string>={off:'Off',popup:'Pop-up for 10 seconds',whole:'Whole song'};
+function NowPlaying({state,disabled,change}:{state:NowPlayingState;disabled:boolean;change:(media:NowPlayingMedia)=>void}){
+ // Show the chosen option while its save runs; once idle, the backend's setting is the truth again.
+ const [choice,setChoice]=useState(state.setting.media);
+ useEffect(()=>{if(!disabled)setChoice(state.setting.media);},[state.setting.media,disabled]);
+ const track=state.view.card?`${state.view.status==='playing'?'Playing':'Paused'}${state.view.stale?' (stale)':''}: ${state.view.title||'Unknown title'} · ${state.view.artist||'Unknown artist'}`:'Nothing playing.';
+ const display=state.showing!=='card'?'not showing a now-playing card':state.takeover?`showing the card over Media (${state.takeover==='popup'?'pop-up':'whole song'})`:'showing the card for 10 seconds';
+ return <section className="now-playing" aria-labelledby="now-playing-heading"><h3 id="now-playing-heading">Now playing</h3>
+ {state.configured?<><p>Hub playback: {({current:'connected',stale:'stale',unavailable:'unavailable'} as const)[state.source]}. {track}</p>
+  <p>Display: {display}.</p>
+  {state.card&&<Pixels rgb={state.card} label="Exact now-playing preview"/>}</>:<p>Hub playback is not configured for this backend.</p>}
+ <fieldset disabled={disabled}><legend>In Media mode</legend>
+  {(['off','popup','whole'] as const).map(media=><label key={media} className="check"><input type="radio" name="now-playing-media" checked={choice===media} onChange={()=>{setChoice(media);change(media);}}/>{mediaLabels[media]}</label>)}
+ </fieldset>
+ <p className="muted">In Monitor mode a new track shows the card for 10 seconds unless a session needs attention. In Media mode, Pop-up and Whole song pause a playing playlist for the card, then resume it. Any manual control cancels the resume.</p>
+ </section>;
 }
 export function MonitorPanel({active}:{active:boolean}){
  const monitor=useMonitor(active),{view}=monitor;
@@ -95,6 +114,7 @@ export function MonitorPanel({active}:{active:boolean}){
  <label>Minimum update interval (ms)<input aria-label="Monitor cadence" type="number" min={1000} max={10000} step={1000} value={cadence} onChange={e=>setCadence(Number(e.target.value))}/></label>
  <button onClick={()=>monitor.change({operation:'view',filter,cadenceMs:cadence})}>Apply monitor view</button></fieldset>
  <p>Filters apply to the preview and display. Labels are assigned only when you save them. Dismissing a notice affects this monitor only.</p>
+ {view.nowPlaying&&<NowPlaying state={view.nowPlaying} disabled={blocked} change={monitor.nowPlaying}/>}
  {view.dashboard.rendition?<div className="monitor-preview"><Pixels rgb={view.dashboard.rendition.rgb}/><p>{view.dashboard.rendition.layout.matched} matching top-level sessions · Page {view.dashboard.rendition.layout.page+1} of {view.dashboard.rendition.layout.pages} · Attention total {view.dashboard.rendition.layout.attentionTotal}</p></div>:<p>Updating exact preview…</p>}
  {!selected.length&&<p>No sessions match this view.</p>}
  <div className="monitor-sessions">{selected.map(s=><SessionRow key={JSON.stringify(s.identity)} session={s} disabled={blocked||!view.source.nextRequestId} shared={monitor.shared}/>)}</div>

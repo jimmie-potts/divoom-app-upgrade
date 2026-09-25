@@ -1,3 +1,4 @@
+import type {NowPlayingState} from '@pixoo/core';
 import {integrationRequest,presentationConfiguration,type IntegrationAction,type IntegrationSnapshot,type SessionIdentity} from '@pixoo/core';
 export function integrationCommand(snapshot:IntegrationSnapshot,action:IntegrationAction){
  if(snapshot.apiVersion!=='pixoo-integration/1.0'||!snapshot.capabilities.modes.includes(action.operation==='mode'?action.mode:snapshot.configuration.mode))throw new Error('Unsupported integration');
@@ -28,6 +29,7 @@ export interface MonitorRead {
  integration:IntegrationSnapshot;
  source:{connection:string;ownerId:string;nextRequestId:string|null;snapshot:null|{asOfMs:number;collector:string;sessions:MonitorSession[]}};
  dashboard:{state:string;rendition:null|{generation:number;rgb:number[];layout:{matched:number;total:number;page:number;pages:number;attentionTotal:number}}};
+ nowPlaying?:NowPlayingState;
 }
 export function matchesMonitor(session:MonitorSession,view:IntegrationSnapshot['configuration']['filter']){
  return (!view.provider||session.identity.provider===view.provider)&&(!view.projectId||session.projectId===view.projectId)&&(!view.q||(session.label??session.identity.sessionId).toLowerCase().includes(view.q.toLowerCase()))&&(!view.session||Object.entries(view.session).every(([key,value])=>session.identity[key as keyof SessionIdentity]===value));

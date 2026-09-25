@@ -18,7 +18,7 @@ The application SHALL expose full labels, identities, provider/activity/attentio
 - **THEN** the command retains that owner's request identity and changes only its consumer acknowledgment without marking chat read, approving work or modifying trackers
 
 ### Requirement: Explicit display participation
-Monitor and Media SHALL be explicit modes. Entering Monitor SHALL pause playlist advancement. Explicit start, show-media, restart or resume SHALL select Media. Leaving Monitor SHALL preserve paused playback until explicit media intent. Collection SHALL continue in either mode and unsolicited events SHALL NOT take over Media.
+Monitor and Media SHALL be explicit modes. Entering Monitor SHALL pause playlist advancement. Explicit start, show-media, restart or resume SHALL select Media. Leaving Monitor SHALL preserve paused playback until explicit media intent. Collection SHALL continue in either mode and unsolicited agent events SHALL NOT take over Media. The only automatic Media change SHALL be the owner's explicit now-playing Media setting, which resumes only playback it paused itself.
 
 #### Scenario: Attention while Media owns the display
 - **WHEN** questions, approvals, errors or turn ends arrive during Media
@@ -27,6 +27,10 @@ Monitor and Media SHALL be explicit modes. Entering Monitor SHALL pause playlist
 #### Scenario: Return to paused media
 - **WHEN** the user enters Monitor during playback and then selects Media
 - **THEN** the captured playlist remains paused until explicit resume or start
+
+#### Scenario: Now-playing setting off
+- **WHEN** the now-playing Media setting is Off and a new track starts during Media
+- **THEN** no picture or ownership change occurs
 
 ### Requirement: One generation-guarded display writer
 All media, monitor and display controls SHALL use the existing backend adapter and serialized queue. Mode changes, screen-off and shutdown SHALL retire obsolete callbacks and pending pictures. At most one monitor upload and one latest desired rendition SHALL be retained; no old completion SHALL restore ownership. Complete RGB frames SHALL use a configurable minimum submission interval of 1000 ms by default, no faster than 1000 ms.
