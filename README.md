@@ -54,7 +54,7 @@ The settings API persists validated `device.json`. The backend captures settings
 once at startup; later saves require restart to affect the active device. Existing
 app data is never deleted at shutdown.
 
-See [local operations](docs/local-operations.md) for persistent native startup,
+See [local operations](docs/local-operations.md) for persistent native startup, the optional Linux user service,
 diagnostics, offline backup/restore, host wakefulness and Windows/WSL checks.
 
 ## Validate and develop

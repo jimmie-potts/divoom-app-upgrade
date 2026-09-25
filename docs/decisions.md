@@ -34,4 +34,4 @@ decisions have not been finalized by the repository bootstrap.
 
 - [ADR 0015: Dashboard transport and cadence](decisions/0015-dashboard-qualification.md) selects complete RGB frames and a configurable 1000 ms interval for downstream integration, with bounded physical evidence and recovery limits.
 
-- [ADR 0018: Monitor and Media share the existing writer](decisions/0018-monitor-display-ownership.md) records explicit activation, selected view, finite commands and recovery.
+- [ADR 0018: Monitor and Media share the existing writer](decisions/0018-monitor-display-ownership.md) records explicit activation, selected view, finite commands and recovery, amended by #77 to restore a saved Monitor selection at device startup.

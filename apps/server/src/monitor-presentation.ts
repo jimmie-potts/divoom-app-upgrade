@@ -55,6 +55,18 @@ export class MonitorPresentation {
    }finally{this.pendingMode=null;this.onChange();}
   });
  }
+ // Startup restore of a saved Monitor selection, used only for device mode.
+ // It reuses explicit activation's pause and guards without saving, and a
+ // failed first upload suspends through tick() like any other transmission.
+ async restore():Promise<void>{
+  return this.enqueue(async()=>{
+   if(this.configuration.mode!=='monitor')return;
+   this.suspend();const paused=this.player.pause(),generation=this.player.getState().generation;
+   await paused;this.playerGeneration=generation;
+   this.active=!this.closed&&this.player.getState().generation===generation&&this.player.getState().requestedScreenOn;
+   this.onChange();
+  });
+ }
  async media<T>(action:()=>Promise<T>,starts:boolean):Promise<T>{
   if(this.closed)throw new ApiError('closed',503);
   if(!starts){

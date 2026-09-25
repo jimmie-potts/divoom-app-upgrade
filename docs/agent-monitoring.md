@@ -11,7 +11,8 @@ Monitoring is disabled by default. Enabling it does not activate hardware.
 Simulator remains the default; existing explicit device mode remains available.
 The Monitor panel selects Monitor or Media through the existing player and
 serialized adapter. Collection does not depend on the selected mode or an open
-browser. Startup never activates monitor presentation.
+browser. Device-mode startup restores a saved Monitor selection; simulator
+startup never activates monitor presentation.
 
 ## Required-client matrix
 
@@ -392,9 +393,17 @@ Screen-on alone never activates either monitor presentation or playback.
 
 `agent-monitor/presentation.json` stores version 1 mode, filter and cadence in
 the private data directory with atomic replacement. Invalid configuration fails
-startup. Restart restores selection and paused playback context, marks prior
-active sessions uncertain through the selected state owner, and waits for an
-explicit Show monitor or media command before display writes. Changing the
+startup. Restart restores selection and paused playback context and marks prior
+active sessions uncertain through the selected state owner. In device mode, a
+saved Monitor selection with the screen requested on then reactivates
+presentation through the same paused player generation and serialized adapter,
+without a client command. This is the owner's
+[#77 decision](https://github.com/jimmie-potts/divoom-app-upgrade/issues/77).
+The first upload follows the ordinary cadence; failure or uncertainty suspends
+presentation without retry until an explicit Show monitor. Simulator startup, a
+saved Media selection and a retained screen-off request wait for an explicit
+Show monitor or media command before display writes. Player retains the
+screen-off request only with saved playback context. Changing the
 selected owner preserves presentation configuration. Labels/notices follow the
 owner's cutover/export/import/rollback procedure above; remote mode creates no
 second reducer. Rollback must use current state, not a stale exported copy.
@@ -458,8 +467,17 @@ reset are separate Hub features, not #34 prerequisites.
 
 ### Start, stop and disconnect
 
+The supported setup is the [Linux user service](local-operations.md#run-as-a-linux-user-service).
+Its private `service.env` sets device mode, `PIXOO_MONITOR_ENABLED=1`,
+`PIXOO_CONTROLLER_ENABLED=1` and the stable controller identity the hub
+registered. Installing it replaces the launcher below and is a separately
+authorized step with its own backup and receipt.
+
 For the one-off installed layout, the foreground launcher is
-`~/.local/share/pixoo-playlist-controller-runtime/start.sh`. Run:
+`~/.local/share/pixoo-playlist-controller-runtime/start.sh`. It must export
+`PIXOO_MONITOR_ENABLED=1` and `PIXOO_CONTROLLER_ENABLED=1` for the hub. A
+reinstall that drops the controller flag leaves BUNNY reporting the Pixoo
+controller unavailable. Run:
 
 ```sh
 PIXOO_MODE=simulator ~/.local/share/pixoo-playlist-controller-runtime/start.sh
@@ -471,12 +489,13 @@ Stop with Ctrl+C and wait for exit before restarting. Keep the terminal open;
 closing the browser does not stop the backend. The shared monitor runs separately
 as `codex-nanoleaf-monitor.service`; stopping Pixoo does not remove shared hooks
 or stop Nanoleaf. Monitor remains the selected display mode after this trial;
-startup itself remains passive until explicit activation. Returning to Media
+device-mode startup restores it as described above. Returning to Media
 leaves playback paused until Resume or Start.
 
 To disconnect monitoring while retaining normal Pixoo use, stop Pixoo, remove
-only `export PIXOO_MONITOR_ENABLED=1` from this installation's launcher, and
-restart with `PIXOO_MONITOR_ENABLED` unset in the calling shell. Keep the private
+only `PIXOO_MONITOR_ENABLED=1` from the service's `service.env` or this
+installation's launcher, and restart with `PIXOO_MONITOR_ENABLED` unset in the
+calling shell. Keep the private
 configuration and media. This disables Pixoo monitoring routes and remote
 polling; it does not revoke the shared credential or uninstall shared hooks.
 Do not run the shared producer-removal procedure to disconnect just Pixoo.

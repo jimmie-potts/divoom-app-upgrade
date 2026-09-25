@@ -1,8 +1,8 @@
 import { startServer } from './server.js';
 
 try {
-  const { app, address } = await startServer();
-  console.log(`Pixoo simulator listening on ${address}`);
+  const { app, address, mode } = await startServer();
+  console.log(`Pixoo ${mode} listening on ${address}`);
   let closing = false;
   const shutdown = () => {
     if (closing) return;

@@ -68,7 +68,12 @@ PowerShell uses `$env:PIXOO_MODE = 'device'` followed by `npm start`.
 The backend captures settings once. Later saves show the active target separately
 and indicate when restart is required. Saving never retargets queued work. Device
 connectivity starts unknown; startup, health reads and opening the browser do not
-probe or upload. A saved session reopens paused.
+probe or upload media. A saved session reopens paused. With monitoring enabled
+and a saved Monitor selection, startup restores monitor presentation and uploads
+the current dashboard picture; see
+[monitor operations](agent-monitoring.md#monitor-panel-and-display-ownership).
+The [Linux user service](local-operations.md#run-as-a-linux-user-service) runs
+device mode without a terminal.
 
 Use one backend for the target. A per-user local lock rejects another backend
 for the same IP even with a different data directory. It cannot exclude other
