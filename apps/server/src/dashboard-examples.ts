@@ -14,7 +14,11 @@ export function syntheticDashboardViews():Array<{name:string;view:MonitorView;at
  const base:MonitorView={apiVersion:'1.0',ownerId:'synthetic',connection:'current',admissionRejected:0,nextRequestId:null,snapshot:{apiVersion:'1.0',revision:1,asOfMs:1000,collector:'running',lossCount:0,sessions}};
  const stale=structuredClone(base);stale.connection='stale';
  const empty=structuredClone(base);empty.snapshot!.sessions=[];
- return [{name:'Attention first',view:base,atMs:0},{name:'Overflow after ten seconds',view:base,atMs:10000},{name:'Stale source, running collector',view:stale,atMs:11000},{name:'Empty',view:empty,atMs:12000}];
+ // Time-ordered session IDs from the same period share a long prefix; unlabeled rows show their ends.
+ const unlabeled=structuredClone(base);
+ unlabeled.snapshot!.sessions=['01a0d3e2-7c4b-7f10-9a3e-5b1c2d4e8f01','01a0d3e2-7c4b-7f10-b1c4-02d9e6a7c3b2','01a0d3e2-91f0-7a22-8d05-c7e3f1a09d43','01a0d3e4-0b6a-7c31-a7f2-4e8b9c2d1f54']
+  .map((sessionId,i)=>{const session=structuredClone(sessions[0]!);delete session.label;session.identity={provider:'codex',client:'desktop',hostId:'synthetic',sourceId:'example',sessionId};session.attention=[];session.activity=i%2?'idle':'active';return session;});
+ return [{name:'Attention first',view:base,atMs:0},{name:'Overflow after ten seconds',view:base,atMs:10000},{name:'Stale source, running collector',view:stale,atMs:11000},{name:'Empty',view:empty,atMs:12000},{name:'Unlabeled sessions with a shared ID prefix',view:unlabeled,atMs:13000}];
 }
 export function syntheticDashboardRenditions():Array<{name:string;rendition:DashboardRendition}>{
  const pager=new DashboardPager();
