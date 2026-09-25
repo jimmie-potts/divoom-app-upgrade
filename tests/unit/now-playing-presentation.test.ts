@@ -158,3 +158,37 @@ it('persists a setting change and ends a takeover the new setting no longer want
   expect(s.player.getState().intent).toBe('active');
  }finally{await s.close();}
 });
+it('lets an explicit resume or start during a takeover win without a second automatic resume',async()=>{
+ for(const act of ['resume','start'] as const){
+  const s=await setup('popup');
+  try{
+   await s.settle(s.player.start(s.store.playlist.id));s.monitor.submitPlayback(playing());await s.run(1000);
+   expect(s.monitor.nowPlayingStatus().takeover,act).toBe('popup');
+   await s.settle(s.monitor.media(()=>act==='resume'?s.player.resume():s.player.start(s.store.playlist.id),true));
+   expect(s.monitor.nowPlayingStatus(),act).toMatchObject({takeover:null,lastTakeover:'dropped'});
+   // A second automatic resume after the pop-up deadline would record 'resumed'.
+   await s.run(12000);expect(s.player.getState().intent,act).toBe('active');
+   expect(s.monitor.nowPlayingStatus().lastTakeover,act).toBe('dropped');
+  }finally{await s.close();}
+ }
+});
+it('drops an active takeover without resuming when the presentation closes',async()=>{
+ const s=await setup('whole');
+ try{
+  await s.settle(s.player.start(s.store.playlist.id));s.monitor.submitPlayback(playing());await s.run(1000);
+  expect(s.monitor.nowPlayingStatus().takeover).toBe('whole');const generation=s.player.getState().generation;
+  await s.monitor.close();await flush(s.clock);s.clock.advance(20000);await flush(s.clock);
+  expect(s.player.getState()).toMatchObject({intent:'paused',generation});expect(s.monitor.nowPlayingStatus().takeover).toBeNull();
+ }finally{await s.player.close();}
+});
+it('uploads a repeated identical card once, and a changed card once more',async()=>{
+ const s=await setup();
+ try{
+  await monitorMode(s);const card=JSON.stringify(s.card(playing()));const cards=()=>s.frames().filter(frame=>JSON.stringify(frame)===card).length;
+  s.monitor.submitPlayback(playing());await s.run(1000);
+  for(let i=0;i<4;i++){s.monitor.submitPlayback(playing());await s.run(1000);}
+  expect(cards()).toBe(1);
+  const paused=playing('HARVEST MOON',{status:'paused'});s.monitor.submitPlayback(paused);await s.run(1000);s.monitor.submitPlayback(paused);await s.run(1000);
+  expect(s.frames().filter(frame=>JSON.stringify(frame)===JSON.stringify(s.card(paused))).length).toBe(1);
+ }finally{await s.close();}
+});
