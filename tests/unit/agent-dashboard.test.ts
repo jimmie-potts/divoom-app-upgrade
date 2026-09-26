@@ -36,7 +36,7 @@ it('keeps notices consumer-specific, full labels and timestamps, and health dime
  const state=view([session('a',{label:'résumé-long',notices:[{id:'n',kind:'turn-ended',turn:{status:'unknown'},acknowledgedBy:['other']}],children:{active:2,uncertain:1}})]);
  state.connection='stale';const layout=new DashboardPager().layout(state,0);
  expect(layout).toMatchObject({connection:'stale',collector:'running'});
- expect(layout.rows[0]).toMatchObject({label:'résumé-long',shortLabel:'R?SUM?-LONG',noticeIds:['n'],activeChildren:2,childrenUncertain:true,uncertain:true,observedAtMs:1000});
+ expect(layout.rows[0]).toMatchObject({label:'résumé-long',shortLabel:'RESUME-LONG',noticeIds:['n'],activeChildren:2,childrenUncertain:true,uncertain:true,observedAtMs:1000});
  state.snapshot!.sessions[0]!.notices[0]!.acknowledgedBy.push('pixoo');
  expect(new DashboardPager().layout(state,0).rows[0]?.noticeIds).toEqual([]);
 });
@@ -130,7 +130,7 @@ it('covers every legend state in the synthetic examples and matches their frame 
  expect(new Set(layouts.map(layout=>layout.collector))).toEqual(new Set(['running','quiesced','faulted','closed','unknown']));
  expect(layouts.some(layout=>!layout.rows.length)).toBe(true);
  expect(layouts.some(layout=>layout.pages>8)).toBe(true);
- expect(cases.map(c=>c.rendition.frames.length)).toEqual([2,2,2,1,1,1,1,1,1,1,1]);
+ expect(cases.map(c=>c.rendition.frames.length)).toEqual([2,2,2,1,1,1,1,1,1,1,1,1,1,2]);
  for(const c of cases)expect(c.rendition.rgb).toEqual(c.rendition.frames[0]);
  expect(cases.map(c=>c.rendition.frames.map(frame=>createHash('sha256').update(new Uint8Array(frame)).digest('hex').slice(0,16)).join(' '))).toEqual([
   'd17b4eff2ddfa03d 120e94276ae78ec2',
@@ -139,12 +139,18 @@ it('covers every legend state in the synthetic examples and matches their frame 
   '428b62f6b5e41da9',
   '20c1d501a9b49f72',
   '988bfd52edc1dc33',
-  'd9021bfd05d09fd2',
+  '37159be9fd7d6231',
   '296eec01f405f193',
   'b5db73a84fb91eeb',
   'e647a684ad3cd44a',
-  '52d07ec1c0a0ff50'
+  '52d07ec1c0a0ff50',
+  'd4bccd3803d166b6',
+  '94293ef42bd5c839',
+  'aab42864520804b9 7fe1b2c9d92c799d'
  ]);
+ expect(rows.some(row=>row.title&&!row.project&&row.label===row.title.value)).toBe(true);
+ expect(rows.some(row=>row.project&&row.label==='Owner choice'&&row.title?.value==='Résumé monitor')).toBe(true);
+ expect(rows.some(row=>row.project&&row.label===row.title?.value)).toBe(true);
  expect(layouts[1]).toMatchObject({attentionTotal:3,page:1,rows:[{attention:'input'}]});
 });
 const sharedPrefix=['01a0d3e2-7c4b-7f10-9a3e-5b1c2d4e8f01','01a0d3e2-7c4b-7f10-b1c4-02d9e6a7c3b2','01a0d3e2-91f0-7a22-8d05-c7e3f1a09d43','01a0d3e4-0b6a-7c31-a7f2-4e8b9c2d1f54'];
@@ -187,4 +193,26 @@ it('draws labels in a 5x7 alphabet with its own truncation marker outside the la
  expect(cell(frame!,2,26)).toEqual(largeMarkerGlyphs['…']);
  expect(cell(frame!,8,26)).toEqual(largeGlyphs['0']);
  expect(cell(frame!,2,35)).toEqual(largeGlyphs['1']);
+});
+it('uses label then shared title then distinct ID tails, and folds accents before truncation',()=>{
+ const state=view([session('a',{title:{value:'Résumé café',source:'provider'},project:'DIVOOM-APP-UPGRADE'})]);
+ expect(new DashboardPager().layout(state,0).rows[0]).toMatchObject({label:'Résumé café',shortLabel:'RESUME CAFE',title:{value:'Résumé café',source:'provider'},project:'DIVOOM-APP-UPGRADE'});
+ state.snapshot!.sessions[0]!.label='Owner choice';
+ expect(new DashboardPager().layout(state,0).rows[0]).toMatchObject({label:'Owner choice',shortLabel:'OWNER CHOICE'});
+ expect(new DashboardPager().layout(state,0,{q:'café'}).matched).toBe(1);
+ expect(new DashboardPager().layout(state,0,{q:'divoom'}).matched).toBe(1);
+ expect(shortLabel('résumé-café')).toBe('RESUME-CAFE');
+});
+it('places project below the title and moves details above it without overlapping ink or changing pulse',async()=>{
+ const {drawText}=await import('../../apps/server/src/pixel-font.js');
+ const {frames}=await renderOne({title:{value:'Résumé monitor',source:'provider'},project:'DIVOOM-APP-UPGRADE',freshness:'uncertain',children:{active:2,uncertain:0},...ask('approval')});
+ const expected=new Uint8Array(12288);drawText(expected,'DIVOOM-…UPGRADE',2,45,[70,170,220]);
+ expect(lit(frames[0]!,0,45,63,49)).toBe(lit(expected,0,45,63,49));
+ expect(lit(frames[0]!,2,21,30,25)).toContain('1');
+ expect(lit(frames[0]!,40,21,63,25)).toContain('1');
+ expect(lit(frames[0]!,0,26,63,26)).not.toContain('1');
+ expect(lit(frames[0]!,0,43,63,44)).not.toContain('1');
+ expect(lit(frames[0]!,33,3,62,7)).toContain('1');
+ expect(frames).toHaveLength(2);
+ expect(differs(frames[0]!,frames[1]!).every(([x,y])=>(x>=1&&x<=20&&y>=1&&y<=20)||(x>=24&&x<=62&&y>=12&&y<=20))).toBe(true);
 });

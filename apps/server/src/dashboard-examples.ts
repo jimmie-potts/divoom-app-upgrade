@@ -24,11 +24,12 @@ function session({provider,label,activity,attention,notice,children}:Example,ind
 /** Named synthetic views; each is paged from zero to `atMs` so every legend state appears on some page. */
 export function syntheticDashboardViews():Array<{name:string;view:MonitorView;atMs:number}>{
  const sessions=examples.map(session);
- const base:MonitorView={apiVersion:'1.0',ownerId:'synthetic',connection:'current',admissionRejected:0,nextRequestId:null,snapshot:{apiVersion:'1.0',revision:1,asOfMs:1000,collector:'running',lossCount:0,sessions}};
+ const base:MonitorView={apiVersion:'1.0',ownerId:'synthetic',connection:'current',admissionRejected:0,nextRequestId:null,snapshot:{apiVersion:'1.2',revision:1,asOfMs:1000,collector:'running',lossCount:0,sessions}};
  const variant=(change:(view:MonitorView)=>void)=>{const view=structuredClone(base);change(view);return view;};
  // Time-ordered session IDs from the same period share a long prefix; unlabeled sessions show their ends.
  const unlabeled=variant(view=>{view.snapshot!.sessions=['01a0d3e2-7c4b-7f10-9a3e-5b1c2d4e8f01','01a0d3e2-7c4b-7f10-b1c4-02d9e6a7c3b2','01a0d3e2-91f0-7a22-8d05-c7e3f1a09d43','01a0d3e4-0b6a-7c31-a7f2-4e8b9c2d1f54']
   .map((sessionId,i)=>{const unnamed=session({provider:'codex',label:'',activity:i%2?'idle':'active'},i);delete unnamed.label;unnamed.identity={provider:'codex',client:'desktop',hostId:'synthetic',sourceId:'example',sessionId};return unnamed;});});
+ const titled=(patch:Partial<SessionSnapshot>)=>variant(view=>{const item=session({provider:'codex',label:'',activity:'active'},0);delete item.label;view.snapshot!.sessions=[{...item,title:{value:'Résumé monitor',source:'provider'},...patch}];});
  const many=variant(view=>{view.snapshot!.sessions=Array.from({length:12},(_,i)=>session({provider:i%2?'claude':'codex',label:`Task ${i+1}`,activity:'active'},i));});
  return [
   {name:'Approval first, pulsing',view:base,atMs:0},
@@ -42,6 +43,9 @@ export function syntheticDashboardViews():Array<{name:string;view:MonitorView;at
   {name:'Unknown activity, collector quiesced',view:variant(view=>{view.snapshot!.collector='quiesced';}),atMs:60000},
   {name:'Source unavailable',view:variant(view=>{view.connection='unavailable';view.snapshot=null;}),atMs:0},
   {name:'More than eight sessions',view:many,atMs:0},
+  {name:'Shared title, accents folded',view:titled({}),atMs:0},
+  {name:'Owner label wins; title and project retained',view:titled({label:'Owner choice',labelOrigin:'user',project:'DIVOOM-APP-UPGRADE'}),atMs:0},
+  {name:'Title and project, uncertain subagents and approval',view:titled({project:'DIVOOM-APP-UPGRADE',freshness:'uncertain',children:{active:2,uncertain:1},attention:[{kind:'approval',id:{status:'known',id:'a'},turn:{status:'known',id:'t1'}}]}),atMs:0},
  ];
 }
 export function syntheticDashboardRenditions():Array<{name:string;rendition:DashboardRendition}>{

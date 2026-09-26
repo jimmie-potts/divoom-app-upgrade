@@ -30,7 +30,7 @@ The Pixoo consumer contract SHALL distinguish activity, continuing questions, bl
 - **THEN** the mapping represents uncertainty and unavailable counts explicitly, without treating silence as completion, connectivity or permission
 
 ### Requirement: Session attribution and private metadata boundaries
-The consumer contract SHALL preserve separate sessions in one project and aggregate only attributable children. It SHALL allow neutral identifiers and explicit user-chosen labels while excluding prompt/tool/transcript content, copied titles, credentials and private paths from monitoring payloads, persistence, diagnostics and errors.
+The consumer contract SHALL preserve separate sessions in one project and aggregate only attributable children. It SHALL allow neutral identifiers, explicit labels, and bounded shared titles and project names while excluding prompt/tool/transcript content, credentials and private paths from monitoring payloads, persistence, diagnostics and errors.
 
 #### Scenario: Concurrent sessions with unknown children
 - **WHEN** two sessions share a project label but parent evidence is unknown
@@ -38,7 +38,11 @@ The consumer contract SHALL preserve separate sessions in one project and aggreg
 
 #### Scenario: User-chosen label
 - **WHEN** a user supplies a supported explicit label
-- **THEN** it remains presentation metadata and does not merge sessions or authorize copying agent-generated titles
+- **THEN** it remains presentation metadata and takes precedence over shared titles and does not merge sessions
+
+#### Scenario: Shared title and project
+- **WHEN** lifecycle 1.1 supplies an allowlisted title and project
+- **THEN** title value and provider/user provenance survive within 160 Unicode scalars, the project remains within 80 scalars, and neither field changes identity or permits credential or private-path disclosure
 
 ### Requirement: Consumer-only notice acknowledgment
 The Pixoo contract SHALL define monitor acknowledgment separately from agent read state and from other consumers' notice policies.

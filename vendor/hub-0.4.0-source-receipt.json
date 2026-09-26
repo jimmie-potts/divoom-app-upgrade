@@ -1,0 +1,134 @@
+{
+  "artifact": "@jimmie-potts/hub",
+  "version": "0.4.0",
+  "filename": "jimmie-potts-hub-0.4.0.tgz",
+  "sha256": "4a54488cc1bb850afa33f993fad4ff2a2302280540ac269ec9c86b9b29474341",
+  "sourceRevision": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+  "reviewedHead": "e9555d07bded1c05f018ec6e02d58f005c52b6be",
+  "reviewBase": "9d0b78d8f89ab8911339ac982a6dd02357e93843",
+  "sourceTree": "655360c20cbb06a62dbd366ccdd98e5e82502345",
+  "prs": [
+    "https://github.com/jimmie-potts/agent-device-hub/pull/452",
+    "https://github.com/jimmie-potts/agent-device-hub/pull/463"
+  ],
+  "issue": "https://github.com/jimmie-potts/agent-device-hub/issues/424",
+  "uiApprovedHead": "3bc2e0c408bee9bf89e8c03cfbf330e58abb39e1",
+  "uiApproval": "https://github.com/jimmie-potts/agent-device-hub/pull/452#issuecomment-5847985991",
+  "reviews": {
+    "Standards": "both implementation and packaging candidates passed",
+    "Specification": "both implementation and packaging candidates passed"
+  },
+  "node": "24.21.0",
+  "python": "3.14.4",
+  "packageChecks": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "test:hub:package:built"
+      ],
+      "exitCode": 0
+    }
+  ],
+  "mainCiChecks": [
+    {
+      "id": 108445912620,
+      "name": "Checks / Contracts and state Python 3.14 on ubuntu-latest",
+      "head": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+      "status": "completed",
+      "conclusion": "success",
+      "app": "depot-code-access",
+      "details_url": "https://depot.dev/orgs/0kwdkp3sc9/workflows/4hr34x2d71?job=w1n6pj3zv7&repo=jimmie-potts%2Fagent-device-hub",
+      "annotations": []
+    },
+    {
+      "id": 108445910614,
+      "name": "Checks / MCP on ubuntu-latest",
+      "head": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+      "status": "completed",
+      "conclusion": "success",
+      "app": "depot-code-access",
+      "details_url": "https://depot.dev/orgs/0kwdkp3sc9/workflows/4hr34x2d71?job=p0vz3twmx8&repo=jimmie-potts%2Fagent-device-hub",
+      "annotations": []
+    },
+    {
+      "id": 108445909050,
+      "name": "Checks / Dashboard browser and contracts on ubuntu-latest",
+      "head": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+      "status": "completed",
+      "conclusion": "success",
+      "app": "depot-code-access",
+      "details_url": "https://depot.dev/orgs/0kwdkp3sc9/workflows/4hr34x2d71?job=n5bptlljrv&repo=jimmie-potts%2Fagent-device-hub",
+      "annotations": []
+    },
+    {
+      "id": 108445907381,
+      "name": "Checks / Workflow checks on ubuntu-latest",
+      "head": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+      "status": "completed",
+      "conclusion": "success",
+      "app": "depot-code-access",
+      "details_url": "https://depot.dev/orgs/0kwdkp3sc9/workflows/4hr34x2d71?job=2hl3hjv6q9&repo=jimmie-potts%2Fagent-device-hub",
+      "annotations": []
+    },
+    {
+      "id": 108445904051,
+      "name": "Checks / Contracts and state Python 3.12 on ubuntu-latest",
+      "head": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+      "status": "completed",
+      "conclusion": "success",
+      "app": "depot-code-access",
+      "details_url": "https://depot.dev/orgs/0kwdkp3sc9/workflows/4hr34x2d71?job=6bxth8g39n&repo=jimmie-potts%2Fagent-device-hub",
+      "annotations": []
+    },
+    {
+      "id": 108445901868,
+      "name": "Work guide / Work guide build and browser checks",
+      "head": "38b47e3259e3f19f65d0f82234efcce7c48167b9",
+      "status": "completed",
+      "conclusion": "success",
+      "app": "depot-code-access",
+      "details_url": "https://depot.dev/orgs/0kwdkp3sc9/workflows/nxwqxq0lj1?job=ptlmmnlt86&repo=jimmie-potts%2Fagent-device-hub",
+      "annotations": []
+    }
+  ],
+  "dependencies": [
+    {
+      "artifact": "@jimmie-potts/agent-lifecycle-contracts",
+      "version": "1.1.0",
+      "archiveSha256": "3afd731d76c8bac66ce14d7210e606771f249f75e76edd8bc9a9ec76815c5d35",
+      "manifestSha256": "b4d86c76f1293b6410d5e452d7b1925e86fea785ff27cbfbe8a536ea34fb2d6d",
+      "sourceRevision": "9d0b78d8f89ab8911339ac982a6dd02357e93843"
+    },
+    {
+      "artifact": "@jimmie-potts/agent-state",
+      "version": "3.3.0",
+      "archiveSha256": "b539d5296a627dece9da4f9a3713e288c3f2247c84a8e2179ff13cbcec70bd7d",
+      "manifestSha256": "f6609c0ece30edf0c2f1c8d2a81d2cde3877eb0338102b36658a64e6b47c7433",
+      "sourceRevision": "9d0b78d8f89ab8911339ac982a6dd02357e93843"
+    },
+    {
+      "artifact": "@jimmie-potts/device-contracts",
+      "version": "1.1.0",
+      "archiveSha256": "25407c366cca0792ba09fba81b88f5467e123ad8583b21b1065954b41b920f3f",
+      "manifestSha256": "86ab212aecc089b2720adbf6f9cec9352cc8526616c1ab98738fe3ce2c1122bf",
+      "sourceRevision": "9f13c08906d7ca3a77f3bd5590a0b2dee632c3be"
+    },
+    {
+      "artifact": "@jimmie-potts/device-mcp",
+      "version": "1.0.1",
+      "archiveSha256": "e6cd65600d02128f5c996e6e4940654d1a9a67b312f7d27148a2137d766a7e32",
+      "manifestSha256": "949ef80fd0a440e1816bc2dc250f63c5f40ff6369f251519cad1e3408d036a3e",
+      "sourceRevision": "6b561baf3698415740184b702fc73107daec9022"
+    }
+  ],
+  "installedAcceptance": "pending; source publication only"
+}
