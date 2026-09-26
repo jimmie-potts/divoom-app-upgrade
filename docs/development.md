@@ -22,12 +22,12 @@ npm run simulator
 ```
 
 On Linux, Playwright may require browser system dependencies; hosted CI uses
-`npx playwright install --with-deps chromium`. Native Windows uses the same npm
-commands in a Node 24 shell. Use npm's default cache and Playwright's default
-browser cache (on Linux and WSL, `~/.npm` and `~/.cache/ms-playwright`), not
-directories under `/tmp`, which can be a small RAM-backed filesystem shared by
-every session. If a sandbox makes either cache read-only, report that instead of
-redirecting it.
+`npx playwright install --with-deps chromium`. Develop on Linux or WSL; native
+Windows is not supported ([ADR 0021](decisions/0021-linux-wsl-only-host.md)).
+Use npm's default cache and Playwright's default browser cache, `~/.npm` and
+`~/.cache/ms-playwright`, not directories under `/tmp`, which can be a small
+RAM-backed filesystem shared by every session. If a sandbox makes either cache
+read-only, report that instead of redirecting it.
 
 | Command | Evidence |
 | --- | --- |
@@ -42,8 +42,8 @@ redirecting it.
 | `npm run simulator` | Builds then starts one loopback backend and UI |
 | `npm start` | Starts a previously built application |
 
-GitHub Actions requires Application checks on Ubuntu and Windows, Workflow
-checks on both hosts, and Simulator browser checks on Ubuntu. The application
+GitHub Actions requires Workflow checks, Application checks and Simulator
+browser checks, all on Ubuntu. The application
 job includes a production build through `npm test`. Browser artifacts are
 ignored under test-results. Emulated phone sizes are not actual LAN verification.
 
@@ -140,7 +140,7 @@ one worktree because both rebuild the production web assets.
 ## Shared lifecycle contract conformance
 
 `npm test` and `npm run check` run the released lifecycle package consumer test
-on the existing Linux/Windows application CI jobs. It checks the committed
+in the existing Application checks CI job. It checks the committed
 archive/source receipt and installed manifest, then runs the original upstream
 validation/deduplication corpus. No provider session or device is invoked.
 This check establishes source contract compatibility only.

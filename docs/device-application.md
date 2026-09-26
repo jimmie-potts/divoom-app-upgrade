@@ -16,19 +16,11 @@ output, precise loop counts or phone access. Issues
 
 Build with Node 24.5 or later in the 24.x line using `npm ci` and `npm run build`. Choose the private data
 directory described in [local operations](local-operations.md). Start explicitly
-in simulator mode before saving settings. In Linux/WSL:
+in simulator mode before saving settings:
 
 ```bash
 export PIXOO_DATA_DIR="$HOME/.local/share/pixoo-playlist-controller"
 export PIXOO_MODE=simulator
-npm start
-```
-
-In a native Windows PowerShell session:
-
-```powershell
-$env:PIXOO_DATA_DIR = Join-Path $env:LOCALAPPDATA 'PixooPlaylistController'
-$env:PIXOO_MODE = 'simulator'
 npm start
 ```
 
@@ -62,8 +54,6 @@ session is authorized, use the same directory and set the mode before starting:
 export PIXOO_MODE=device
 npm start
 ```
-
-PowerShell uses `$env:PIXOO_MODE = 'device'` followed by `npm start`.
 
 The backend captures settings once. Later saves show the active target separately
 and indicate when restart is required. Saving never retargets queued work. Device
@@ -133,8 +123,8 @@ unexercised issue criteria; local Codex acceptance follows its own runbook.
 ## Return to the simulator and troubleshoot
 
 Stop the backend, set `PIXOO_MODE=simulator`, and run `npm start` again with the
-same private directory. In PowerShell set `$env:PIXOO_MODE = 'simulator'`.
-The library and settings remain intact and saved playback restores paused.
+same private directory. The library and settings remain intact and saved
+playback restores paused.
 `npm run simulator` builds then starts; it inherits the environment, so explicitly
 set simulator mode when rolling back from a device session.
 

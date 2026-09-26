@@ -53,9 +53,10 @@ media SHALL NOT be discarded as a cache. Trace: issue #10 startup criterion and 
 Documented native startup SHALL serve production UI and API from one loopback
 origin, retain external data across graceful shutdown, and keep orchestration
 running after all browser pages close while the host and process remain awake.
-Documentation SHALL describe Windows/WSL reachability checks and native Windows
-as an alternative. Source delivery SHALL NOT install services or change
-networking policy. Trace: issue #10 startup, browser lifetime and platform criteria.
+Documentation SHALL describe Windows-to-WSL reachability checks. Linux/WSL is the
+supported host; documentation SHALL NOT present native Windows as a runtime
+alternative. Source delivery SHALL NOT install services or change networking
+policy. Trace: issue #10 startup and browser lifetime criteria; issue #86 host scope.
 
 #### Scenario: Browser closes during playback
 - **WHEN** a browser starts a bounded playlist and closes before it finishes
