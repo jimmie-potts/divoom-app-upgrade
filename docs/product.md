@@ -13,8 +13,9 @@ framework-independent playback, SSE, Vitest, and Playwright as the stack directi
 Foundation versions and licenses are recorded in [dependencies](dependencies.md).
 GIF decoding is specified in [media-rendering](../openspec/specs/media-rendering/spec.md);
 persistence is specified in [library-persistence](../openspec/specs/library-persistence/spec.md).
-Deployment remains future work. Node 24
-and OpenSpec 1.12.0 remain the tooling selections.
+Local startup, backup/recovery and an optional Linux user service are supported;
+see [local operations](local-operations.md). Source support does not establish a
+current installation. Node 24 and OpenSpec 1.12.0 remain the tooling selections.
 
 Start with 30 seconds per image, three total plays per GIF, repeat enabled,
 shuffle disabled, fit with black padding, and nearest-neighbor scaling. Handoff
@@ -50,7 +51,13 @@ software completion never closes its hardware acceptance issue.
 The [hardware evidence](hardware-validation.md) records a bounded Pixoo64 smoke
 test with unknown firmware and early loading screens. Broader limits, precise
 play counts and phone access remain unverified.
-The handoff's six follow-on areas remain deferred GitHub issues.
+The handoff's follow-on areas now belong to their current GitHub issues.
+Scheduling, routines and timezone policy belong to
+[Hub #45](https://github.com/jimmie-potts/agent-device-hub/issues/45);
+[Pixoo #13](https://github.com/jimmie-potts/divoom-app-upgrade/issues/13) retains
+the Media-mode command precondition and show-one-rendition extension, with
+rendition discovery owned by
+[Pixoo #96](https://github.com/jimmie-potts/divoom-app-upgrade/issues/96).
 
 
 ## Shared agent monitoring direction
@@ -58,5 +65,16 @@ The handoff's six follow-on areas remain deferred GitHub issues.
 The accepted [hub integration plan](hub-integration.md) uses shared provider
 qualification, agent state and controller/MCP contracts from agent-device-hub.
 Pixoo owns consumer integration, media/playback, its 64x64 renderer and one
-device writer. The first shared core can run in this backend; a standalone hub
-requires a separate ownership migration. Pixoo adopts the [released lifecycle contract](agent-monitoring-vocabulary.md) and [consumer requirements](agent-monitoring.md). The opt-in monitor runtime and browser panel provide explicit Monitor/Media selection, owner-backed labels/notices and one selected view for preview/display. Startup defaults to simulator mode, where enabling monitoring does not activate presentation. In explicit device mode, startup restores a saved Monitor selection ([#77](https://github.com/jimmie-potts/divoom-app-upgrade/issues/77)). Installed acceptance remains separate.
+device writer. The selected session source supports an embedded shared core or
+a remote owner; switching owners requires an explicit ownership migration.
+Pixoo adopts the [released lifecycle contract](agent-monitoring-vocabulary.md)
+and [consumer requirements](agent-monitoring.md). The opt-in monitor runtime and
+browser panel provide explicit Monitor/Media selection, owner-backed labels/notices
+and one selected view for preview/display.
+
+Startup defaults to simulator mode, where enabling monitoring does not activate
+presentation. In explicit device mode, startup restores a saved Monitor selection
+when the screen is requested on
+([#77](https://github.com/jimmie-potts/divoom-app-upgrade/issues/77)). Screen-on
+alone does not resume playback or monitoring. Installation and physical acceptance
+remain separate; see the [dated evidence](hardware-validation.md#issue-77-user-service-installation).
