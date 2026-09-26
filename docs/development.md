@@ -26,8 +26,8 @@ On Linux, Playwright may require browser system dependencies; hosted CI uses
 Windows is not supported ([ADR 0021](decisions/0021-linux-wsl-only-host.md)).
 Use npm's default cache and Playwright's default browser cache, `~/.npm` and
 `~/.cache/ms-playwright`, not directories under `/tmp`, which can be a small
-RAM-backed filesystem shared by every session. If a sandbox makes either cache read-only, report that instead of
-redirecting it.
+RAM-backed filesystem shared by every session. If a sandbox makes either cache
+read-only, report that instead of redirecting it.
 
 | Command | Evidence |
 | --- | --- |
