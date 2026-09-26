@@ -50,10 +50,14 @@ function useMonitor(enabled:boolean){
   reconnect:()=>{setError('');setAttempt(x=>x+1);},
  };
 }
-function Pixels({rgb,label='Exact monitor preview'}:{rgb:number[];label?:string}){
- const ref=useRef<HTMLCanvasElement>(null);
- useEffect(()=>{const context=ref.current?.getContext('2d');if(!context||rgb.length!==12288)return;const image=context.createImageData(64,64);for(let i=0;i<4096;i++){image.data[i*4]=rgb[i*3]!;image.data[i*4+1]=rgb[i*3+1]!;image.data[i*4+2]=rgb[i*3+2]!;image.data[i*4+3]=255;}context.putImageData(image,0,0);},[rgb]);
- return <canvas ref={ref} width={64} height={64} className="monitor-pixels" aria-label={label}/>;
+/** Exact 64×64 frames, cycled at `delayMs` when there is more than one, as the device plays them. */
+function Pixels({frames,delayMs=500,label='Exact monitor preview'}:{frames:number[][];delayMs?:number;label?:string}){
+ const ref=useRef<HTMLCanvasElement>(null),[tick,setTick]=useState(0);
+ // Restart only when the frame count changes: renditions refresh with new evidence far more often than the pulse.
+ useEffect(()=>{setTick(0);if(frames.length<2)return;const timer=setInterval(()=>setTick(t=>t+1),delayMs);return ()=>clearInterval(timer);},[frames.length,delayMs]);
+ const index=tick%Math.max(1,frames.length),rgb=frames[index]??[];
+ useEffect(()=>{const canvas=ref.current,context=canvas?.getContext('2d');if(!canvas||!context||rgb.length!==12288)return;const image=context.createImageData(64,64);for(let i=0;i<4096;i++){image.data[i*4]=rgb[i*3]!;image.data[i*4+1]=rgb[i*3+1]!;image.data[i*4+2]=rgb[i*3+2]!;image.data[i*4+3]=255;}context.putImageData(image,0,0);canvas.dataset.frame=String(index);},[rgb,index]);
+ return <canvas ref={ref} width={64} height={64} className="monitor-pixels" aria-label={label} data-frames={frames.length}/>;
 }
 function SessionRow({session,disabled,shared}:{session:MonitorSession;disabled:boolean;shared:(action:Record<string,unknown>)=>void}){
  const [label,setLabel]=useState(session.label??'');useEffect(()=>setLabel(session.label??''),[session.label]);
@@ -77,7 +81,7 @@ function NowPlaying({state,disabled,change}:{state:NowPlayingState;disabled:bool
  return <section className="now-playing" aria-labelledby="now-playing-heading"><h3 id="now-playing-heading">Now playing</h3>
  {state.configured?<><p>Hub playback: {({current:'connected',stale:'stale',unavailable:'unavailable'} as const)[state.source]}. {track}</p>
   <p>Display: {display}.</p>
-  {state.card&&<Pixels rgb={state.card} label="Exact now-playing preview"/>}</>:<p>Hub playback is not configured for this backend.</p>}
+  {state.card&&<Pixels frames={[state.card]} label="Exact now-playing preview"/>}</>:<p>Hub playback is not configured for this backend.</p>}
  <fieldset disabled={disabled}><legend>In Media mode</legend>
   {(['off','popup','whole'] as const).map(media=><label key={media} className="check"><input type="radio" name="now-playing-media" checked={choice===media} onChange={()=>{setChoice(media);change(media);}}/>{mediaLabels[media]}</label>)}
  </fieldset>
@@ -115,7 +119,7 @@ export function MonitorPanel({active}:{active:boolean}){
  <button onClick={()=>monitor.change({operation:'view',filter,cadenceMs:cadence})}>Apply monitor view</button></fieldset>
  <p>Filters apply to the preview and display. Labels are assigned only when you save them. Dismissing a notice affects this monitor only.</p>
  {view.nowPlaying&&<NowPlaying state={view.nowPlaying} disabled={blocked} change={monitor.nowPlaying}/>}
- {view.dashboard.rendition?<div className="monitor-preview"><Pixels rgb={view.dashboard.rendition.rgb}/><p>{view.dashboard.rendition.layout.matched} matching top-level sessions · Page {view.dashboard.rendition.layout.page+1} of {view.dashboard.rendition.layout.pages} · Attention total {view.dashboard.rendition.layout.attentionTotal}</p></div>:<p>Updating exact preview…</p>}
+ {view.dashboard.rendition?<div className="monitor-preview"><Pixels frames={view.dashboard.rendition.frames} delayMs={view.dashboard.rendition.frameDelayMs}/><p>{view.dashboard.rendition.layout.matched} matching top-level sessions · Session {view.dashboard.rendition.layout.page+1} of {view.dashboard.rendition.layout.pages} · Attention total {view.dashboard.rendition.layout.attentionTotal}{view.dashboard.rendition.frames.length>1?' · Pulsing for attention':''}</p></div>:<p>Updating exact preview…</p>}
  {!selected.length&&<p>No sessions match this view.</p>}
  <div className="monitor-sessions">{selected.map(s=><SessionRow key={JSON.stringify(s.identity)} session={s} disabled={blocked||!view.source.nextRequestId} shared={monitor.shared}/>)}</div>
  </>}

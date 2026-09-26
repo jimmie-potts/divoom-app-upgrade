@@ -144,11 +144,12 @@ export class Player {
   }
   restartWithChanges():Promise<void> {if(this.record?.source?.kind==='media')return Promise.reject(new PlaybackError('unsupported-operation'));return this.record?this.start(this.record.snapshot.id):Promise.reject(new PlaybackError('no-context'));}
   pause():Promise<void> {return this.dispatch(async()=>{},'paused');}
-  async uploadDashboard(rgb:Uint8Array,expectedGeneration:number):Promise<OperationResult<UploadResult>|undefined> {
-    if(!(rgb instanceof Uint8Array)||rgb.length!==12288)throw new PlaybackError('invalid-input');
+  /** Upload one monitor picture of one or two complete frames, played at 500 ms each. */
+  async uploadDashboard(frames:readonly Uint8Array[],expectedGeneration:number):Promise<OperationResult<UploadResult>|undefined> {
+    if(!Array.isArray(frames)||frames.length<1||frames.length>2||frames.some(rgb=>!(rgb instanceof Uint8Array)||rgb.length!==12288))throw new PlaybackError('invalid-input');
     if(this.closing||expectedGeneration!==this.epoch||this.intent!=='paused'||!this.requestedScreenOn)return undefined;
     const generation=this.adapterGeneration;
-    const result=await this.device.uploadAnimation({frames:[{rgb:new Uint8Array(rgb),delayMs:500}]},
+    const result=await this.device.uploadAnimation({frames:frames.map(rgb=>({rgb:new Uint8Array(rgb),delayMs:500}))},
       {generation,signal:this.abort.signal,timeoutMs:this.operationTimeoutMs});
     // Evidence from a retired write cannot alter the current player or revive it.
     if(expectedGeneration===this.epoch&&!this.closing){

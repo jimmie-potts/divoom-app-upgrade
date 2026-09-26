@@ -17,8 +17,9 @@ export type DashboardLayout = {
 };
 const key=(identity:Identity)=>JSON.stringify([identity.provider,identity.client,identity.hostId,identity.sourceId,identity.sessionId]);
 const compare=(a:string,b:string)=>a<b?-1:a>b?1:0;
-// Glyph cells for a row identifier. A layout change may alter the width, not the rule.
-const IDENTIFIER_WIDTH=6,MARKER='…';
+// Display characters in an identifier, drawn as two lines of ten. A layout change may alter the width, not the rule.
+export const IDENTIFIER_WIDTH=20;
+const MARKER='…',PAGE_SIZE=1;
 const displayChars=(value:string)=>Array.from(value).map(char=>/^[a-z]$/.test(char)?char.toUpperCase():char).map(char=>/^[A-Z0-9 ._+!?/-]$/.test(char)?char:'?');
 /** A chosen label: whole when it fits, otherwise its first and last characters around the marker. */
 export function shortLabel(label:string):string {
@@ -53,14 +54,14 @@ export class DashboardPager {
   const top=all.filter(s=>s.parent.status!=='known'||s.unavailable.some(u=>u.dimension==='parent'&&u.reason==='ambiguous'));
   const ordered=top.filter(s=>(!filter.projectId||s.projectId===filter.projectId)&&(!filter.session||key(s.identity)===key(filter.session))&&(!filter.provider||s.identity.provider===filter.provider)&&(!filter.q||(s.label??s.identity.sessionId).toLowerCase().includes(filter.q.toLowerCase())))
    .sort((a,b)=>rank(a,this.consumer)-rank(b,this.consumer)||compare(key(a.identity),key(b.identity)));
-  const pages=Math.max(1,Math.ceil(ordered.length/4));
+  const pages=Math.max(1,Math.ceil(ordered.length/PAGE_SIZE));
   const membership=JSON.stringify([view.ownerId,filter,ordered.map(s=>key(s.identity))]);
   if(membership!==this.membership){this.membership=membership;this.page=Math.min(this.page,pages-1);this.deadline=now+10000;}
   else if(now>=this.deadline){const steps=Math.floor((now-this.deadline)/10000)+1;this.page=(this.page+steps)%pages;this.deadline+=steps*10000;}
   const unknownChildren=all.some(s=>s.parent.status==='unknown'||s.unavailable.some(u=>u.dimension==='parent'));
   return {version:1,ownerId:view.ownerId,revision:view.snapshot?.revision??null,asOfMs:view.snapshot?.asOfMs??null,connection:view.connection,collector:view.snapshot?.collector??'unknown',
    total:top.length,matched:ordered.length,attentionTotal:top.filter(s=>attention(s)!=='none').length,page:this.page,pages,
-   rows:ordered.slice(this.page*4,this.page*4+4).map(s=>({identity:{...s.identity},label:s.label??s.identity.sessionId,shortLabel:s.label===undefined?shortSessionId(s.identity.sessionId):shortLabel(s.label),activity:s.activity,attention:attention(s),
+   rows:ordered.slice(this.page*PAGE_SIZE,this.page*PAGE_SIZE+PAGE_SIZE).map(s=>({identity:{...s.identity},label:s.label??s.identity.sessionId,shortLabel:s.label===undefined?shortSessionId(s.identity.sessionId):shortLabel(s.label),activity:s.activity,attention:attention(s),
     uncertain:view.connection!=='current'||s.freshness==='uncertain'||s.unavailable.length>0||s.activity==='unknown'||s.parent.status==='unknown'||s.ordering.status==='unknown',
     activeChildren:s.children.active,childrenUncertain:unknownChildren||s.children.uncertain>0||view.connection!=='current',noticeIds:notices(s,this.consumer),observedAtMs:s.observedAtMs,lastEvidenceAtMs:s.lastEvidenceAtMs,freshness:s.freshness,unavailable:structuredClone(s.unavailable)}))};
  }

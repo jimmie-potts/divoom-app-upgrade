@@ -10,12 +10,12 @@ it('uploads exact monitor pixels only for the paused current player generation',
  try{
   await player.start(store.playlist.id);await flush(clock);await player.pause();
   const context=player.getSession(),generation=player.getState().generation,rgb=new Uint8Array(12288).fill(17);
-  const upload=player.uploadDashboard(rgb,generation);await flush(clock);expect((await upload)?.ok).toBe(true);
+  const upload=player.uploadDashboard([rgb],generation);await flush(clock);expect((await upload)?.ok).toBe(true);
   expect(device.effects.filter(e=>e.kind==='frame').at(-1)).toMatchObject({frame:{rgb,delayMs:500}});
   expect(player.getSession()).toEqual(context);expect(player.getState().intent).toBe('paused');
   await player.resume();await flush(clock);const before=device.operations.length;
-  expect(await player.uploadDashboard(rgb,generation)).toBeUndefined();
-  expect(await player.uploadDashboard(rgb,player.getState().generation)).toBeUndefined();expect(device.operations).toHaveLength(before);
+  expect(await player.uploadDashboard([rgb],generation)).toBeUndefined();
+  expect(await player.uploadDashboard([rgb],player.getState().generation)).toBeUndefined();expect(device.operations).toHaveLength(before);
  }finally{await player.close();}
 });
 it('retires queued monitor writes on screen-off and cannot revive them on screen-on',async()=>{
@@ -23,11 +23,24 @@ it('retires queued monitor writes on screen-off and cannot revive them on screen
  const player=await Player.open({store,device,clock});
  try{
   await player.pause();const old=player.getState().generation;
-  const upload=player.uploadDashboard(new Uint8Array(12288),old);
+  const upload=player.uploadDashboard([new Uint8Array(12288)],old);
   const off=player.setScreen(false);await flush(clock);clock.advance(100);await flush(clock);await off;
   expect(await upload).toMatchObject({ok:false});expect(device.effects.filter(e=>e.kind==='frame')).toHaveLength(0);
   const on=player.setScreen(true);await flush(clock);clock.advance(100);await flush(clock);await on;
-  expect(await player.uploadDashboard(new Uint8Array(12288),old)).toBeUndefined();
+  expect(await player.uploadDashboard([new Uint8Array(12288)],old)).toBeUndefined();
   expect(device.effects.filter(e=>e.kind==='frame')).toHaveLength(0);
+ }finally{await player.close();}
+});
+it('uploads a two-frame monitor picture as one 500 ms animation and rejects other frame sets',async()=>{
+ const clock=new ManualClock(),store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter({clock});
+ const player=await Player.open({store,device,clock});
+ try{
+  await player.pause();const generation=player.getState().generation;
+  const first=new Uint8Array(12288).fill(1),second=new Uint8Array(12288).fill(2);
+  const before=device.operations.length;
+  const upload=player.uploadDashboard([first,second],generation);await flush(clock);expect((await upload)?.ok).toBe(true);
+  expect(device.operations.slice(before).filter(o=>o.kind==='uploadAnimation')).toHaveLength(1);
+  expect(device.effects.filter(e=>e.kind==='frame').slice(-2)).toMatchObject([{frame:{rgb:first,delayMs:500}},{frame:{rgb:second,delayMs:500}}]);
+  for(const invalid of [[],[first,second,first],[new Uint8Array(12287)]])await expect(player.uploadDashboard(invalid,generation)).rejects.toThrow();
  }finally{await player.close();}
 });

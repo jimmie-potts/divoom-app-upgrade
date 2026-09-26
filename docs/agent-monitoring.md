@@ -287,7 +287,9 @@ protections as sessions. It accepts no query parameters and uses `Cache-Control:
 no-store`. The response contains `state`, `active`, `pending`, `cadenceMs`, and
 `rendition`. State is `pending`, `current`, `error`, or `closed`; only `current`
 contains pixels. A rendition has version 1, generation, width/height 64, format
-`rgb888`, layout metadata and exactly 12288 row-major RGB bytes as a JSON array.
+`rgb888` and layout metadata. `frames` holds one or two frames, each exactly
+12288 row-major RGB bytes as a JSON array, played in order at `frameDelayMs`
+(500). `rgb` equals the first frame for readers of a single picture.
 Consumers must discard their previous preview when state is not current and
 fetch current state on SSE resync. The generation is scoped to this renderer's
 process; it is not a shared-state revision or durable device generation.
@@ -301,40 +303,40 @@ The endpoint shows the selected monitor projection. Provider, project ID, full
 session identity and label/session search filters apply to both preview and
 display. Filtering preserves the complete source snapshot and child rollup.
 
+[Issue #98](https://github.com/jimmie-potts/divoom-app-upgrade/issues/98) replaced
+the four-row grid with one session per picture. The owner chose the layout from
+three sketches and asked that it pulse only when a person is needed.
+[ADR 0020](decisions/0020-one-session-monitor.md) records the choice.
+
 | Area | Pixels and meaning |
 | --- | --- |
-| Summary, y=1 | `S` matching top-level sessions, `!` total top-level sessions with approval/input/questions across all pages and filters, current/total pages |
-| Four rows, y=14/24/34/44 | Provider at x=0; activity at 4; attention at 8; six-cell identifier at 12; children at 40; uncertainty at 56; notice at 60 |
-| Provider | `C` Codex, `L` Claude |
-| Activity | `>` active, `=` idle, `X` interrupted, `]` runtime ended, `?` unknown |
-| Attention | `A` approval, `!` blocking input, `?` continuing question, blank none; activity is separate |
-| Identifier | The chosen label, or the session ID when unlabeled. `…`, two dots on the baseline, marks removed characters: `PIX…87` for a label, `…E8F01` for an ID's end |
-| Children | `+0` through `+9`; `+9+` means more than nine; suffix `?` indicates incomplete/uncertain relationship or activity evidence; full count stays in metadata |
-| Row flags | `?` uncertain/stale/unknown evidence; `T` retained turn-ended notice, never successful task completion |
-| Footer, y=57 | `F` source: C current / S stale / ? unavailable. `C` collector: R running / Q quiesced / F faulted / X closed / ? unknown |
+| Tile, x=1–20, y=1–20 | Activity colour and a black icon: green ▶ active, blue ‖ idle, red ✕ interrupted, grey ■ runtime ended, purple ? unknown. The word at (33,3) repeats it: `ACTIVE`, `IDLE`, `STOPPED`, `ENDED`, `UNKNOWN` |
+| Provider, (24,2) | Cyan hollow square with a centre dot: Codex. Orange star: Claude |
+| Attention, y=12–20 | Amber chip reading `APPROVAL`, `INPUT` or `QUESTION`. Only then does the picture pulse: a second 500 ms frame dims the tile and chip. `TURN END` without a chip is a retained turn-ended notice, never task success |
+| Label, y=26 and y=35 | Up to 20 characters in the 5×7 font on two lines of ten. The line breaks after a space, `-`, `_`, `/` or `.` when the rest fits, otherwise at ten |
+| Details, y=45 | `+n SUB` active subagents; `+9+` means more than nine; `?` marks incomplete relationship or activity evidence. `UNSURE`, with a dimmed label, marks uncertain, stale or unknown evidence |
+| Summary, y=56 | Matching sessions, `!n` sessions with approval, input or questions across all pages and filters, and page dots, or `p/n` above eight pages |
+| Health, x=52 and x=58 | Source: filled current, ring stale, ✕ unavailable. Collector: filled running, ‖ quiesced, ✕ faulted, hollow square closed, ? unknown |
 
-The original 3x5 font supports ASCII A-Z, digits, space and `._+!?/-`. Lowercase
-ASCII becomes uppercase; each unsupported Unicode code point becomes `?`.
-Identifiers of up to six code points are shown whole. Issue #87 set the rule for
-longer ones, so rows from the same period stay distinct:
+Every mark differs in shape or words as well as colour. Labels use an original
+5×7 font. Small words use the 3×5 font, which covers ASCII A–Z, digits, space and
+`._+!?/-`. Lowercase ASCII becomes uppercase, and each unsupported Unicode code
+point becomes `?`. Identifiers of up to 20 code points are shown whole. Issue #87
+set the rule for longer ones, so sessions from the same period stay distinct:
 
-- A chosen label keeps its first three and last two display characters around
+- A chosen label keeps its first ten and last nine display characters around
   `…`, so labels that differ only in a trailing number stay distinct.
-- An unlabeled row shows `…` and the last five display characters of its
+- An unlabeled session shows `…` and the last nineteen display characters of its
   session ID. Codex session IDs are time-ordered UUIDs that share their opening
   characters across a period; their final characters are random.
 
-The `…` glyph is outside the label alphabet, so no label or ID character can
-produce it, and its position shows which part was removed. Labels still come
-only from the owner; titles, prompts and paths never become identifiers. Two
-rows can still collide when different IDs share their last five characters,
-about one chance in 175,000 for four visible UUIDs, or when different labels
-share their first three and last two characters. The layout's `label` field and
-the Monitor tab keep the full label or ID. A shared neutral alias from
+The `…` glyph, three baseline dots in the 5×7 font, is outside the label
+alphabet, so no label or ID character can produce it. Its position shows which
+part was removed. Labels still come only from the owner; titles, prompts and paths
+never become identifiers. The layout's `label` field and the Monitor tab keep the
+full label or ID. A shared neutral alias from
 [Hub #364](https://github.com/jimmie-potts/agent-device-hub/issues/364) could
-replace the ID fallback; a layout redesign changes only the identifier width.
-Icons differ in shape as well as color. Empty pages retain summary and health
-with `EMPTY` in the body.
+replace the ID fallback. An empty view shows `NO SESSIONS` above the summary strip.
 
 Blocking approval/input comes first, then continuing questions, retained notices,
 and other sessions. Full provider/client/host/source/session identity breaks ties
@@ -345,7 +347,8 @@ Acknowledged notices disappear only for that consumer. New turns use the core's
 consumer policy. Restart uncertainty remains visible independently of collector
 health and source connection.
 
-Pagination rotates at ten-second intervals using an injectable monotonic clock.
+Pagination shows one session per page and rotates at ten-second intervals using
+an injectable monotonic clock.
 Membership/order/filter changes clamp the page and restart its interval. Evidence
 refreshes with unchanged ordering preserve the deadline. Delayed ticks account
 for complete elapsed intervals. Rendering coalesces to one active job and one
@@ -358,7 +361,12 @@ of the operator-selected upload cadence. The pure renderer retains its 3000 ms
 standalone fallback. Upload starts use the selected 1000–10000 ms interval,
 defaulting to 1000 ms under [ADR 0015](decisions/0015-dashboard-qualification.md).
 Slower settings can omit intermediate pictures; the writer always takes the
-latest completed rendition.
+latest completed rendition. A pulsing picture is one upload of both frames, which
+the device loops, so the pulse adds no traffic. The observed Pixoo64 profile
+allows two uniform 500 ms frames. Physical qualification has covered single
+dashboard pictures (ADR 0015) and two-frame media GIFs with the known
+transition flashing ([#52](https://github.com/jimmie-potts/divoom-app-upgrade/issues/52)),
+not a pulsing dashboard picture.
 
 After `npm run build`, generate the standalone synthetic browser preview:
 
@@ -366,13 +374,14 @@ After `npm run build`, generate the standalone synthetic browser preview:
 node scripts/dashboard-preview.mjs /tmp/agent-dashboard-preview.html
 ```
 
-The [committed synthetic examples](examples/agent-dashboard.html) show native
-64x64 and nearest-neighbor 4x previews with full row details. They include blocked
-approval, a continuing question, a retained notice, overflow, unknown/unsupported
-labels, stale source, empty state and four unlabeled sessions whose IDs share a
-prefix. The browser checks compare every canvas
-byte to renderer RGB; fake-device tests verify the same frames. These tests do
-not prove native-font fidelity, physical readability, installed hooks or timing.
+The [committed synthetic examples](examples/agent-dashboard.html) show every
+frame at native 64x64 and nearest-neighbor 4x, with full layout details. Every
+legend state appears: each activity, attention kind and provider, a retained
+notice, subagents above nine, uncertainty, each source and collector state, an
+empty view, more than eight pages and four unlabeled sessions whose IDs share a
+prefix. The browser checks compare every canvas frame to renderer RGB; fake-device
+tests verify the same frames in one upload. These tests do not prove physical
+readability, installed hooks or timing.
 
 
 ## Monitor panel and display ownership
@@ -386,9 +395,10 @@ Projects use the shared optional neutral `projectId`; sessions use all five
 identity fields. Unlabeled sessions retain their neutral ID.
 
 Apply monitor view saves the provider/project/session/search selection and
-cadence. Counts distinguish matching top-level rows from the total. Empty views
+cadence. Counts distinguish matching top-level sessions from the total. Empty views
 retain health and summary pixels. The 64×64 canvas uses the renderer's exact RGB
-bytes, enlarged with nearest-neighbor scaling. The latest preview may lead a
+frames, enlarged with nearest-neighbor scaling, and cycles a pulsing picture's
+two frames at 500 ms as the device plays them. The latest preview may lead a
 pending upload. It is desired content, not evidence that a physical display
 shows those pixels. The full label or session ID remains visible beside the
 truncated glyphs.
@@ -766,7 +776,7 @@ Claude completion.
 | Isolation and failure, criterion 5 | Two concurrent sessions in one project remain separate; collector outage, failed hook delivery, duplicate/delayed events, five-minute uncertainty and backend restart. Measure agent progress independently of monitor success; a healthy collector cannot refresh stale observations. |
 | Durability and privacy, criterion 6 | Current labels/state/notices survive restart and 24-hour/10,000-event journal cleanup. Synthetic canaries for prompts, transcripts, tool arguments/output, copied titles and secrets are absent from transmitted payloads, state, logs and dashboard. Keep real payloads out of receipts. |
 | Physical preflight, criterion 7 | Exact device IP, named test owner, model/firmware, approved sequence and display replacement, prior screen/brightness and restoration limits. Earlier rendering consent does not authorize this test. |
-| Display, criterion 8 | Four rows, icons/short labels, attention total on every page, ten-second overflow, uncertainty/notices, native-size readability and exact preview. Record visible loading/timing separately from HTTP acknowledgment. |
+| Display, criterion 8 | One session per screen with icons, words and a two-line label, the attention-only pulse, attention total on every page, ten-second overflow, uncertainty/notices, native-size readability and exact preview. Record visible loading/timing separately from HTTP acknowledgment. |
 | Mode/writer, criterion 9 | Monitor pauses advancement; hooks cannot select Monitor from Media; return leaves playback paused. Exercise mode changes during uploads, disconnect/reconnect and screen-off/on without stale replay or a second writer. |
 | Nanoleaf/removal, criterion 10 | Legacy hooks work with monitor enabled, unavailable and removed. Only after separate cutover authorization verify shared input and rollback without duplicates. Revoke owned access, preserve other hooks and restore known display settings within limits. |
 | Evidence, criterion 11 | Dated redacted receipt with exact profiles and separate source/CI, installation, real-client, transport and visible-device verdicts. Missing required observations keep the issue open. |

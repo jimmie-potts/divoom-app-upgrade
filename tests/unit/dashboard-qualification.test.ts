@@ -8,14 +8,25 @@ it('defaults to fake even when a physical target is present in the environment',
   expect(parseDashboardArgs([], {PIXOO_DEVICE_IP:'192.168.1.2'})).toMatchObject({mode:'fake', cadenceMs:3000, durationMs:15000});
   expect(parseDashboardArgs([], {PIXOO_DEVICE_IP:'192.168.1.2'})).not.toHaveProperty('ip');
 });
-it('replaces all pixels when rows disappear and supplies an overflow page', () => {
+it('replaces all pixels when the session disappears, supplies a next page and pulses only the attention tile and chip',async () => {
   const cases=dashboardCases();
   expect(cases.every(item=>item.rgb.length===12288)).toBe(true);
-  expect(cases.some(item=>item.id==='overflow-page-2')).toBe(true);
-  const full=cases.find(item=>item.id==='four-rows')!.rgb;
-  const cleared=cases.find(item=>item.id==='rows-cleared')!.rgb;
-  expect(full.slice(34*64*3,54*64*3).some(value=>value!==0)).toBe(true);
-  expect(cleared.slice(34*64*3,54*64*3).every(value=>value===0)).toBe(true);
+  expect(cases.some(item=>item.id==='next-page')).toBe(true);
+  const card=cases.find(item=>item.id==='attention-pulse')!;
+  const cleared=cases.find(item=>item.id==='session-cleared')!.rgb;
+  expect(card.rgb.slice(0,50*64*3).some(value=>value!==0)).toBe(true);
+  expect(cleared.slice(0,50*64*3).every(value=>value===0)).toBe(true);
+  expect(cases.filter(item=>item.pulse).map(item=>item.id)).toEqual(['attention-pulse','return-page-1']);
+  for(let i=0;i<4096;i++){
+    const x=i%64,y=Math.floor(i/64),same=card.rgb.slice(i*3,i*3+3).join()===card.pulse!.slice(i*3,i*3+3).join();
+    if(!same)expect((x>=1&&x<=20&&y>=1&&y<=20)||(x>=24&&x<=62&&y>=12&&y<=20)).toBe(true);
+  }
+  const device=new FakeDeviceAdapter();
+  const report=await runDashboard(device,[card],{cadenceMs:1000,durationMs:1000});
+  expect(report.uploads).toMatchObject([{id:'attention-pulse',frames:2,result:{ok:true}}]);
+  expect(device.operations.filter(item=>item.kind==='uploadAnimation')).toHaveLength(1);
+  expect(device.effects.map(item=>item.kind==='frame'?[item.frame.delayMs,item.frame.rgb]:null)).toEqual([[500,card.rgb],[500,card.pulse]]);
+  await expect(runDashboard(device,[{...card,pulse:new Uint8Array(3)}],{cadenceMs:1000,durationMs:1000})).rejects.toThrow('Invalid synthetic events');
 });
 it('coalesces bursts to the latest picture without replaying obsolete pictures', async () => {
   vi.useFakeTimers();

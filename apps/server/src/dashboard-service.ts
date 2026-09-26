@@ -1,12 +1,13 @@
 import {DashboardPager,type DashboardLayout,type DashboardFilter} from './agent-dashboard.js';
-import {renderDashboard} from './dashboard-pixels.js';
+import {DASHBOARD_FRAME_MS,renderDashboard} from './dashboard-pixels.js';
 import type {MonitorView} from './monitor-source.js';
-export type DashboardRendition={version:1;generation:number;width:64;height:64;format:'rgb888';layout:DashboardLayout;rgb:number[]};
-export type DashboardOptions={clock?:()=>number;cadenceMs?:number;consumerId?:string;render?:(layout:DashboardLayout)=>Uint8Array|Promise<Uint8Array>};
+/** `frames` play in order at `frameDelayMs`; `rgb` is the first frame, for readers of a single picture. */
+export type DashboardRendition={version:1;generation:number;width:64;height:64;format:'rgb888';layout:DashboardLayout;rgb:number[];frames:number[][];frameDelayMs:number};
+export type DashboardOptions={clock?:()=>number;cadenceMs?:number;consumerId?:string;render?:(layout:DashboardLayout)=>Uint8Array[]|Promise<Uint8Array[]>};
 export class DashboardService {
  private readonly clock:()=>number;
  private readonly cadence:number;
- private readonly render:(layout:DashboardLayout)=>Uint8Array|Promise<Uint8Array>;
+ private readonly render:(layout:DashboardLayout)=>Uint8Array[]|Promise<Uint8Array[]>;
  private readonly pager:DashboardPager;
  private generation=0;
  private signature='';
@@ -35,10 +36,11 @@ export class DashboardService {
   if(signature!==this.signature){this.signature=signature;this.generation++;this.pending={generation:this.generation,layout};this.rendition=null;this.failed=false;}
   if(this.active||!this.pending||this.clock()<this.nextStart)return;
   const job=this.pending;this.pending=null;this.active=true;this.nextStart=this.clock()+this.cadence;
-  void Promise.resolve().then(()=>this.render(structuredClone(job.layout))).then(rgb=>{
+  void Promise.resolve().then(()=>this.render(structuredClone(job.layout))).then(frames=>{
    if(this.closed||job.generation!==this.generation)return;
-   if(!(rgb instanceof Uint8Array)||rgb.length!==12288)throw new Error('invalid-dashboard-pixels');
-   this.rendition={version:1,generation:job.generation,width:64,height:64,format:'rgb888',layout:job.layout,rgb:Array.from(rgb)};this.failed=false;
+   if(!Array.isArray(frames)||frames.length<1||frames.length>2||frames.some(rgb=>!(rgb instanceof Uint8Array)||rgb.length!==12288))throw new Error('invalid-dashboard-pixels');
+   const copies=frames.map(rgb=>Array.from(rgb));
+   this.rendition={version:1,generation:job.generation,width:64,height:64,format:'rgb888',layout:job.layout,rgb:copies[0]!,frames:copies,frameDelayMs:DASHBOARD_FRAME_MS};this.failed=false;
   }).catch(()=>{
    if(!this.closed&&job.generation===this.generation){this.failed=true;this.pending=job;}
   }).finally(()=>{this.active=false;});

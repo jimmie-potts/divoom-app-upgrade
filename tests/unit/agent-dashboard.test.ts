@@ -13,20 +13,22 @@ it('prioritizes blocking attention before continuing questions, keeps stable row
  const attention=(kind:'input'|'question')=>[{kind,id:{status:'unknown'} as const,turn:{status:'unknown'} as const}];
  const sessions=[session('z'),session('b',{attention:attention('question')}),session('c',{attention:attention('input')}),session('a'),session('child',{parent:{status:'known',identity:session('a').identity}})];
  const pager=new DashboardPager();
- const layout=pager.layout(view(sessions),0);
- expect(layout.rows.map(row=>row.identity.sessionId)).toEqual(['c','b','a','z']);
- expect(layout.rows[1]).toMatchObject({activity:'active',attention:'question'});
- expect(layout.attentionTotal).toBe(2);
- expect(pager.layout(view(sessions.reverse()),1).rows).toEqual(layout.rows);
+ const order=(pager:DashboardPager,state:MonitorView)=>[0,10000,20000,30000].map(at=>pager.layout(state,at).rows.map(row=>row.identity.sessionId).join(''));
+ expect(order(pager,view(sessions))).toEqual(['c','b','a','z']);
+ expect(pager.layout(view(sessions),0)).toMatchObject({pages:4,attentionTotal:2});
+ const second=new DashboardPager();second.layout(view(sessions),0);
+ expect(second.layout(view(sessions),10000).rows[0]).toMatchObject({activity:'active',attention:'question'});
+ expect(order(new DashboardPager(),view([...sessions].reverse()))).toEqual(['c','b','a','z']);
 });
 
-it('rotates at ten seconds, skips elapsed intervals and clamps when filters or sessions change',()=>{
+it('shows one session per page, rotates at ten seconds, skips elapsed intervals and clamps when filters or sessions change',()=>{
  const pager=new DashboardPager(),state=view(Array.from({length:9},(_,i)=>session(String(i))));
- expect(pager.layout(state,0).page).toBe(0);
+ expect(pager.layout(state,0)).toMatchObject({page:0,pages:9,matched:9});
+ expect(pager.layout(state,0).rows.map(row=>row.identity.sessionId)).toEqual(['0']);
  expect(pager.layout(state,9999).page).toBe(0);
- expect(pager.layout(state,10000).rows[0]?.identity.sessionId).toBe('4');
+ expect(pager.layout(state,10000).rows.map(row=>row.identity.sessionId)).toEqual(['1']);
  expect(pager.layout(state,20000).rows).toHaveLength(1);
- expect(pager.layout(state,40000).page).toBe(1);
+ expect(pager.layout(state,40000).page).toBe(4);
  expect(pager.layout(state,41000,{q:'0'})).toMatchObject({page:0,pages:1,matched:1,total:9});
  expect(pager.layout(view([]),42000)).toMatchObject({page:0,pages:1,rows:[]});
 });
@@ -34,61 +36,155 @@ it('keeps notices consumer-specific, full labels and timestamps, and health dime
  const state=view([session('a',{label:'résumé-long',notices:[{id:'n',kind:'turn-ended',turn:{status:'unknown'},acknowledgedBy:['other']}],children:{active:2,uncertain:1}})]);
  state.connection='stale';const layout=new DashboardPager().layout(state,0);
  expect(layout).toMatchObject({connection:'stale',collector:'running'});
- expect(layout.rows[0]).toMatchObject({label:'résumé-long',shortLabel:'R?S…NG',noticeIds:['n'],activeChildren:2,childrenUncertain:true,uncertain:true,observedAtMs:1000});
+ expect(layout.rows[0]).toMatchObject({label:'résumé-long',shortLabel:'R?SUM?-LONG',noticeIds:['n'],activeChildren:2,childrenUncertain:true,uncertain:true,observedAtMs:1000});
  state.snapshot!.sessions[0]!.notices[0]!.acknowledgedBy.push('pixoo');
  expect(new DashboardPager().layout(state,0).rows[0]?.noticeIds).toEqual([]);
 });
-it('renders exact RGB pixels and different state shapes, independently of caller mutation',async()=>{
+type Frame=Uint8Array;
+const lit=(frame:Frame,x0:number,y0:number,x1:number,y1:number)=>{const bits=[];for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)bits.push(frame[(y*64+x)*3]!|frame[(y*64+x)*3+1]!|frame[(y*64+x)*3+2]!?'1':'0');return bits.join('');};
+const differs=(a:Frame,b:Frame)=>{const out:Array<[number,number]>=[];for(let i=0;i<4096;i++)if(a[i*3]!==b[i*3]||a[i*3+1]!==b[i*3+1]||a[i*3+2]!==b[i*3+2])out.push([i%64,Math.floor(i/64)]);return out;};
+async function renderOne(patch:Partial<SessionSnapshot>={},change:(state:MonitorView)=>void=()=>{}){
+ const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
+ const state=view([session('a',{label:'Build',ordering:{status:'known',epoch:'e',sequence:1},...patch})]);change(state);
+ const layout=new DashboardPager().layout(state,0);
+ return {layout,frames:renderDashboard(layout)};
+}
+const ask=(kind:'approval'|'input'|'question')=>({attention:[{kind,id:{status:'unknown'} as const,turn:{status:'unknown'} as const}]});
+it('renders exact RGB frames, independently of caller mutation',async()=>{
  const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
  const layout=new DashboardPager().layout(view([session('a')]),0);
- const rgb=renderDashboard(layout);
- expect(rgb).toHaveLength(12288);
- expect(rgb).toEqual(renderDashboard(layout));
- rgb.fill(0);expect(renderDashboard(layout).some(v=>v!==0)).toBe(true);
- const shapes=new Set<string>();
- for(const activity of ['unknown','active','idle','interrupted','ended'] as const){
-  layout.rows[0]!.activity=activity;
-  const frame=renderDashboard(layout),bits=[];
-  for(let y=14;y<19;y++)for(let x=4;x<7;x++)bits.push(frame[(y*64+x)*3]!==0);
-  shapes.add(JSON.stringify(bits));
- }
- expect(shapes.size).toBe(5);
+ const frames=renderDashboard(layout);
+ expect(frames).toHaveLength(1);expect(frames[0]).toHaveLength(12288);
+ expect(frames).toEqual(renderDashboard(layout));
+ frames[0]!.fill(0);expect(renderDashboard(layout)[0]!.some(v=>v!==0)).toBe(true);
 });
-it('matches the synthetic RGB fixture hashes and retains attention total on overflow',async()=>{
+it('distinguishes every activity, attention, provider and notice state by shape or words, not only colour',async()=>{
+ const tiles=new Set<string>(),words=new Set<string>();
+ for(const activity of ['unknown','active','idle','interrupted','ended'] as const){
+  const [frame]=(await renderOne({activity})).frames;
+  tiles.add(lit(frame!,7,7,13,13));words.add(lit(frame!,33,3,62,7));
+ }
+ expect(tiles.size).toBe(5);expect(words.size).toBe(5);
+ const chips=new Set<string>();
+ for(const kind of ['approval','input','question'] as const)chips.add(lit((await renderOne(ask(kind))).frames[0]!,24,12,62,20));
+ const notice=lit((await renderOne({notices:[{id:'n',kind:'turn-ended',turn:{status:'unknown'},acknowledgedBy:[]}]})).frames[0]!,24,12,62,20);
+ const plain=lit((await renderOne()).frames[0]!,24,12,62,20);
+ expect(new Set([...chips,notice,plain]).size).toBe(5);
+ const providers=new Set<string>();
+ for(const provider of ['codex','claude'] as const)providers.add(lit((await renderOne({},state=>{state.snapshot!.sessions[0]!.identity.provider=provider;})).frames[0]!,24,2,30,8));
+ expect(providers.size).toBe(2);
+});
+it('pulses only a session that needs attention, dimming just its tile and chip in the second frame',async()=>{
+ for(const kind of ['approval','input','question'] as const){
+  const {frames}=await renderOne(ask(kind));
+  expect(frames).toHaveLength(2);
+  const changed=differs(frames[0]!,frames[1]!);
+  expect(changed.length).toBeGreaterThan(0);
+  expect(changed.every(([x,y])=>(x>=1&&x<=20&&y>=1&&y<=20)||(x>=24&&x<=62&&y>=12&&y<=20))).toBe(true);
+ }
+ for(const activity of ['active','idle','interrupted','ended','unknown'] as const)expect((await renderOne({activity})).frames).toHaveLength(1);
+ // Attention elsewhere keeps the shown session and the steady total still.
+ const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
+ const pager=new DashboardPager(),state=view([session('a',ask('approval')),session('b')]);pager.layout(state,0);
+ const layout=pager.layout(state,10000);
+ expect(layout).toMatchObject({attentionTotal:1,rows:[{attention:'none'}]});
+ expect(renderDashboard(layout)).toHaveLength(1);
+});
+it('spells out uncertainty and dims the label instead of a trailing symbol',async()=>{
+ const certain=(await renderOne()).frames[0]!,uncertain=(await renderOne({freshness:'uncertain'})).frames[0]!;
+ expect(lit(certain,39,45,62,49)).not.toContain('1');
+ expect(lit(uncertain,39,45,62,49)).toContain('1');
+ const label=(frame:Frame)=>Array.from(frame.slice((26*64+2)*3,(33*64+62)*3)).reduce((a,b)=>Math.max(a,b),0);
+ expect(label(uncertain)).toBeLessThan(label(certain));
+});
+it('shows subagents, and keeps the summary and separate source and collector health on every page, including an empty one',async()=>{
+ const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
+ expect(lit((await renderOne()).frames[0]!,2,45,33,49)).not.toContain('1');
+ expect(lit((await renderOne({children:{active:3,uncertain:0}})).frames[0]!,2,45,33,49)).toContain('1');
+ const sources=new Set<string>(),collectors=new Set<string>();
+ for(const connection of ['current','stale','unavailable'] as const)sources.add(lit((await renderOne({},state=>{state.connection=connection;})).frames[0]!,52,56,56,60));
+ for(const collector of ['running','quiesced','faulted','closed'] as const)collectors.add(lit((await renderOne({},state=>{state.snapshot!.collector=collector;})).frames[0]!,58,56,62,60));
+ const none=view([]);none.connection='unavailable';none.snapshot=null;
+ const empty=renderDashboard(new DashboardPager().layout(none,0));
+ expect(empty).toHaveLength(1);
+ collectors.add(lit(empty[0]!,58,56,62,60));
+ expect([sources.size,collectors.size]).toEqual([3,5]);
+ expect(lit(empty[0]!,0,14,63,31)).toContain('1');
+ expect(lit(empty[0]!,0,56,50,60)).toContain('1');
+ // Page dots up to eight pages, then a numeric position.
+ const many=(n:number)=>renderDashboard(new DashboardPager().layout(view(Array.from({length:n},(_,i)=>session(String(i)))),0))[0]!;
+ expect(lit(many(8),26,56,49,60)).not.toEqual(lit(many(9),26,56,49,60));
+ expect(lit(many(2),26,56,49,56)).toBe('0'.repeat(24));
+});
+it('covers every legend state in the synthetic examples and matches their frame hashes',async()=>{
  const {createHash}=await import('node:crypto');
  const {syntheticDashboardRenditions}=await import('../../apps/server/src/dashboard-examples.js');
- const cases=syntheticDashboardRenditions();
- expect(cases.map(c=>createHash('sha256').update(new Uint8Array(c.rendition.rgb)).digest('hex'))).toEqual([
-  '0fa5f26fc03c181834d80af5c816e69d447b9e8cba9569bcd93b1bea5d740539',
-  '900bf69b32e7305224e6729dc5ca8eb76e8526fa31aaa810780e47801591ef1d',
-  '5c5556a05f1d8d95901a75565991093dfc2364d447e8400de82c0b84758827af',
-  'e9525a027c180a9cd5897fe2a16984972d902dd7a4e42aec73b7899cc222ced4',
-  '77f4a5bdebdd0276955bbba77afc84eec97dcb4ead62fa22f5fa62cbf4e006ef'
+ const cases=syntheticDashboardRenditions(),rows=cases.flatMap(c=>c.rendition.layout.rows),layouts=cases.map(c=>c.rendition.layout);
+ expect(new Set(rows.map(row=>row.identity.provider))).toEqual(new Set(['codex','claude']));
+ expect(new Set(rows.map(row=>row.activity))).toEqual(new Set(['active','idle','interrupted','ended','unknown']));
+ expect(new Set(rows.map(row=>row.attention))).toEqual(new Set(['approval','input','question','none']));
+ expect(rows.some(row=>row.noticeIds.length&&row.attention==='none')).toBe(true);
+ expect(rows.some(row=>row.activeChildren>9&&row.childrenUncertain)).toBe(true);
+ expect(new Set(rows.map(row=>row.uncertain))).toEqual(new Set([true,false]));
+ expect(new Set(layouts.map(layout=>layout.connection))).toEqual(new Set(['current','stale','unavailable']));
+ expect(new Set(layouts.map(layout=>layout.collector))).toEqual(new Set(['running','quiesced','faulted','closed','unknown']));
+ expect(layouts.some(layout=>!layout.rows.length)).toBe(true);
+ expect(layouts.some(layout=>layout.pages>8)).toBe(true);
+ expect(cases.map(c=>c.rendition.frames.length)).toEqual([2,2,2,1,1,1,1,1,1,1,1]);
+ for(const c of cases)expect(c.rendition.rgb).toEqual(c.rendition.frames[0]);
+ expect(cases.map(c=>c.rendition.frames.map(frame=>createHash('sha256').update(new Uint8Array(frame)).digest('hex').slice(0,16)).join(' '))).toEqual([
+  'd17b4eff2ddfa03d 120e94276ae78ec2',
+  '98e1146603fba33f 5ff602a38c54257e',
+  'd1b97446ab602ce0 d1694b5080644fe4',
+  '428b62f6b5e41da9',
+  '20c1d501a9b49f72',
+  '988bfd52edc1dc33',
+  'd9021bfd05d09fd2',
+  '296eec01f405f193',
+  'b5db73a84fb91eeb',
+  'e647a684ad3cd44a',
+  '52d07ec1c0a0ff50'
  ]);
- expect(cases[4]!.rendition.layout.rows.map(row=>row.shortLabel)).toEqual(['…E8F01','…7C3B2','…09D43','…D1F54']);
- expect(cases[0]!.rendition.layout.attentionTotal).toBe(2);
- expect(cases[1]!.rendition.layout.attentionTotal).toBe(2);
+ expect(layouts[1]).toMatchObject({attentionTotal:3,page:1,rows:[{attention:'input'}]});
 });
 const sharedPrefix=['01a0d3e2-7c4b-7f10-9a3e-5b1c2d4e8f01','01a0d3e2-7c4b-7f10-b1c4-02d9e6a7c3b2','01a0d3e2-91f0-7a22-8d05-c7e3f1a09d43','01a0d3e4-0b6a-7c31-a7f2-4e8b9c2d1f54'];
-it('shows the distinguishing end of unlabeled session IDs and both ends of long labels',()=>{
- expect(sharedPrefix.map(shortSessionId)).toEqual(['…E8F01','…7C3B2','…09D43','…D1F54']);
- const layout=new DashboardPager().layout(view(sharedPrefix.map(id=>session(id))),0);
- expect(new Set(layout.rows.map(row=>row.shortLabel)).size).toBe(4);
- expect(layout.rows.map(row=>row.label)).toEqual(sharedPrefix);
- expect(shortLabel('pixoo-87')).toBe('PIX…87');
- expect(shortLabel('pixoo-98')).toBe('PIX…98');
- expect(new DashboardPager().layout(view([session('b',{label:'Build'})]),0).rows[0]).toMatchObject({label:'Build',shortLabel:'BUILD'});
- expect([shortLabel('Review'),shortSessionId('s1')]).toEqual(['REVIEW','S1']);
- expect([shortLabel('a…b'),shortLabel('ab…cdefg'),shortSessionId('x…y')]).toEqual(['A?B','AB?…FG','X?Y']);
+const tails=['…0-9A3E-5B1C2D4E8F01','…0-B1C4-02D9E6A7C3B2','…2-8D05-C7E3F1A09D43','…1-A7F2-4E8B9C2D1F54'];
+it('shows the distinguishing end of unlabeled session IDs and both ends of long labels at the 20-character width',()=>{
+ expect(sharedPrefix.map(shortSessionId)).toEqual(tails);
+ const pager=new DashboardPager(),state=view(sharedPrefix.map(id=>session(id)));
+ const rows=[0,10000,20000,30000].map(at=>pager.layout(state,at).rows[0]!);
+ expect(rows.map(row=>row.shortLabel)).toEqual(tails);
+ expect(rows.map(row=>row.label)).toEqual(sharedPrefix);
+ expect(shortLabel('resume-long-running-migration-7')).toBe('RESUME-LON…GRATION-7');
+ expect(shortLabel('resume-long-running-migration-8')).toBe('RESUME-LON…GRATION-8');
+ expect(shortLabel('pixoo-layout-redesign')).toBe('PIXOO-LAYO…-REDESIGN');
+ expect(new DashboardPager().layout(view([session('b',{label:'pixoo-layout-98'})]),0).rows[0]).toMatchObject({label:'pixoo-layout-98',shortLabel:'PIXOO-LAYOUT-98'});
+ expect([shortLabel('a'.repeat(20)),shortSessionId('s1')]).toEqual(['A'.repeat(20),'S1']);
+ expect([shortLabel('a…b'),shortLabel('ab…cdefghijklmnopqrstu'),shortSessionId('x…y')]).toEqual(['A?B','AB?CDEFGHI…MNOPQRSTU','X?Y']);
 });
-it('draws the truncation marker as its own glyph, outside the label alphabet',async()=>{
- const {glyphs,markerGlyphs}=await import('../../apps/server/src/pixel-font.js');
+it('wraps identifiers into two lines of ten at a separator when the rest fits, otherwise at ten',async()=>{
+ const {identifierLines}=await import('../../apps/server/src/dashboard-pixels.js');
+ expect(identifierLines('BUILD')).toEqual(['BUILD']);
+ expect(identifierLines('PIXOO-LAYOUT-98')).toEqual(['PIXOO-','LAYOUT-98']);
+ expect(identifierLines('FIX THE BUILD')).toEqual(['FIX THE','BUILD']);
+ expect(identifierLines('RESUME-LON…GRATION-7')).toEqual(['RESUME-LON','…GRATION-7']);
+ expect(identifierLines('…0-9A3E-5B1C2D4E8F01')).toEqual(['…0-9A3E-5B','1C2D4E8F01']);
+ expect(identifierLines('ABCDEFGHIJKLMNOP')).toEqual(['ABCDEFGHIJ','KLMNOP']);
+});
+it('draws labels in a 5x7 alphabet with its own truncation marker outside the label alphabet',async()=>{
+ const {glyphs,markerGlyphs,largeGlyphs,largeMarkerGlyphs}=await import('../../apps/server/src/pixel-font.js');
  const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
  expect(Object.keys(markerGlyphs)).toEqual(['…']);
  expect(Object.hasOwn(glyphs,'…')).toBe(false);
  expect(Object.values(glyphs)).not.toContain(markerGlyphs['…']);
- const cell=(frame:Uint8Array,x:number)=>{const bits=[];for(let y=14;y<19;y++)for(let dx=0;dx<3;dx++)bits.push(frame[(y*64+x+dx)*3]!==0?'1':'0');return bits.join('');};
- const frame=renderDashboard(new DashboardPager().layout(view([session(sharedPrefix[0]!)]),0));
- expect(cell(frame,12)).toBe(markerGlyphs['…']);
- expect(cell(frame,16)).toBe(glyphs.E);
+ const labelAlphabet=[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ._+!?/-'];
+ expect(Object.keys(largeGlyphs).sort()).toEqual([...labelAlphabet].sort());
+ expect(Object.keys(largeMarkerGlyphs)).toEqual(['…']);
+ expect(Object.values(largeGlyphs)).not.toContainEqual(largeMarkerGlyphs['…']);
+ expect(new Set(Object.values(largeGlyphs).map(glyph=>glyph.join(''))).size).toBe(labelAlphabet.length);
+ const cell=(frame:Uint8Array,x:number,y:number)=>{const rows=[];for(let dy=0;dy<7;dy++){let row='';for(let dx=0;dx<5;dx++)row+=frame[((y+dy)*64+x+dx)*3]!==0?'#':'.';rows.push(row);}return rows;};
+ const [frame]=renderDashboard(new DashboardPager().layout(view([session(sharedPrefix[0]!)]),0));
+ expect(cell(frame!,2,26)).toEqual(largeMarkerGlyphs['…']);
+ expect(cell(frame!,8,26)).toEqual(largeGlyphs['0']);
+ expect(cell(frame!,2,35)).toEqual(largeGlyphs['1']);
 });

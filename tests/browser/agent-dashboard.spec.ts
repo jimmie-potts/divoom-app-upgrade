@@ -5,11 +5,13 @@ test('dashboard native and enlarged previews reproduce exact pixels and safely e
  const cases=syntheticDashboardRenditions();
  cases[0]!.rendition.layout.rows[0]!.label='<img src=x onerror=alert(1)>';
  await page.setContent(dashboardPreviewHtml(cases));
- await expect(page.locator('canvas')).toHaveCount(cases.length*2);
- for(let i=0;i<cases.length;i++)for(const scale of ['native','enlarged']){
-  const canvas=page.locator(`canvas[data-index="${i}"][data-scale="${scale}"]`);
-  const rgb=await canvas.evaluate(el=>Array.from((el as HTMLCanvasElement).getContext('2d')!.getImageData(0,0,64,64).data).filter((_,index)=>index%4!==3));
-  expect(rgb).toEqual(cases[i]!.rendition.rgb);
+ const frames=cases.flatMap((c,index)=>c.rendition.frames.map((rgb,frame)=>({index,frame,rgb})));
+ expect(frames.length).toBeGreaterThan(cases.length);
+ await expect(page.locator('canvas')).toHaveCount(frames.length*2);
+ for(const {index,frame,rgb} of frames)for(const scale of ['native','enlarged']){
+  const canvas=page.locator(`canvas[data-index="${index}"][data-frame="${frame}"][data-scale="${scale}"]`);
+  const actual=await canvas.evaluate(el=>Array.from((el as HTMLCanvasElement).getContext('2d')!.getImageData(0,0,64,64).data).filter((_,i)=>i%4!==3));
+  expect(actual).toEqual(rgb);
  }
  await expect(page.locator('img')).toHaveCount(0);
  await expect(page.getByText('<img src=x onerror=alert(1)>',{exact:false})).toBeVisible();
