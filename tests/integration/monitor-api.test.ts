@@ -14,7 +14,7 @@ it('authenticates embedded monitoring and persists an event independently of pla
  try{
   expect((await app.inject('/api/monitor/v1/sessions')).statusCode).toBe(401);
   const before=await app.inject({url:'/api/monitor/v1/sessions',headers});expect(before.statusCode).toBe(200);
-  const response=await app.inject({method:'POST',url:'/api/monitor/v1/events',headers,payload:{apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000}});
+  const response=await app.inject({method:'POST',url:'/api/monitor/v1/events',headers,payload:{apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:Date.now()}});
   expect(response.statusCode).toBe(200);expect(response.json().ok).toBe(true);
   const snapshot=(await app.inject({url:'/api/monitor/v1/sessions',headers})).json();expect(snapshot.snapshot.sessions).toHaveLength(1);
   expect((await app.inject('/api/health')).json().mode).toBe('simulator');
@@ -28,7 +28,7 @@ it('preserves origin/header protections, scopes, privacy, filtering and command 
  const app=createApp({dataDir:directory,monitorEnabled:true}),url='/api/monitor/v1';
  const headers={authorization:`Bearer ${token}`,'x-pixoo-request':'1'};
  const identity={provider:'claude',client:'code',hostId:'host',sourceId:'source',sessionId:'session'} as const;
- const event={apiVersion:'1.0',identity,turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'turn.ended'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:1000};
+ const event={apiVersion:'1.0',identity,turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'turn.ended'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:Date.now()};
  try{
   expect((await app.inject({url:url+'/sessions',headers:{...headers,origin:'https://foreign.test'}})).statusCode).toBe(403);
   expect((await app.inject({method:'POST',url:url+'/events',headers:{authorization:`Bearer ${token}`},payload:event})).statusCode).toBe(403);

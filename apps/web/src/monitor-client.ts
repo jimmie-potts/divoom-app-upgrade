@@ -20,7 +20,7 @@ export class MonitorCursor {
  }
 }
 export interface MonitorSession {
- identity:SessionIdentity;label?:string;projectId?:string;activity:string;freshness:string;
+ identity:SessionIdentity;label?:string;title?:{value:string;source:'provider'|'user'};project?:string;projectId?:string;activity:string;freshness:string;
  observedAtMs:number;lastEvidenceAtMs:number;observationAgeMs:number;parent:{status:string};
  children:{active:number;uncertain:number};attention:Array<{kind:string}>;
  notices:Array<{id:string;acknowledgedBy:string[]}>;
@@ -32,5 +32,5 @@ export interface MonitorRead {
  nowPlaying?:NowPlayingState;
 }
 export function matchesMonitor(session:MonitorSession,view:IntegrationSnapshot['configuration']['filter']){
- return (!view.provider||session.identity.provider===view.provider)&&(!view.projectId||session.projectId===view.projectId)&&(!view.q||(session.label??session.identity.sessionId).toLowerCase().includes(view.q.toLowerCase()))&&(!view.session||Object.entries(view.session).every(([key,value])=>session.identity[key as keyof SessionIdentity]===value));
+ return (!view.provider||session.identity.provider===view.provider)&&(!view.projectId||session.projectId===view.projectId)&&(!view.q||[session.label,session.title?.value,session.project,session.identity.sessionId].some(value=>value?.toLowerCase().includes(view.q!.toLowerCase())))&&(!view.session||Object.entries(view.session).every(([key,value])=>session.identity[key as keyof SessionIdentity]===value));
 }

@@ -15,7 +15,8 @@ it('rejects duplicate, stale, malformed and retired-epoch SSE notifications',()=
 });
 it('uses the full session identity alongside project, provider and explicit label search',()=>{
  const identity={provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'} as const;
- const session={identity,projectId:'project',label:'My label'} as MonitorSession;
+ const session={identity,projectId:'project',label:'My label',title:{value:'Résumé title',source:'provider'},project:'Divoom upgrade'} as MonitorSession;
  expect(matchesMonitor(session,{projectId:'project',provider:'codex',q:'LABEL',session:identity})).toBe(true);
+ expect(matchesMonitor(session,{q:'résumé'})).toBe(true);expect(matchesMonitor(session,{q:'upgrade'})).toBe(true);
  expect(matchesMonitor(session,{session:{...identity,hostId:'another'}})).toBe(false);expect(matchesMonitor(session,{projectId:'other'})).toBe(false);
 });

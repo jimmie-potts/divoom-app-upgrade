@@ -19,7 +19,7 @@ it('shares the stream capacity budget, preserves admission and resyncs expired m
   const healthy=await connect('/api/monitor/v1/changes');
   for(let i=0;i<14;i++)await connect(i%2?'/controller/v1/events':'/api/events');
   expect((await fetch(address+'/api/monitor/v1/changes',{headers})).status).toBe(503);
-  const response=await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{...headers,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000})});
+  const response=await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{...headers,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:Date.now()})});
   expect(response.status).toBe(200);expect(new TextDecoder().decode((await healthy.reader.read()).value)).toContain('"revision":1');
   first.close();await new Promise(resolve=>setTimeout(resolve,30));
   const reconnect=await connect('/api/monitor/v1/changes','expired:1');expect(reconnect.first).toContain('event: resync');expect(reconnect.first).toContain('"revision":1');
@@ -31,7 +31,7 @@ it('notifies core capacity loss even when the durable revision does not change',
  const token=await provisionCredential(directory,'reader',['control']),app=createApp({dataDir,monitorEnabled:true}),controller=new AbortController();
  try{
   const address=await app.listen({host:'127.0.0.1',port:0}),headers={authorization:`Bearer ${token}`,'content-type':'application/json','x-pixoo-request':'1'};
-  const event=(sessionId:string)=>({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000});
+  const event=(sessionId:string)=>({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:Date.now()});
   for(let i=0;i<128;i++)expect((await(await fetch(address+'/api/monitor/v1/events',{method:'POST',headers,body:JSON.stringify(event('session-'+i))})).json()).ok).toBe(true);
   const response=await fetch(address+'/api/monitor/v1/changes',{headers,signal:controller.signal});const reader=response.body!.getReader();await reader.read();
   expect(await(await fetch(address+'/api/monitor/v1/events',{method:'POST',headers,body:JSON.stringify(event('excess'))})).json()).toMatchObject({ok:false,code:'capacity'});
@@ -54,7 +54,7 @@ it('disconnects a backpressured monitor socket while admitting events and servin
   response!.cork();response!.write(':'+ 'x'.repeat(1024*1024)+'\n\n');expect(response!.writableNeedDrain).toBe(true);
   const closed=new Promise<void>(resolve=>response!.once('close',resolve));
   for(let sequence=1;sequence<=2;sequence++){
-   const event={apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'activity.observed'},ordering:{status:'known',epoch:'epoch',sequence},observedAtMs:1000};
+   const event={apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'},turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'activity.observed'},ordering:{status:'known',epoch:'epoch',sequence},observedAtMs:Date.now()};
    expect(await(await fetch(url+'/api/monitor/v1/events',{method:'POST',headers:{...headers,'content-type':'application/json','x-pixoo-request':'1'},body:JSON.stringify(event)})).json()).toMatchObject({ok:true});
   }
   await Promise.race([closed,new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('slow-client-not-closed')),6000).unref())]);

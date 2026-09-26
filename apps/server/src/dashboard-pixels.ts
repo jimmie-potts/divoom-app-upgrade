@@ -1,4 +1,4 @@
-import type {DashboardLayout,DashboardRow} from './agent-dashboard.js';
+import {shortLabel,type DashboardLayout,type DashboardRow} from './agent-dashboard.js';
 import {drawBitmap,drawLargeText,drawText,type Color} from './pixel-font.js';
 // One session per picture: a state tile, provider and activity, attention, a two-line label, details and a summary strip.
 // Pixel positions are documented in docs/agent-monitoring.md and openspec change gh-98-one-session-monitor.
@@ -50,9 +50,11 @@ function frame(layout:DashboardLayout,pulse:boolean):Uint8Array {
   drawBitmap(rgb,provider.mark,24,2,provider.color);drawText(rgb,activity.word,33,3,activity.color);
   if(row.attention!=='none'){rect(24,12,39,9,shade(amber));drawText(rgb,attentionWords[row.attention],26,14,black);}
   else if(row.noticeIds.length)drawText(rgb,'TURN END',24,14,amber);
-  identifierLines(row.shortLabel).forEach((line,index)=>drawLargeText(rgb,line,2,26+index*9,row.uncertain?dimLabel:white));
-  if(row.activeChildren||row.childrenUncertain)drawText(rgb,`+${Math.min(row.activeChildren,9)}${row.activeChildren>9?'+':''}${row.childrenUncertain?'?':''} SUB`,2,45,cyan);
-  if(row.uncertain)drawText(rgb,'UNSURE',40,45,purple);
+  const titleY=row.project?27:26,detailsY=row.project?21:45;
+  identifierLines(row.shortLabel).forEach((line,index)=>drawLargeText(rgb,line,2,titleY+index*9,row.uncertain?dimLabel:white));
+  if(row.project)drawText(rgb,shortLabel(row.project,15),2,45,cyan);
+  if(row.activeChildren||row.childrenUncertain)drawText(rgb,`+${Math.min(row.activeChildren,9)}${row.activeChildren>9?'+':''}${row.childrenUncertain?'?':''} SUB`,2,detailsY,cyan);
+  if(row.uncertain)drawText(rgb,'UNSURE',40,detailsY,purple);
  }else{drawLargeText(rgb,'NO',26,18,grey);drawLargeText(rgb,'SESSIONS',8,27,grey);}
  rect(0,53,64,1,divider);
  const count=String(layout.matched);drawText(rgb,count,1,56,white);

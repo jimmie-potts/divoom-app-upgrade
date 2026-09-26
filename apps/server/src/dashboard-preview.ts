@@ -4,12 +4,13 @@ export function dashboardPreviewHtml(cases:ReadonlyArray<{name:string;rendition:
  const data=JSON.stringify(cases.map(({name,rendition})=>({name,layout:rendition.layout,delay:rendition.frameDelayMs,frames:rendition.frames.map(rgb=>Buffer.from(rgb).toString('base64'))}))).replaceAll('<','\\u003c');
  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent dashboard pixel previews</title>
 <style>body{background:#141820;color:#eee;font:16px system-ui;margin:20px}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:24px}section{min-width:0}canvas{image-rendering:pixelated;max-width:100%}canvas[data-scale=enlarged]{width:256px;height:256px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px monospace}h2{font-size:18px}.pixels{display:flex;align-items:start;gap:12px;flex-wrap:wrap}figure{margin:0}figcaption{font-size:13px;color:#bbc}table{border-collapse:collapse;margin:8px 0 20px}th,td{text-align:left;vertical-align:top;padding:3px 10px 3px 0;border-bottom:1px solid #334}</style>
-<h1>Agent dashboard pixel previews</h1><p>One session per screen, cycling every ten seconds, attention first. The full label and every detail stay in the Monitor tab.</p>
+<h1>Agent dashboard pixel previews</h1><p>One session per screen, cycling every ten seconds, attention first. The full label, title, project and every detail stay in the Monitor tab.</p>
 <table><tr><th>Area</th><th>Meaning</th></tr>
 <tr><td>Tile, top left</td><td>Activity: green ▶ active, blue ‖ idle, red ✕ stopped (interrupted), grey ■ ended, purple ? unknown. The word beside the provider mark repeats it.</td></tr>
 <tr><td>Provider mark</td><td>Cyan hollow square: Codex. Orange star: Claude.</td></tr>
 <tr><td>Amber chip</td><td>APPROVAL, INPUT or QUESTION. Only then do the tile and chip pulse, as two 500 ms frames. TURN END without a chip is a retained turn-ended notice, never task success.</td></tr>
-<tr><td>Label</td><td>The chosen label, or the session ID when unlabeled, up to 20 characters on two lines; … marks removed characters. A dimmed label with UNSURE means uncertain evidence.</td></tr>
+<tr><td>Label</td><td>The shared label, then title, then session ID, up to 20 characters on two lines; … marks removed characters. A dimmed label with UNSURE means uncertain evidence.</td></tr>
+<tr><td>Project</td><td>A dedicated cyan line below the title, up to 15 characters with a middle ellipsis. When present, subagent and uncertainty details sit above the title.</td></tr>
 <tr><td>+n SUB</td><td>Active subagents; +9+ means more than nine, ? incomplete evidence.</td></tr>
 <tr><td>Bottom strip</td><td>Matching sessions, !attention total, page dots (or page/pages above eight). Right marks: source (filled current, ring stale, ✕ unavailable) and collector (filled running, ‖ quiesced, ✕ faulted, hollow square closed, ? unknown).</td></tr></table>
 <p>Each frame is shown at native 64×64 and enlarged 4× with identical RGB pixels. Physical readability and timing are unverified.</p><main></main>

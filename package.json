@@ -41,8 +41,8 @@
     "globals": "16.5.0",
     "@types/node": "24.13.3",
     "@modelcontextprotocol/sdk": "1.30.0",
-    "@jimmie-potts/agent-lifecycle-contracts": "file:vendor/jimmie-potts-agent-lifecycle-contracts-1.0.0.tgz",
-    "@jimmie-potts/hub": "file:vendor/jimmie-potts-hub-0.1.0.tgz"
+    "@jimmie-potts/agent-lifecycle-contracts": "file:vendor/jimmie-potts-agent-lifecycle-contracts-1.1.0.tgz",
+    "@jimmie-potts/hub": "file:vendor/jimmie-potts-hub-0.4.0.tgz"
   },
   "type": "module",
   "workspaces": [

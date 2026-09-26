@@ -17,7 +17,7 @@ it('routes remote reads, labels and acknowledgment to the owner, reports host lo
  try{
   const url=await app.listen({host:'127.0.0.1',port:0});
   const identity={provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'} as const;
-  const response=await fetch(url+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity,turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000})});expect(response.status).toBe(200);
+  const response=await fetch(url+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity,turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:Date.now()})});expect(response.status).toBe(200);
   remote=await createSessionSource(remoteDir,{version:1,mode:'remote',ownerId:'owner',endpoint:url+'/api/monitor/v1',token});
   await remote.refresh();expect(remote.view()).toMatchObject({connection:'current',snapshot:{revision:1}});
   const command={operation:'label' as const,requestId:remote.view().nextRequestId!,identity,label:'Mine'};
@@ -26,7 +26,7 @@ it('routes remote reads, labels and acknowledgment to the owner, reports host lo
   await expect(remote.command({...command,label:'Conflict'})).rejects.toMatchObject({code:'request-conflict',status:409});
   await remote.refresh();expect(remote.view().snapshot?.sessions[0]?.label).toBe('Mine');
   expect(new DashboardPager().layout(remote.view(),0).rows[0]?.label).toBe('Mine');
-  const ended=await fetch(url+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity,turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'turn.ended'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:1001})});expect(ended.status).toBe(200);
+  const ended=await fetch(url+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({apiVersion:'1.0',identity,turn:{status:'known',id:'turn'},parent:{status:'unknown'},event:{kind:'turn.ended'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:Date.now()+1})});expect(ended.status).toBe(200);
   await remote.refresh();const notice=remote.view().snapshot!.sessions[0]!.notices[0]!;
   const acknowledgment={operation:'acknowledge' as const,requestId:remote.view().nextRequestId!,identity,noticeId:notice.id,consumerId:'pixoo'};
   expect(await remote.command(acknowledgment)).toMatchObject({ok:true,revision:4});
@@ -58,7 +58,7 @@ it('marks malformed remote mutation responses stale and clears replay admission'
  const {createServer}=await import('node:http');
  const {MemoryStorage,createAgentState}=await import('@jimmie-potts/agent-state');
  const owner=await createAgentState({storage:new MemoryStorage(),ownerId:'owner',consumers:[]});
- const server=createServer((request,response)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify(request.method==='POST'?{}:{apiVersion:'1.0',ownerId:'owner',connection:'current',admissionRejected:0,snapshot:owner.snapshot(),nextRequestId:'epoch:1'}));});
+ const server=createServer((request,response)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify(request.method==='POST'?{}:{apiVersion:'1.0',ownerId:'owner',connection:'current',admissionRejected:0,snapshot:owner.snapshot('1.2'),nextRequestId:'epoch:1'}));});
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('address');
  const source=await createSessionSource('/unused',{version:1,mode:'remote',ownerId:'owner',endpoint:`http://127.0.0.1:${address.port}/api/monitor/v1`,token:'a'.repeat(43)});
  try{
@@ -103,10 +103,28 @@ it('serves remote filters and change notifications through the same protected HT
   proxy=createApp({dataDir:proxyDir,monitorEnabled:true});const url=await proxy.listen({host:'127.0.0.1',port:0}),headers={authorization:`Bearer ${proxyToken}`};
   expect((await fetch(url+'/api/monitor/v1/sessions')).status).toBe(401);
   const stream=await fetch(url+'/api/monitor/v1/changes',{headers,signal:abort.signal}),reader=stream.body!.getReader();await reader.read();
-  await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${ownerToken}`,'content-type':'application/json','x-pixoo-request':'1'},body:JSON.stringify({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'selected'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:1000})});
+  await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${ownerToken}`,'content-type':'application/json','x-pixoo-request':'1'},body:JSON.stringify({apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'selected'},turn:{status:'unknown'},parent:{status:'unknown'},event:{kind:'session.started'},ordering:{status:'unknown'},observedAtMs:Date.now()})});
   const view=await(await fetch(url+'/api/monitor/v1/sessions?q=selected&provider=codex',{headers})).json();expect(view).toMatchObject({snapshot:{revision:1},matches:[{sessionId:'selected'}]});
   expect((await(await fetch(url+'/api/monitor/v1/sessions?q=absent',{headers})).json()).matches).toEqual([]);
   const notification=await Promise.race([reader.read(),new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('remote-notification-timeout')),3000).unref())]);expect(new TextDecoder().decode(notification.value)).toContain('"revision":1');
   expect(await readdir(join(proxyDir,'agent-monitor'))).not.toContain('state');
  }finally{abort.abort();await proxy?.close();await owner.close();await rm(root,{recursive:true,force:true});}
 },10000);
+it('retains shared titles and projects through embedded and negotiated remote snapshots',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'monitor-metadata-'));
+ const source=await createSessionSource(directory,{version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]},()=>1000);
+ try{
+  const identity={provider:'codex',client:'cli',hostId:'host',sourceId:'source',sessionId:'session'};
+  expect(await source.ingest({apiVersion:'1.1',identity,title:{value:'Résumé monitor',source:'provider'},project:'DIVOOM-APP-UPGRADE',turn:{status:'known',id:'turn'},parent:{status:'top-level'},event:{kind:'session.started'},ordering:{status:'known',epoch:'epoch',sequence:1},observedAtMs:1000})).toMatchObject({ok:true});
+  expect(source.view().snapshot).toMatchObject({apiVersion:'1.2',sessions:[{title:{value:'Résumé monitor',source:'provider'},project:'DIVOOM-APP-UPGRADE'}]});
+  expect(source.view('1.0').snapshot?.sessions[0]).not.toHaveProperty('title');
+  expect(source.view('1.1').snapshot?.sessions[0]).not.toHaveProperty('project');
+  const {createServer}=await import('node:http');
+  let requested='',legacy=false;const server=createServer((request,response)=>{requested=request.url!;response.setHeader('content-type','application/json');response.end(JSON.stringify({...source.view(legacy?'1.0':'1.2'),nextRequestId:'epoch:1'}));});
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('address');
+  const remote=await createSessionSource('/unused',{version:1,mode:'remote',ownerId:'owner',endpoint:`http://127.0.0.1:${address.port}/api/monitor/v1`,token:'a'.repeat(43)});
+  try{await remote.refresh();expect(requested).toBe('/api/monitor/v1/sessions?snapshotVersion=1.2');expect(remote.view().snapshot?.sessions[0]?.title?.value).toBe('Résumé monitor');
+   legacy=true;await remote.refresh();expect(remote.view()).toMatchObject({connection:'stale',snapshot:{apiVersion:'1.2',sessions:[{title:{value:'Résumé monitor'}}]}});}
+  finally{await remote.close();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+ }finally{await source.close();await rm(directory,{recursive:true,force:true});}
+});

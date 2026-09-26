@@ -48,7 +48,7 @@ export async function writeMonitorJson(path:string,value:unknown):Promise<void>{
  finally{await rm(temporary,{force:true});}
 }
 export interface SessionSource {
- view():MonitorView;
+ view(version?:Snapshot['apiVersion']):MonitorView;
  refresh():Promise<void>;
  ingest(event:unknown):Promise<Outcome>;
  command(command:MonitorCommand):Promise<Outcome|DurableState>;
@@ -64,7 +64,7 @@ export async function createSessionSource(directory:string,config:MonitorConfig,
  if(imported!==undefined){try{await rm(join(directory,'import.json'));}catch(error){await owner.shutdown();throw error;}}
  const commands=new Commands<{monitor:{input:MonitorCommand;result:Outcome|DurableState}}>();
  return {
-  view:()=>({apiVersion:'1.0',ownerId:config.ownerId,connection:'current',admissionRejected:0,snapshot:owner.snapshot(),nextRequestId:commands.nextRequestId}),
+  view:(version='1.2')=>({apiVersion:'1.0',ownerId:config.ownerId,connection:'current',admissionRejected:0,snapshot:owner.snapshot(version),nextRequestId:commands.nextRequestId}),
   refresh:async()=>{},
   ingest:event=>owner.ingest(event),
   command:input=>commands.execute(input.requestId,input,{kind:'monitor',input},async()=>{
@@ -100,12 +100,24 @@ function remoteSource(config:Extract<MonitorConfig,{mode:'remote'}>):SessionSour
   finally{clearTimeout(timer);controllers.delete(controller);}
  }
  return {
-  view:()=>structuredClone(current),
+  view:(version='1.2')=>{
+   const view=structuredClone(current);
+   if(view.snapshot&&version!==view.snapshot.apiVersion){
+    // Old readers receive the shared contract's legacy projection.
+    view.snapshot.apiVersion=version;
+    for(const session of view.snapshot.sessions){
+     if(version==='1.0')delete session.generation;
+     if(session.labelOrigin==='agent')delete session.label;
+     delete session.title;delete session.project;delete session.labelOrigin;
+    }
+   }
+   return view;
+  },
   refresh:()=>refreshing??(refreshing=(async()=>{
    try{
-    const value=await request('/sessions') as MonitorView;
+    const value=await request('/sessions?snapshotVersion=1.2') as MonitorView;
     const checked=validateSnapshot(value.snapshot);
-    if(value.apiVersion!=='1.0'||value.ownerId!==config.ownerId||value.connection!=='current'||!checked.ok||typeof value.nextRequestId!=='string'||value.nextRequestId.length>100||!Number.isSafeInteger(value.admissionRejected)||value.admissionRejected<0)throw new Error('invalid-remote');
+    if(value.apiVersion!=='1.0'||value.ownerId!==config.ownerId||value.connection!=='current'||!checked.ok||checked.value.apiVersion!=='1.2'||typeof value.nextRequestId!=='string'||value.nextRequestId.length>100||!Number.isSafeInteger(value.admissionRejected)||value.admissionRejected<0)throw new Error('invalid-remote');
     if(current.snapshot&&checked.value.revision<current.snapshot.revision)throw new Error('remote-revision-regression');
     current={apiVersion:'1.0',ownerId:config.ownerId,connection:'current',snapshot:checked.value,admissionRejected:value.admissionRejected,nextRequestId:value.nextRequestId};
    }catch{current={...current,connection:current.snapshot?'stale':'unavailable',nextRequestId:null};}
