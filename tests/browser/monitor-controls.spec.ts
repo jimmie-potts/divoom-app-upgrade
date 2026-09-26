@@ -33,11 +33,14 @@ test('monitor panel uses explicit mode, shared labels, project filters and exact
   const preview=page.locator('canvas[aria-label="Exact monitor preview"]');
   await expect(preview).toHaveAttribute('data-frames','2');await expect(page.getByText('Pulsing for attention',{exact:false})).toBeVisible();
   const pulsing=(await (await fetch(address+'/api/integration/v1/view')).json()).dashboard.rendition;expect(pulsing.frames).toHaveLength(2);
+  // Evidence-only updates arrive faster than the pulse; they must not restart it.
+  let sequence=3;const post=(body:unknown)=>fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify(body)});
+  const churn=setInterval(()=>{void post({...approval,ordering:{status:'known',epoch:'e',sequence:sequence++},observedAtMs:Date.now()});},200);
   const seen=new Set<string>();
-  await expect.poll(async()=>{
+  try{await expect.poll(async()=>{
    const sample=await preview.evaluate(el=>({frame:(el as HTMLCanvasElement).dataset.frame!,rgb:Array.from((el as HTMLCanvasElement).getContext('2d')!.getImageData(0,0,64,64).data).filter((_,i)=>i%4!==3)}));
    expect(sample.rgb).toEqual(pulsing.frames[Number(sample.frame)]);seen.add(sample.frame);return seen.size;
-  },{timeout:5000,intervals:[150]}).toBe(2);
+  },{timeout:5000,intervals:[150]}).toBe(2);}finally{clearInterval(churn);}
   await page.getByRole('button',{name:'Dismiss notice for session-one'}).click();await expect(page.getByRole('button',{name:'Dismiss notice for session-one'})).toHaveCount(0);
   await page.screenshot({path:`/tmp/pixoo33-monitor-${testInfo.project.name}.png`,fullPage:true});
   await page.getByRole('button',{name:'Select Media',exact:true}).click();await expect(page.getByText('Selected mode: Media',{exact:true})).toBeVisible();
