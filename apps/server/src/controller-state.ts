@@ -86,24 +86,34 @@ export class ControllerState {
   this.onChange();
  }
  private observe(event:CommandEvent){
-  const [kind,body]=event.payload as [string,Record<string,unknown>];
   let command:Command|undefined;
-  if(kind==='controller')command=(body as unknown as Request).command;
-  else if(kind==='display')command=body.brightness!==undefined?{kind:'brightness.set',percent:body.brightness as number}:{kind:'power.set',on:body.screenOn as boolean};
-  else if(kind==='player'&&body.command==='start')command={kind:'media.start',playlistId:body.playlistId as string};
-  else if(kind==='player'&&['pause','resume','stop','next','previous','clear'].includes(String(body.command)))command={kind:'media.control',action:body.command as 'pause'};
+  switch(event.kind){
+   case 'controller':command=event.input;break;
+   case 'display':command=event.input.brightness!==undefined?{kind:'brightness.set',percent:event.input.brightness}:{kind:'power.set',on:event.input.screenOn!};break;
+   case 'player':{
+    const body=event.input;
+    switch(body.command){
+     case 'start':command={kind:'media.start',playlistId:body.playlistId};break;
+     case 'pause':case 'resume':case 'stop':case 'next':case 'previous':case 'clear':command={kind:'media.control',action:body.command};break;
+     case 'show-media':case 'restart-with-changes':break;
+     default:body satisfies never;
+    }
+    break;
+   }
+   case 'integration':break;
+   default:event satisfies never;
+  }
   if(!command){this.earlyMediaOutcomes.delete(event.requestId);return;}
   if(event.phase==='pending')this.pending.set(event.requestId,{requestId:ticket(event.requestId),command,generation:this.generation()});
   else{
    this.pending.delete(event.requestId);
    const media=this.earlyMediaOutcomes.get(event.requestId);this.earlyMediaOutcomes.delete(event.requestId);
    if(media)this.lastOutcome={status:'known',receipt:media};
-   else if(kind==='controller'&&validate('receipt',event.result))this.lastOutcome={status:'known',receipt:structuredClone(event.result as Receipt)};
+   else if(event.kind==='controller'&&event.outcome==='success'&&validate('receipt',event.result))this.lastOutcome={status:'known',receipt:structuredClone(event.result)};
    else{
     const receipt=this.base(ticket(event.requestId));
-    const result=event.result as Awaited<ReturnType<ControlService['applyDisplay']>>|undefined;
-    if(kind==='display'&&result)this.operation(receipt,result.operation);
-    else if(event.error)this.failed(receipt,event.error);
+    if(event.kind==='display'&&event.outcome==='success')this.operation(receipt,event.result.operation);
+    else if(event.outcome==='failure'&&event.error)this.failed(receipt,event.error);
     this.lastOutcome={status:'known',receipt};
    }
   }
@@ -124,7 +134,7 @@ export class ControllerState {
   if(request.deviceId!==this.identity.deviceId||request.controllerId!==this.identity.controllerId)throw new ApiError('unknown-device',404);
   const requestId=`${request.requestId.epoch}:${request.requestId.sequence}`;
   try{
-   const retained=await this.service.commands.execute(requestId,['controller',canonical(request)],async()=>{
+   const retained=await this.service.commands.execute(requestId,['controller',canonical(request)],{kind:'controller',input:request.command},async()=>{
     const receipt=this.base(request.requestId);
     try{
      await this.refreshCatalog();

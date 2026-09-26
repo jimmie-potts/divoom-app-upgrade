@@ -62,12 +62,12 @@ export async function createSessionSource(directory:string,config:MonitorConfig,
  try{imported=await readMonitorJson(join(directory,'import.json'),16*1024*1024);}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  const owner=await createAgentState({storage:new MonitorStorage(join(directory,'state')),ownerId:config.ownerId,consumers:config.consumers,...(clock?{clock}:{}),...(imported===undefined?{}:{importState:imported})});
  if(imported!==undefined){try{await rm(join(directory,'import.json'));}catch(error){await owner.shutdown();throw error;}}
- const commands=new Commands();
+ const commands=new Commands<{monitor:{input:MonitorCommand;result:Outcome|DurableState}}>();
  return {
   view:()=>({apiVersion:'1.0',ownerId:config.ownerId,connection:'current',admissionRejected:0,snapshot:owner.snapshot(),nextRequestId:commands.nextRequestId}),
   refresh:async()=>{},
   ingest:event=>owner.ingest(event),
-  command:input=>commands.execute(input.requestId,input,async()=>{
+  command:input=>commands.execute(input.requestId,input,{kind:'monitor',input},async()=>{
    if(input.operation==='label')return owner.setLabel(input.identity as Identity,input.label);
    if(input.operation==='acknowledge')return owner.acknowledge(input.identity as Identity,input.noticeId,input.consumerId);
    const state=await owner.exportState();await writeMonitorJson(join(directory,'quiesced.json'),{version:1,ownerId:config.ownerId,revision:state.revision});return state;
