@@ -31,8 +31,8 @@ it('projects durable notices after restart and respects dismissal and new-turn p
 it('sends exact synthetic renderer pixels through the deterministic fake boundary',async()=>{
  const fake=new FakeDeviceAdapter();
  for(const {rendition} of syntheticDashboardRenditions()){
-  const result=await fake.uploadAnimation({frames:[{rgb:new Uint8Array(rendition.rgb),delayMs:1000}]},{generation:fake.generation});
-  expect(result.ok).toBe(true);const effect=fake.effects.at(-1)!;
-  expect(effect.kind).toBe('frame');if(effect.kind==='frame')expect(Array.from(effect.frame.rgb)).toEqual(rendition.rgb);
+  const result=await fake.uploadAnimation({frames:rendition.frames.map(rgb=>({rgb:new Uint8Array(rgb),delayMs:rendition.frameDelayMs}))},{generation:fake.generation});
+  expect(result.ok).toBe(true);const effects=fake.effects.slice(-rendition.frames.length);
+  expect(effects.map(effect=>effect.kind==='frame'?Array.from(effect.frame.rgb):null)).toEqual(rendition.frames);
  }
 });

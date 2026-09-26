@@ -3,7 +3,8 @@ import {systemClock, type Clock, type DeviceAdapter, type OperationResult, type 
 import {validateDeviceIp} from './http-transport.js';
 
 export interface DashboardSettings {cadenceMs:number; durationMs:number}
-export interface DashboardEvent {atMs:number; id:string; rgb:Uint8Array}
+/** One synthetic picture. `pulse`, when present, is its second frame; both play at 500 ms in one upload. */
+export interface DashboardEvent {atMs:number; id:string; rgb:Uint8Array; pulse?:Uint8Array}
 export type DashboardConfig = DashboardSettings & {preview?:string} & (
   {mode:'fake'} | {mode:'device'; ip:string; owner:string; model:string; firmware:string; sourceRevision:string}
 );
@@ -43,7 +44,8 @@ export function parseDashboardArgs(args:string[], env:NodeJS.ProcessEnv):Dashboa
 
 export interface DashboardUpload {
   id:string; eventAtMs:number; submittedAtMs:number; acknowledgedAfterEventMs:number;
-  sha256:string; result:OperationResult<UploadResult>;
+  /** Hash of every frame's bytes in order. */
+  sha256:string; frames:number; result:OperationResult<UploadResult>;
 }
 /** One pending picture, no retries. The adapter remains the sole serialized writer. */
 export async function runDashboard(device:DeviceAdapter, events:readonly DashboardEvent[], settings:DashboardSettings,
@@ -51,8 +53,9 @@ export async function runDashboard(device:DeviceAdapter, events:readonly Dashboa
   validateSettings(settings);
   if (!events.length || events.length>64 || events.some((event,index)=>
     !bounded(event.atMs,0,60000) || (index>0 && event.atMs<events[index-1]!.atMs) ||
-    !/^[a-zA-Z0-9-]{1,40}$/.test(event.id) || !(event.rgb instanceof Uint8Array) || event.rgb.length!==12288)) throw new Error('Invalid synthetic events');
-  const pictures=events.map(event=>({...event,rgb:new Uint8Array(event.rgb)}));
+    !/^[a-zA-Z0-9-]{1,40}$/.test(event.id) || !(event.rgb instanceof Uint8Array) || event.rgb.length!==12288 ||
+    (event.pulse!==undefined && (!(event.pulse instanceof Uint8Array) || event.pulse.length!==12288)))) throw new Error('Invalid synthetic events');
+  const pictures=events.map(event=>({atMs:event.atMs,id:event.id,frames:[event.rgb,...(event.pulse?[event.pulse]:[])].map(rgb=>new Uint8Array(rgb))}));
   const start=clock.now(), deadline=start+settings.durationMs;
   const uploads:DashboardUpload[]=[];
   let cursor=0,coalesced=0,nextEligible=start;
@@ -74,11 +77,11 @@ export async function runDashboard(device:DeviceAdapter, events:readonly Dashboa
     const picture=pictures[latest]!;
     cursor=latest+1;
     const submittedAtMs=clock.now()-start;
-    const result=await device.uploadAnimation({frames:[{rgb:picture.rgb,delayMs:500}]}, {
+    const result=await device.uploadAnimation({frames:picture.frames.map(rgb=>({rgb,delayMs:500}))}, {
       generation:device.generation,timeoutMs:Math.min(5000,deadline-clock.now()),...(signal?{signal}:{})});
     uploads.push({id:picture.id,eventAtMs:picture.atMs,submittedAtMs,
       acknowledgedAfterEventMs:clock.now()-start-picture.atMs,
-      sha256:createHash('sha256').update(picture.rgb).digest('hex'),result});
+      sha256:picture.frames.reduce((hash,rgb)=>hash.update(rgb),createHash('sha256')).digest('hex'),frames:picture.frames.length,result});
     if (!result.ok) {status=signal?.aborted?'cancelled':'failed';break;}
     nextEligible=start+submittedAtMs+settings.cadenceMs;
   }

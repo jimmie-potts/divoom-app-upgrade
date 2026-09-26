@@ -21,7 +21,7 @@ async function setup(media:Media='off'){
  const monitor=new MonitorPresentation(player,{save:async()=>{},clock:()=>clock.now(),nowPlaying:{version:1,media},saveNowPlaying:async value=>{saved.push(value);}});
  const frames=()=>device.effects.filter(e=>e.kind==='frame').map(e=>Array.from(e.frame.rgb));
  const card=(status:PlaybackSourceStatus)=>Array.from(renderNowPlaying(status.view));
- const dashboard=()=>monitor.rendition().rendition!.rgb;
+ const dashboard=()=>monitor.rendition().rendition!.frames.at(-1)!;
  /** Advance in 100 ms ticks, as the backend's render timer does. */
  const run=async(ms:number)=>{for(let t=0;t<ms;t+=100){clock.advance(100);monitor.tick();await flush(clock);}};
  /** Let the fake device's scheduled work complete while a player operation settles. */

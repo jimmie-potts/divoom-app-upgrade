@@ -28,7 +28,7 @@ export interface MonitorSession {
 export interface MonitorRead {
  integration:IntegrationSnapshot;
  source:{connection:string;ownerId:string;nextRequestId:string|null;snapshot:null|{asOfMs:number;collector:string;sessions:MonitorSession[]}};
- dashboard:{state:string;rendition:null|{generation:number;rgb:number[];layout:{matched:number;total:number;page:number;pages:number;attentionTotal:number}}};
+ dashboard:{state:string;rendition:null|{generation:number;rgb:number[];frames:number[][];frameDelayMs:number;layout:{matched:number;total:number;page:number;pages:number;attentionTotal:number}}};
  nowPlaying?:NowPlayingState;
 }
 export function matchesMonitor(session:MonitorSession,view:IntegrationSnapshot['configuration']['filter']){

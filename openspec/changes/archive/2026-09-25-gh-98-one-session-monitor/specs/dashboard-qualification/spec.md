@@ -1,21 +1,4 @@
-# Dashboard qualification specification
-
-## Purpose
-
-Qualify synthetic Pixoo dashboard updates with bounded traffic and reproducible previews while keeping software, transport and visible-device evidence separate.
-
-## Requirements
-
-### Requirement: Explicit bounded experiment
-The comparison tool SHALL default to a fake adapter, ignore device environment activation in fake mode, and reject unknown or invalid options before device setup. Physical mode SHALL require an explicit protocol-tool target, source revision, test owner, model/firmware record, display replacement consent and confirmation that external writers are stopped. Both protocol tools SHALL share the normal backend's local target lock and retain it until transport closure. Cross-host exclusion SHALL remain an operator responsibility.
-
-#### Scenario: Default invocation
-- **WHEN** the operator invokes the tool without physical flags, even with a device environment target
-- **THEN** only synthetic fake operations occur and the report makes no transport or physical success claim
-
-#### Scenario: Competing writer or missing authorization
-- **WHEN** physical prerequisites are missing or another local process holds the target lock
-- **THEN** the tool fails before sending a device command
+## MODIFIED Requirements
 
 ### Requirement: Latest-picture delivery within bounds
 The experiment SHALL use the existing serialized adapter for complete pictures of one frame, or two frames at a uniform 500 ms delay, each as one upload, with a configurable 1000–10000 ms cadence, a 1000–60000 ms run deadline and at most 20 uploads. Defaults SHALL be provisional 3000 ms cadence and 15000 ms duration. It SHALL coalesce obsolete pending pictures, stop on the first failure or cancellation, and perform no retry or automatic reset/restoration. Each operation SHALL be limited by the remaining deadline and a 5000 ms timeout.
@@ -38,10 +21,3 @@ The tool SHALL provide synthetic 64×64 complete RGB cases in the one-session mo
 #### Scenario: Preview and stale row clearing
 - **WHEN** a session case is followed by an empty case
 - **THEN** the complete replacement clears the previous session and the browser canvas pixels match every upload frame
-
-### Requirement: Separate evidence and pending physical decision
-Reports SHALL identify the candidate, settings, synthetic case, frame hash, event/submission/completion timing and operation outcomes, excluding device IP and raw device responses. Acknowledgment latency SHALL never be labeled visible latency. The procedure SHALL require fresh settings observations and record restoration limits before replacement. Documentation SHALL leave physical measurements and the final method/cadence decision pending until dated observations satisfy issue #30.
-
-#### Scenario: Successful transport without an observer
-- **WHEN** every physical operation is acknowledged but visible measurements are absent
-- **THEN** the result remains observation-pending and cannot close physical acceptance

@@ -174,16 +174,17 @@ The qualification CLI retains its historical 3000 ms default, configurable from
 1000 to 10000 ms. ADR 0015 selects 1000 ms for downstream dashboard integration;
 pass it explicitly to reproduce the accepted experiment.
 The default duration is 15000 ms, configurable from 1000 to 60000 ms. At most
-20 single-frame uploads occur, with zero retries. Each upload queries the ID
-then sends one frame, so physical traffic is at most 42 HTTP requests including
-the two-request initial probe. The probe has a separate 5000 ms timeout; the
+20 uploads occur, with zero retries. Each upload queries the ID then sends its
+frames: one, or two for a pulsing picture at a uniform 500 ms. Physical traffic
+is therefore at most 62 HTTP requests including the two-request initial probe. The probe has a separate 5000 ms timeout; the
 run deadline starts after that probe. Each upload is bounded by the smaller of
 5000 ms and remaining run time. Transport shutdown may take additional time
 to settle local request closure; a deadline cannot recall an applied write.
 
 Events occur at 0, 250, 500, 750, 4000, 7000, 10000 and 12500 ms. They exercise
-four rows, state/provider symbols, A–F labels, subagent and attention counts,
-rapid state changes, removed rows, page 2 and a final clear. They are synthetic
+the one-session layout from issue #98: a state tile, provider symbols, doubled
+labels, subagent and attention counts, a two-frame attention pulse, rapid state
+changes, a removed session, page 2 and a final clear. They are synthetic
 fixtures, not real agent metadata. The runner selects the latest due picture
 when cadence permits. It awaits each upload; obsolete pictures are counted and
 never replayed. Slow runs or short durations can omit cases, which the receipt
@@ -228,7 +229,7 @@ inspect `status` and every operation outcome before calling transport successful
 
 For each cadence, record a bounded sample with event ID and event time, HTTP
 completion, first-visible time with observation method and uncertainty, loading
-or blanking duration, four-row readability, stale-pixel/overlay clearing,
+or blanking duration, one-session readability, pulse flashing, stale-pixel/overlay clearing,
 burst ordering and final visible picture. A video synchronized to the event
 timeline is preferable for latency; unsynchronized impressions cannot provide
 an event-to-visible measurement. Record sample count, median/range and every

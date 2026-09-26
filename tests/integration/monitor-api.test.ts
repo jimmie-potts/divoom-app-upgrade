@@ -75,7 +75,8 @@ it('serves authenticated exact dashboard renditions without taking over the simu
   expect(result.state).toBe('current');expect(result.rendition.rgb).toHaveLength(12288);
   expect(result.rendition.layout).toMatchObject({ownerId:'owner',rows:[],connection:'current'});
   const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
-  expect(result.rendition.rgb).toEqual(Array.from(renderDashboard(result.rendition.layout)));
+  expect(result.rendition).toMatchObject({frameDelayMs:500,frames:renderDashboard(result.rendition.layout).map(rgb=>Array.from(rgb))});
+  expect(result.rendition.rgb).toEqual(result.rendition.frames[0]);
   expect((await app.inject('/api/health')).json().mode).toBe('simulator');
  }finally{await app.close();await rm(directory,{recursive:true,force:true});}
 });

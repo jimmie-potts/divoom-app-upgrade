@@ -1,10 +1,4 @@
-# Agent dashboard renderer
-
-## Purpose
-
-Project shared agent session evidence onto an exact, paged 64x64 Pixoo rendition without interpreting providers or requiring physical transport. Source: issue #32.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Stable compact session projection
 
@@ -17,26 +11,6 @@ The dashboard SHALL show a summary strip and one top-level session per page. The
 #### Scenario: Every legend state is distinguishable without colour
 - **WHEN** sessions in each activity, attention, notice and uncertainty state and each source and collector health state are rendered
 - **THEN** each state differs from the others in its lit pixel shape or words, not only in colour
-
-### Requirement: Independent timed pagination
-
-Overflow SHALL rotate every ten seconds using injectable time independently of render cadence. Session/filter changes SHALL clamp the page, preserve stable ordering and restart the page interval. Empty results SHALL retain summary/health information.
-
-#### Scenario: Overflow shrinks or filters change
-- **WHEN** a later page loses its rows or a filter reduces the matching sessions
-- **THEN** the page clamps to the last valid page, and the next rotation occurs ten seconds after the changed membership
-
-### Requirement: Preserve shared evidence semantics
-
-Notices SHALL reflect the selected consumer's shared acknowledgments and new-turn policy without renderer persistence or inferred task success. Observation freshness SHALL be distinct from collector and source health.
-
-#### Scenario: Restart, dismissal and new turn
-- **WHEN** shared state retains or removes a notice after restart, acknowledgment or a new turn
-- **THEN** the next rendition reflects that state and never substitutes task-completed or chat-read semantics
-
-#### Scenario: Stale source with running collector
-- **WHEN** the source becomes stale while its cached collector reports running
-- **THEN** source health and uncertain observations remain visible without declaring the collector stopped
 
 ### Requirement: Exact portable rendition
 
@@ -58,21 +32,7 @@ The truncation marker SHALL be a glyph that no label or session ID character can
 - **WHEN** two long user labels share their opening characters and differ in their final characters
 - **THEN** the identifiers keep the opening and final characters around a middle marker and differ
 
-### Requirement: Bounded current-state publication
-
-The rendering service SHALL coalesce bursts to one newest pending snapshot alongside at most one active render. Superseded or closed generations SHALL NOT publish. Rendering cadence SHALL be configurable independently of pagination. Resync SHALL replace current state, including deletions, and failures SHALL NOT publish partial frames.
-
-#### Scenario: Slow obsolete render and state burst
-- **WHEN** newer snapshots arrive while rendering is pending
-- **THEN** only the newest generation can publish, pending work stays bounded, and cadence does not alter the ten-second page schedule
-
-### Requirement: Source-only preview boundary
-
-Authenticated preview reads SHALL consume the selected session-source facade and preserve existing read security. Rendering and synthetic simulator examples SHALL remain usable without device configuration. Monitoring SHALL NOT take over media or invoke a physical writer.
-
-#### Scenario: Preview access and simulator use
-- **WHEN** a reader requests a rendition or synthetic pixels are sent to the deterministic fake
-- **THEN** authorized preview pixels match layout output, unauthorized reads fail, and no physical command or provider interpretation occurs
+## ADDED Requirements
 
 ### Requirement: Attention-only pulse
 

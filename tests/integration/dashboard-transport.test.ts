@@ -23,7 +23,7 @@ it('sends complete frame bytes through the existing queue and retains uncertain 
   const report=await runDashboard(device,cases,{cadenceMs:1000,durationMs:1000});
   expect(report).toMatchObject({status:'failed',uploads:[{result:{ok:false,priorEffects:'possible'}}]});
   expect(requests.map(item=>item.Command)).toEqual(['Draw/GetHttpGifId','Draw/SendHttpGif']);
-  expect(requests[1]).toMatchObject({PicID:3,PicNum:1,PicOffset:0,PicWidth:64,PicSpeed:500});
+  expect(requests[1]).toMatchObject({PicID:3,PicNum:2,PicOffset:0,PicWidth:64,PicSpeed:500});
   expect(Buffer.from(requests[1]!.PicData as string,'base64')).toEqual(Buffer.from(cases[0]!.rgb));
 });
 it('legacy protocol CLI refuses the backend target lock without contacting hardware',async()=>{

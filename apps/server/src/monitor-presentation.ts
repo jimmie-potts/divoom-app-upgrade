@@ -117,14 +117,14 @@ export class MonitorPresentation {
  /** Forget a takeover without resuming: the user, the screen or a failure owns what happens next. */
  private dropTakeover(){if(!this.takeover)return;this.takeover=null;this.lastTakeover='dropped';this.lastFrame='';this.onChange();}
  /** The picture the display should show now, if the presentation owns it. */
- private frame():{key:string;rgb:Uint8Array|number[];generation:number;card:boolean}|null{
+ private frame():{key:string;frames:ReadonlyArray<Uint8Array|number[]>;generation:number;card:boolean}|null{
   const view=this.playback.view;
   if(this.active){
-   if(this.popupUntil&&view.card)return {key:'card:'+JSON.stringify(view),rgb:renderNowPlaying(view),generation:this.playerGeneration,card:true};
+   if(this.popupUntil&&view.card)return {key:'card:'+JSON.stringify(view),frames:[renderNowPlaying(view)],generation:this.playerGeneration,card:true};
    const rendition=this.dashboard.status().rendition;
-   return rendition?{key:'dashboard:'+rendition.generation,rgb:rendition.rgb,generation:this.playerGeneration,card:false}:null;
+   return rendition?{key:'dashboard:'+rendition.generation,frames:rendition.frames,generation:this.playerGeneration,card:false}:null;
   }
-  if(this.takeover&&view.card)return {key:'card:'+JSON.stringify(view),rgb:renderNowPlaying(view),generation:this.takeover.generation,card:true};
+  if(this.takeover&&view.card)return {key:'card:'+JSON.stringify(view),frames:[renderNowPlaying(view)],generation:this.takeover.generation,card:true};
   return null;
  }
  private enqueue<T>(work:()=>Promise<T>):Promise<T>{
@@ -193,7 +193,7 @@ export class MonitorPresentation {
   const generation=this.generation,playerGeneration=frame.generation,takeover=this.active?null:this.takeover;
   const renditionGeneration=this.dashboard.status().rendition?.generation??0;
   this.inFlight=true;this.lastStart=this.clock();this.lastFrame=frame.key;this.onChange();
-  void this.player.uploadDashboard(new Uint8Array(frame.rgb),playerGeneration).then(result=>{
+  void this.player.uploadDashboard(frame.frames.map(rgb=>new Uint8Array(rgb)),playerGeneration).then(result=>{
    // A Media takeover reports through its own status; a failed or uncertain card upload ends it without resuming.
    if(takeover){if(!result?.ok&&this.takeover===takeover)this.dropTakeover();return;}
    this.lastOutcome={generation,renditionGeneration,status:result?.ok?'sent':result&&!result.ok&&result.priorEffects==='possible'?'uncertain':!result||result.code==='cancelled'||result.code==='stale-generation'?'cancelled':'failed',...(result&&!result.ok?{code:result.code}:{})};

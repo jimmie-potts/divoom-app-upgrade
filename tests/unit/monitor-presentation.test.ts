@@ -13,7 +13,11 @@ it('retains paused context and renders only after explicit Monitor activation',a
   const view=syntheticDashboardViews()[0]!.view;monitor.submit(view);await flush(clock);monitor.tick();await flush(clock);expect(device.effects).toHaveLength(0);
   await player.start(store.playlist.id);await flush(clock);await monitor.configure({operation:'mode',mode:'monitor'});await flush(clock);monitor.tick();await flush(clock);
   expect(player.getState().intent).toBe('paused');expect(monitor.status().participating).toBe(true);
-  const frames=device.effects.filter(e=>e.kind==='frame');expect(frames.at(-1)?.frame.rgb).toEqual(new Uint8Array(monitor.rendition().rendition!.rgb));
+  const frames=device.effects.filter(e=>e.kind==='frame'),rendition=monitor.rendition().rendition!;expect(rendition.frames).toHaveLength(2);
+  expect(frames.slice(-2).map(e=>e.frame)).toEqual(rendition.frames.map(rgb=>({rgb:new Uint8Array(rgb),delayMs:500})));
+  const uploads=()=>device.operations.filter(o=>o.kind==='uploadAnimation').length,sent=uploads();
+  // The device loops the pulse; an unchanged rendition is not uploaded again.
+  clock.advance(5000);monitor.tick();await flush(clock);expect(uploads()).toBe(sent);
   await monitor.configure({operation:'mode',mode:'media'});expect(player.getState().intent).toBe('paused');
   const count=device.effects.length;clock.advance(11000);monitor.submit(view);await flush(clock);monitor.tick();await flush(clock);expect(device.effects).toHaveLength(count);
   expect(saved).toHaveLength(2);
@@ -23,13 +27,15 @@ it('bounds bursts by latest rendition and cadence without submitting missed page
  const clock=new ManualClock(),store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter({clock,latencyMs:100});const player=await Player.open({store,device,clock});
  const monitor=new MonitorPresentation(player,{save:async()=>{},clock:()=>clock.now(),renderCadenceMs:1});
  try{
-  const view=syntheticDashboardViews()[0]!.view;monitor.submit(view);await flush(clock);await monitor.configure({operation:'mode',mode:'monitor'});monitor.tick();
+  // One-frame pictures keep the fake's per-frame latency to one 100 ms step per upload.
+  const view=syntheticDashboardViews()[0]!.view;for(const session of view.snapshot!.sessions)session.attention=[];
+  monitor.submit(view);await flush(clock);await monitor.configure({operation:'mode',mode:'monitor'});monitor.tick();
   for(let i=0;i<20;i++){view.snapshot!.revision++;view.snapshot!.sessions[0]!.label=`Burst ${i}`;monitor.submit(view);await flush(clock);}
   expect(monitor.status().inFlight).toBe(1);clock.advance(100);await flush(clock);monitor.tick();await flush(clock);
   expect(device.operations.filter(o=>o.kind==='uploadAnimation')).toHaveLength(1);
   clock.advance(900);monitor.tick();await flush(clock);monitor.tick();clock.advance(100);await flush(clock);
   expect(device.operations.filter(o=>o.kind==='uploadAnimation')).toHaveLength(2);
-  expect(device.effects.filter(e=>e.kind==='frame').at(-1)?.frame.rgb).toEqual(new Uint8Array(monitor.rendition().rendition!.rgb));
+  expect(device.effects.filter(e=>e.kind==='frame').at(-1)?.frame.rgb).toEqual(new Uint8Array(monitor.rendition().rendition!.frames.at(-1)!));
   expect(device.operations.filter(o=>o.kind==='uploadAnimation').map(o=>o.timing.submittedAtMs)).toEqual([0,1000]);
  }finally{await monitor.close();await player.close();}
 });
