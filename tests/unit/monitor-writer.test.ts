@@ -29,9 +29,19 @@ it('retires queued monitor writes on screen-off and cannot revive them on screen
   const on=player.setScreen(true);await flush(clock);clock.advance(100);await flush(clock);await on;
   expect(await player.uploadDashboard([new Uint8Array(12288)],old)).toBeUndefined();
   expect(device.effects.filter(e=>e.kind==='frame')).toHaveLength(0);
-  // The retired completion leaves the newer screen write as the transport evidence.
-  expect(player.getDisplayEvidence().transport).toMatchObject({source:'screen',ok:true});expect(player.getState().intent).toBe('paused');
  }finally{await player.close();}
+});
+it('keeps newer evidence and intent when a retired monitor upload completes late',async()=>{
+ const clock=new ManualClock(),store=new MemoryPlaybackStore();let release=()=>{};
+ class Held extends FakeDeviceAdapter{override async uploadAnimation(...args:Parameters<FakeDeviceAdapter['uploadAnimation']>){const result=await super.uploadAnimation(...args);await new Promise<void>(resolve=>{release=resolve;});return result;}}
+ const device=new Held({clock}),player=await Player.open({store,device,clock});
+ try{
+  await player.pause();const upload=player.uploadDashboard([new Uint8Array(12288)],player.getState().generation);await flush(clock);
+  clock.advance(50);const off=player.setScreen(false);await flush(clock);await off;
+  const current=player.getDisplayEvidence().transport;expect(current).toMatchObject({source:'screen',atMs:50,ok:true});
+  release();expect(await upload).toMatchObject({ok:true});
+  expect(player.getDisplayEvidence().transport).toEqual(current);expect(player.getState()).toMatchObject({intent:'paused',requestedScreenOn:false});
+ }finally{release();await player.close();}
 });
 it('uploads a two-frame monitor picture as one 500 ms animation and rejects other frame sets',async()=>{
  const clock=new ManualClock(),store=new MemoryPlaybackStore(),device=new FakeDeviceAdapter({clock});
