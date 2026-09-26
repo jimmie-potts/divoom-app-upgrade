@@ -32,14 +32,6 @@ Start the backend with the same data directory and explicit MCP activation:
 PIXOO_DATA_DIR=/absolute/private/pixoo-data PIXOO_MCP_ENABLED=1 npm start
 ```
 
-PowerShell uses the same built command and a Windows absolute data directory:
-
-```powershell
-$env:PIXOO_DATA_DIR = 'C:\private\pixoo-data'
-$env:PIXOO_MCP_ENABLED = '1'
-npm start
-```
-
 The listener remains `127.0.0.1`, on `PIXOO_PORT` or 8787. MCP activation does not
 activate hardware. Default startup remains simulator. Existing explicit
 `PIXOO_MODE=device` selection and validated private settings continue to govern
