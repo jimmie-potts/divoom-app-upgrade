@@ -7,6 +7,8 @@ const connectivityErrors=new Set(['offline','timeout','http-error']);
 const codeOf=(error:unknown)=>typeof (error as {code?:unknown})?.code==='string'?String((error as {code:string}).code):'operation-failed';
 interface Options {store:PlaybackStore;device:DeviceAdapter;clock?:Clock;random?:()=>number;retryBaseMs?:number;maxRetries?:number;operationTimeoutMs?:number;pauseOnUncertain?:boolean}
 
+/** The Player operation that produced the latest transport evidence. Dashboard uploads stay distinct from media uploads. */
+export type DisplayEvidenceSource = 'brightness'|'screen'|'probe'|'upload'|'dashboard';
 export type MediaOperationEvent = {operationId:number;generation:number} & ({phase:'pending'}|{phase:'complete';result:OperationResult<UploadResult>});
 
 export class Player {
@@ -36,9 +38,9 @@ export class Player {
   private requestedScreenOn=true;
   private screenSequence=0;
   private requestedBrightness:number|null=null;
-  private evidence:{brightness:{acknowledged:{value:number;atMs:number}|null;observed:{value:number;atMs:number}|null};screen:{acknowledged:{value:boolean;atMs:number}|null;observed:{value:boolean;atMs:number}|null};transport:{source:string;atMs:number;ok:boolean;priorEffects:'none'|'possible'}|null}={brightness:{acknowledged:null,observed:null},screen:{acknowledged:null,observed:null},transport:null};
+  private evidence:{brightness:{acknowledged:{value:number;atMs:number}|null;observed:{value:number;atMs:number}|null};screen:{acknowledged:{value:boolean;atMs:number}|null;observed:{value:boolean;atMs:number}|null};transport:{source:DisplayEvidenceSource;atMs:number;ok:boolean;priorEffects:'none'|'possible'}|null}={brightness:{acknowledged:null,observed:null},screen:{acknowledged:null,observed:null},transport:null};
   getDisplayEvidence(){return structuredClone({requestedBrightness:this.requestedBrightness,requestedScreenOn:this.requestedScreenOn,...this.evidence});}
-  private observeResult<T>(result:OperationResult<T>,generation:number,source:string):void {
+  private observeResult<T>(result:OperationResult<T>,generation:number,source:DisplayEvidenceSource):void {
     if(generation!==this.adapterGeneration||this.closing)return;
     this.evidence.transport={source,atMs:result.timing.completedAtMs,ok:result.ok,priorEffects:result.ok?'none':result.priorEffects};
   }
