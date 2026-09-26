@@ -40,16 +40,17 @@ for private configuration, explicit activation, smoke limits and simulator rollb
 
 ## Runtime data
 
-The default directory is `~/.local/share/pixoo-playlist-controller` on Linux/WSL
-and `%LOCALAPPDATA%\PixooPlaylistController` on Windows. Override with an absolute
+The backend runs on Linux or WSL; native Windows is not supported
+([ADR 0021](docs/decisions/0021-linux-wsl-only-host.md)). The default directory is
+`~/.local/share/pixoo-playlist-controller`. Override with an absolute
 `PIXOO_DATA_DIR` outside source control. Startup creates missing directories,
 checks writability, and preserves existing files. It rejects relative/blank paths,
 paths within this checkout or another Git checkout, and symlink aliases into them.
 Private directories are never served directly or included in health responses. Validated preview routes serve effective PNG frames by rendition ID.
 
 `PIXOO_PORT` defaults to `8787`; `0` requests an available port. `PIXOO_MODE`
-defaults to `simulator`; `device` requires valid private settings at startup. See [shell](examples/config.sh)
-and [PowerShell](examples/config.ps1) examples. Startup configuration is environment-only; no .env loader is used.
+defaults to `simulator`; `device` requires valid private settings at startup. See the
+[shell example](examples/config.sh). Startup configuration is environment-only; no .env loader is used.
 The settings API persists validated `device.json`. The backend captures settings
 once at startup; later saves require restart to affect the active device. Existing
 app data is never deleted at shutdown.

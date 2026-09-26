@@ -17,21 +17,14 @@ npm ci
 npm run build
 ```
 
-Choose a persistent directory outside every Git checkout. For Linux/WSL:
+Choose a persistent directory outside every Git checkout. The backend runs on
+Linux or WSL; native Windows is not supported
+([ADR 0021](decisions/0021-linux-wsl-only-host.md)).
 
 ```bash
 export PIXOO_DATA_DIR="$HOME/.local/share/pixoo-playlist-controller"
 export PIXOO_PORT=8787
 export PIXOO_MODE=simulator
-npm start
-```
-
-For a native Windows Node 24 PowerShell session:
-
-```powershell
-$env:PIXOO_DATA_DIR = Join-Path $env:LOCALAPPDATA 'PixooPlaylistController'
-$env:PIXOO_PORT = '8787'
-$env:PIXOO_MODE = 'simulator'
 npm start
 ```
 
@@ -53,8 +46,8 @@ same directory on the next start to recover saved context paused.
 Stop with Ctrl+C and wait for the process to exit before backup or moving data.
 SIGINT/SIGTERM handling drains the player and in-flight adapter transport before
 releasing ownership and closing the catalog. Shutdown sends no display restoration
-command; last content may remain visible. On Windows,
-use Ctrl+C in its console; forced process termination is not graceful shutdown.
+command; last content may remain visible. Forced process termination is not
+graceful shutdown.
 Keep one backend per data directory. A `busy` error means another owner holds it;
 stop that owner rather than deleting owner.sqlite or SQLite sidecars.
 
@@ -63,8 +56,7 @@ stop that owner rather than deleting owner.sqlite or SQLite sidecars.
 A systemd user service starts the installed backend with the user manager,
 restarts it after a failure and stops it with SIGTERM so the player drains. Use
 it in WSL or Linux with systemd enabled. It replaces a manual launcher; do not
-run both against the same data directory or device. Native Windows has no
-service template.
+run both against the same data directory or device.
 
 Installing, upgrading or removing the service on a real host is a separate,
 authorized step. Before installing, stop the manual backend, take an offline
@@ -214,18 +206,11 @@ library UI. Do not delete referenced files by hand.
 Stop the backend first. Commands take explicit absolute paths and never default
 to your personal data. The destination must not exist, its parent must exist, and
 source/destination must not contain each other. All paths must be outside Git.
-For Linux/WSL, choose a private existing parent, then run:
+Choose a private existing parent, then run:
 
 ```bash
 npm run backup -- "$PIXOO_DATA_DIR" "$HOME/pixoo-backup-2026-09-06"
 npm run restore -- "$HOME/pixoo-backup-2026-09-06" "$HOME/pixoo-restored-2026-09-06"
-```
-
-PowerShell uses the same commands with Windows absolute paths:
-
-```powershell
-npm run backup -- $env:PIXOO_DATA_DIR (Join-Path $env:USERPROFILE 'pixoo-backup-2026-09-06')
-npm run restore -- (Join-Path $env:USERPROFILE 'pixoo-backup-2026-09-06') (Join-Path $env:USERPROFILE 'pixoo-restored-2026-09-06')
 ```
 
 Choose a new name for each run. Backup acquires the existing catalog owner lock,
@@ -277,11 +262,12 @@ Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue
 In WSL, `ss -ltn 'sport = :8787'` shows listeners. A failed Windows connection when
 WSL succeeds is a host/WSL reachability problem, not device unavailability. Check
 which process owns the port and whether the intended WSL instance is running.
-Do not add forwarding, firewall or router rules as a workaround. If Windows cannot
-reach WSL loopback, use the native Windows Node 24 build and a separate Windows
-local data directory. Do not share a live SQLite directory between Windows and WSL.
+Do not add forwarding, firewall or router rules as a workaround. Native Windows
+is not a supported fallback; leave the WSL networking problem to the host owner.
+Never open the WSL data directory from Windows or share a live SQLite directory
+between hosts.
 Transfer only an offline verified bundle if moving data.
 
 Phone/LAN access with authentication and HTTPS remains separate work. Docker,
-ARM64 and Raspberry Pi deployment are unverified. Ubuntu/Windows automated source
-checks and emulated phone viewports do not establish those deployment claims.
+ARM64 and Raspberry Pi deployment are unverified. Ubuntu automated source checks
+and emulated phone viewports do not establish those deployment claims.

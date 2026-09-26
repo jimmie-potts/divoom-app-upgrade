@@ -625,9 +625,8 @@ The fixture uses private temporary files and an ephemeral simulator listener.
 It invokes the shared SDK and hook executable, preserves synthetic legacy
 Nanoleaf and unrelated hooks, rejects a changed plan, checks idempotence,
 leaves an unqualified source disabled, and confirms removal revokes access.
-It does not invoke Codex, Claude or a physical worker. The test is explicitly
-skipped on native Windows because this SDK is qualified only as Linux/WSL
-source tooling. A green Windows job is not Windows setup acceptance.
+It does not invoke Codex, Claude or a physical worker. The test runs only on
+Linux because this SDK is qualified only as Linux/WSL source tooling.
 
 ### Prepare a concrete installation request
 
