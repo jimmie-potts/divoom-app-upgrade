@@ -2,8 +2,10 @@
 
 Issue [#31](https://github.com/jimmie-potts/divoom-app-upgrade/issues/31) composes
 `@jimmie-potts/agent-state` 3.3.0 inside the existing backend. The vendored release
-archive has SHA-256 `ae589d311e282c3356579c85507a3aa973ab7990e06e062143aeb08d8d2dcc99`.
-The source receipt identifies Hub PR #105 and its immutable source. Pixoo supplies
+archive has SHA-256 `b539d5296a627dece9da4f9a3713e288c3f2247c84a8e2179ff13cbcec70bd7d`.
+The [source receipt](../vendor/agent-state-3.3.0-source-receipt.json) identifies
+[Hub PR #452](https://github.com/jimmie-potts/agent-device-hub/pull/452) and source
+revision `9d0b78d8f89ab8911339ac982a6dd02357e93843`. Pixoo supplies
 storage and authenticated transport; the package supplies provider normalization,
 reduction, deduplication, child rollup, freshness, retention and migration validation.
 
