@@ -1,12 +1,13 @@
 # Shared hub integration
 
-Status: Accepted direction; implementation remains in GitHub issues.
+This guide describes the implemented local integration and its ownership
+boundaries. GitHub issues own remaining work and delivery acceptance.
 
 ## Ownership and current boundary
 
 The [agent-device-hub architecture](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/architecture.md)
 owns shared provider qualification, session contracts/state, controller
-contracts, MCP infrastructure and the future unified overview.
+contracts, MCP infrastructure and the unified overview.
 [Its roadmap](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/roadmap.md)
 links the cross-repository sequence. GitHub issues own actual acceptance,
 dependencies and status.
@@ -15,10 +16,13 @@ Pixoo retains media ingestion/renditions, catalog/playlists, player, 64x64 statu
 rendering, explicit Monitor/Media policy and its existing serialized writer.
 Startup defaults to the simulator; explicit validated device activation uses
 the dated smoke profile through the same controller API and writer. The optional
-local MCP bindings reuse the shared gateway and existing writer. Shared monitoring,
-native hub controller integration and installed hooks remain planned.
+local MCP bindings reuse the shared gateway and existing writer. Optional shared
+monitoring, the native controller API and the Pixoo Monitor/Media extension are
+implemented. Installation, actual-client and physical evidence remain separate;
+see the dated [monitoring acceptance](hardware-validation.md#issue-34-monitoring-acceptance)
+and [user-service receipt](hardware-validation.md#issue-77-user-service-installation).
 
-## Adoption sequence
+## Ownership and delivery references
 
 - [divoom-app-upgrade#29](https://github.com/jimmie-potts/divoom-app-upgrade/issues/29) records the [vocabulary mapping](agent-monitoring-vocabulary.md) and [consumer requirements](agent-monitoring.md), consuming qualified schemas/vocabulary from [agent-device-hub#2](https://github.com/jimmie-potts/agent-device-hub/issues/2).
 - [divoom-app-upgrade#31](https://github.com/jimmie-potts/divoom-app-upgrade/issues/31) embeds [agent-device-hub#3](https://github.com/jimmie-potts/agent-device-hub/issues/3) in the existing backend and uses
@@ -49,13 +53,14 @@ success nor readership. Only explicit user-chosen labels or neutral IDs enter
 shared monitoring. Prompts, transcripts, tools, automatically copied titles,
 credentials and private paths remain excluded.
 
-Keep one active agent-state owner. First it can run inside Pixoo; later
-standalone hosting requires an explicit quiesced export/import, producer and
-consumer endpoint switch, and rollback. Issue #31 owns the embedded/remote
-session-source facade used by the renderer, browser feed and shared
+Keep one active agent-state owner. The selected source can embed the shared core
+in Pixoo or connect to a remote owner. Switching owners requires an explicit
+quiesced export/import, producer and consumer endpoint switch, and rollback.
+Issue #31 owns the embedded/remote session-source facade used by the renderer, browser feed and shared
 label/acknowledgment operations. Remote mode does not start a local reducer;
-stale feeds remain visibly stale until recovery or explicit rollback. Hub #5
-depends on that boundary and verifies the route switch. Issue #33 consumes the
+stale feeds remain visibly stale until recovery or explicit rollback.
+[Hub #5](https://github.com/jimmie-potts/agent-device-hub/issues/5) records
+standalone hosting and route-switch work. Issue #33 consumes the
 facade in either mode. Never run both owners against one live state store.
 Device databases remain private, including across Windows/WSL.
 
@@ -81,17 +86,24 @@ separate. Existing physical smoke evidence does not authorize further tests.
 [ADR 0010](decisions/0010-shared-agent-device-hub.md) records local adoption;
 the [monitoring consumer capability](../openspec/specs/shared-monitor-contract/spec.md) records source adoption. Runtime hosting, UI and installed acceptance retain their own gates.
 
-## Shared monitor host candidate
+## Shared monitor host
 
-Issue #31 composes the released agent-state 1.0.0 package behind the selected
-session-source facade. See [agent monitoring](agent-monitoring.md) for private
+The Pixoo source dependency remains agent-state 1.0.0, composed by #31 behind
+the selected session-source facade. See [agent monitoring](agent-monitoring.md) for private
 configuration, authentication, API/feeds and explicit owner handoff. The shared
 engine remains in the hub; no source delivery installs hooks or starts a second
-host. Monitor renderer/UI and installed-device acceptance keep their separate issues.
+host. The [dated installed setup](agent-monitoring.md#small-installed-setup-accepted-on-september-22-2026)
+records its remote owner and installed versions separately from this source pin.
+Enabling monitoring does not select device mode or activate simulator presentation.
+In explicit device mode, startup restores a saved Monitor selection when the screen
+is requested on; screen-on alone remains passive. See [startup ownership](agent-monitoring.md#monitor-panel-and-display-ownership).
 
 ## Native controller adoption
 
-The opt-in [shared controller API](hub-controller-api.md) adopts controller
-contract 1.0.0 for identity, snapshots, commands and resumable feeds. It composes
-the existing backend services and writer. Monitor/Media and filter extensions
-remain unavailable pending #33; no dependency on that implementation is added.
+The opt-in [shared controller API](hub-controller-api.md) implements controller
+contract 1.0.0 for identity, snapshots, commands and resumable feeds through the
+existing backend services and serialized writer. Shared controller v1 continues
+to advertise modes unsupported. When monitoring and the native controller are
+both enabled, the [Pixoo integration extension](hub-controller-api.md#pixoo-integration-extension)
+exposes Monitor/Media selection, filters and cadence through protected
+`pixoo-integration/1.0` routes.
