@@ -33,6 +33,6 @@ it('keeps legacy payload ordering and rejects extra policy fields before admissi
  await expect(service.playback({requestId,command:'show-media',renditionId:'a'.repeat(64),playback:{mode:'duration',durationMs:50,extra:true}})).rejects.toMatchObject({code:'invalid-input'});
  expect(commands.nextRequestId).toBe(requestId);
  const original={requestId,command:'pause'};
- const retained=await commands.execute(requestId,['player',original],async()=>service.snapshot());
+ const retained=await commands.execute(requestId,['player',original],{kind:'player',input:{requestId,command:'pause'}},async()=>service.snapshot());
  expect(await service.playback({command:'pause',requestId})).toEqual(retained);expect(pause).not.toHaveBeenCalled();
 });

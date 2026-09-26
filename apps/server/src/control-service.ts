@@ -21,7 +21,7 @@ export class ControlService {
   if(!this.monitor)throw new ApiError('monitor-unavailable',503);
   const monitor=this.monitor;
   const canonical=(value:unknown):unknown=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)])):value;
-  const result=await this.commands.execute(body.requestId,['integration',canonical(body)],async()=>{
+  const result=await this.commands.execute(body.requestId,['integration',canonical(body)],{kind:'integration',input:undefined},async()=>{
    await monitor.configure(body.action,()=>{
    if(body.expectedConfigurationRevision!==this.commands.configurationRevision)throw new ApiError('revision-conflict',409);
    if(body.expectedGeneration!==monitor.status().generation)throw new ApiError('stale-generation',409);
@@ -41,7 +41,7 @@ export class ControlService {
  }
  async playback(input:unknown){
   const body=parse(playerCommand,input);
-  const retained=await this.commands.execute(body.requestId,['player',body],async()=>{
+  const retained=await this.commands.execute(body.requestId,['player',body],{kind:'player',input:body},async()=>{
    this.commands.changed();return this.applyPlayback(body);
   });
   return structuredClone(retained);
@@ -63,7 +63,7 @@ export class ControlService {
  }
  async display(input:unknown){
   const body=parse(displayCommand,input);
-  const retained=await this.commands.execute(body.requestId,['display',body],async()=>{
+  const retained=await this.commands.execute(body.requestId,['display',body],{kind:'display',input:body},async()=>{
    this.commands.changed();return this.applyDisplay(body);
   });
   return structuredClone(retained);
