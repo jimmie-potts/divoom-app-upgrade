@@ -1,5 +1,5 @@
 import {expect,it,vi} from 'vitest';
-import {mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {InjectOptions} from 'fastify';
@@ -13,12 +13,13 @@ import {gifFixture} from '../helpers/media-fixtures.js';
 import {Library} from '@pixoo/library';
 import type {DeviceTransport} from '@pixoo/device';
 import {provisionCredential,revokeCredential} from '../../apps/server/src/mcp-config.js';
-async function fixture(transportForTests?:DeviceTransport,prepare?:(dataDir:string)=>Promise<void>){
+async function fixture(transportForTests?:DeviceTransport,prepare?:(dataDir:string)=>Promise<void>,monitor=false){
  const dataDir=await mkdtemp(join(tmpdir(),'pixoo-mcp-'));
  if(prepare)await prepare(dataDir);
  const token=await provisionCredential(dataDir,'codex',['read','control']);
  if(transportForTests)await writeFile(join(dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.50.20',profile:'pixoo64-smoke-2026-09-06'}}));
- const app=createApp({dataDir,mcpEnabled:true,...(transportForTests?{mode:'device' as const,transportForTests,deviceLockDirectoryForTests:dataDir}:{})});
+ if(monitor){await mkdir(join(dataDir,'agent-monitor'));await writeFile(join(dataDir,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));await provisionCredential(join(dataDir,'agent-monitor'),'writer',['read','control']);}
+ const app=createApp({dataDir,mcpEnabled:true,...(monitor?{monitorEnabled:true,monitorRenderCadenceMs:1}:{}),...(transportForTests?{mode:'device' as const,transportForTests,deviceLockDirectoryForTests:dataDir}:{})});
  await app.listen({host:'127.0.0.1',port:0});
  const address=app.server.address();if(!address||typeof address==='string')throw new Error('No listener');
  const base=`http://127.0.0.1:${address.port}`;
@@ -44,6 +45,23 @@ it('serves fixed tools from the built application and preserves cross-transport 
   const conflict=await fetch(`${f.base}/api/device/display`,{method:'PATCH',headers:{'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({requestId:request_id,brightness:43})});expect(conflict.status).toBe(409);
   for(let n=0;n<40;n++)expect(data(await f.client.callTool({name:'get_status',arguments:{}})).connected).toBe(false);
   await f.client.close();expect((await fetch(`${f.base}/api/health`)).status).toBe(200);
+ }finally{await f.close();}
+},20000);
+it('keeps status valid and honest after an explicitly activated dashboard upload',async()=>{
+ const f=await fixture(undefined,undefined,true);try{
+  const prefix='/api/integration/v1',headers={'x-pixoo-request':'1'};
+  const snapshot=(await f.inject(prefix+'/snapshot')).json();
+  const activated=await f.inject({method:'POST',url:prefix+'/commands',headers,payload:{apiVersion:'pixoo-integration/1.0',requestId:snapshot.nextRequestId,expectedConfigurationRevision:snapshot.configurationRevision,expectedGeneration:snapshot.generation,action:{operation:'mode',mode:'monitor'}}});
+  expect(activated.statusCode,activated.body).toBe(200);
+  await vi.waitFor(async()=>expect((await f.inject(prefix+'/snapshot')).json().lastOutcome).toMatchObject({status:'sent'}),{timeout:5000});
+  // Listing tools makes the SDK client validate each result against the advertised output schema.
+  expect((await f.client.listTools()).tools.find(tool=>tool.name==='get_status')?.outputSchema).toBeDefined();
+  const reads=[];for(let n=0;n<3;n++)reads.push(await f.client.callTool({name:'get_status',arguments:{}}));
+  for(const read of reads)expect(read.isError,JSON.stringify(read.content)).toBeFalsy();
+  const [first,...rest]=reads.map(data);
+  expect(first).toMatchObject({mode:'simulator',connected:false,display:{requestedScreenOn:true,brightness:{acknowledged:null,observed:null},screen:{acknowledged:null,observed:null},transport:{source:'upload',ok:true,priorEffects:'none'}}});
+  for(const later of rest){expect(later.display).toEqual(first!.display);expect(later.player).toEqual(first!.player);}
+  expect(JSON.stringify(reads)).not.toMatch(/dashboard|192\.168|agent-monitor/);
  }finally{await f.close();}
 },20000);
 it('revokes existing sessions and keeps native access separate from browser API authorization',async()=>{

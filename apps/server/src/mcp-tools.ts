@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {requestIdentity,apiId,apiHash,apiRevision,apiName,playbackPolicy,catalogQuery} from '@pixoo/core';
 import {LibraryError} from '@pixoo/library';
 import {MediaError} from '@pixoo/media';
-import {PlaybackError} from '@pixoo/playback';
+import {PlaybackError,type DisplayEvidenceSource} from '@pixoo/playback';
 import {bindServiceTools,createDeviceRegistry,type JsonSchema,type ServiceExtension} from '@jimmie-potts/device-mcp';
 import {ControlService} from './control-service.js';
 import {ApiError} from './security.js';
@@ -17,15 +17,21 @@ const brightness=z.object({acknowledged:evidenceValue(z.number().int().min(0).ma
 const screen=z.object({acknowledged:evidenceValue(z.boolean()),observed:evidenceValue(z.boolean())}).strict();
 const player=z.object({state:z.enum(['idle','loading','playing','paused','reconnecting','error']),intent:z.enum(['active','paused','stopped']),availability:z.enum(['unknown','available','offline']),generation:z.number().int().nonnegative(),sessionId:id.nullable(),playlistId:id.nullable(),playlistRevision:z.number().int().positive().nullable(),itemId:id.nullable(),estimatedReadyAtMs:nullableTime,dwellDeadlineMs:nullableTime,timing:z.literal('estimated'),requestedScreenOn:z.boolean(),lastError:z.object({code,itemId:id.optional(),priorEffects:z.enum(['none','possible']).optional()}).strict().nullable()}).strict();
 const snapshot=z.object({sampledAtMs:time,serverId:id,nextRequestId:requestIdentity,player}).strict();
-const status=z.object({ready:z.literal(true),mode:z.enum(['simulator','device']),connected:z.boolean().nullable(),serverId:id,nextRequestId:requestIdentity,sampledAtMs:time,display:z.object({requestedBrightness:z.number().int().min(0).max(100).nullable(),requestedScreenOn:z.boolean(),brightness,screen,transport:z.object({source:z.enum(['brightness','screen','probe','upload']),atMs:time,ok:z.boolean(),priorEffects:z.enum(['none','possible'])}).strict().nullable()}).strict(),player}).strict();
+const transportSource=z.enum(['brightness','screen','probe','upload']);
+// Every Player source needs an explicit public value; dashboard frames are uploads to MCP callers.
+const publicSource={brightness:'brightness',screen:'screen',probe:'probe',upload:'upload',dashboard:'upload'} as const satisfies Record<DisplayEvidenceSource,z.infer<typeof transportSource>>;
+const status=z.object({ready:z.literal(true),mode:z.enum(['simulator','device']),connected:z.boolean().nullable(),serverId:id,nextRequestId:requestIdentity,sampledAtMs:time,display:z.object({requestedBrightness:z.number().int().min(0).max(100).nullable(),requestedScreenOn:z.boolean(),brightness,screen,transport:z.object({source:transportSource,atMs:time,ok:z.boolean(),priorEffects:z.enum(['none','possible'])}).strict().nullable()}).strict(),player}).strict();
 const timing=z.object({submittedAtMs:time,startedAtMs:nullableTime,completedAtMs:time,queueMs:time,serviceMs:time}).strict();
 const outcome=z.object({ok:z.boolean(),requestId:requestIdentity,timing:timing.nullable(),priorEffects:z.enum(['none','possible']),code:code.nullable(),snapshot:snapshot.nullable(),retry:z.literal('never-automatically')}).strict();
 const schema=(value:z.ZodType)=>z.toJSONSchema(value) as JsonSchema;
+function publicDisplay(value:ReturnType<ControlService['status']>['display']){
+ return {...value,transport:value.transport&&{...value.transport,source:publicSource[value.transport.source]}};
+}
 function safePlayer(value:ReturnType<ControlService['status']>['player']){
  return {...value,lastError:value.lastError?{...value.lastError,code:code.safeParse(value.lastError.code).success?value.lastError.code:'operation-failed'}:null};
 }
 export function createLocalTools(service:ControlService,changed:()=>void){
- const read:ServiceExtension={inputSchema:schema(z.object({}).strict()),outputSchema:schema(status),scope:'read',description:'Read application readiness and dated transport evidence. Null values are unavailable; acknowledged writes are not visual confirmation. This call never probes the display.',annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:true},async invoke(){const value=service.status();return {data:status.parse({...value,player:safePlayer(value.player)})};}};
+ const read:ServiceExtension={inputSchema:schema(z.object({}).strict()),outputSchema:schema(status),scope:'read',description:'Read application readiness and dated transport evidence. Null values are unavailable; acknowledged writes are not visual confirmation. This call never probes the display.',annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:true},async invoke(){const value=service.status();return {data:status.parse({...value,display:publicDisplay(value.display),player:safePlayer(value.player)})};}};
  const write=(kind:'brightness'|'screen'):ServiceExtension=>({inputSchema:schema(kind==='brightness'?z.object({percent:z.number().int().min(0).max(100),request_id:requestIdentity}).strict():z.object({on:z.boolean(),request_id:requestIdentity}).strict()),outputSchema:schema(outcome),scope:'control',description:kind==='brightness'?'Request brightness through the existing writer using the exact next request_id from status. Reuse that identity only for the same intent; never automatically retry uncertain effects.':'Request screen power through the existing writer. Off pauses playback; on never resumes it. Use the exact next request_id from status and never automatically replay uncertain effects.',annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:true},async invoke(args){
   const requestId=args.request_id as string;
   try{

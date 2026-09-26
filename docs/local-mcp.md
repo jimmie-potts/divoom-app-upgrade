@@ -76,7 +76,8 @@ Status reports application readiness, selected mode, physical connectivity,
 player state and dated evidence. Simulator physical connectivity is always false.
 Null display observations are unavailable. Requested values express intent;
 acknowledged values record successful transport writes; probe-observed values
-record only returned telemetry. These do not prove visible content. Repeated
+record only returned telemetry. These do not prove visible content. Monitor
+dashboard pictures report transport source `upload`, like media uploads. Repeated
 status reads never probe the display or refresh evidence timestamps.
 
 Use `nextRequestId` from status as `request_id` for a write. A retained matching

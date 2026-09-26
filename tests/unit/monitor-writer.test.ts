@@ -29,6 +29,8 @@ it('retires queued monitor writes on screen-off and cannot revive them on screen
   const on=player.setScreen(true);await flush(clock);clock.advance(100);await flush(clock);await on;
   expect(await player.uploadDashboard([new Uint8Array(12288)],old)).toBeUndefined();
   expect(device.effects.filter(e=>e.kind==='frame')).toHaveLength(0);
+  // The retired completion leaves the newer screen write as the transport evidence.
+  expect(player.getDisplayEvidence().transport).toMatchObject({source:'screen',ok:true});expect(player.getState().intent).toBe('paused');
  }finally{await player.close();}
 });
 it('uploads a two-frame monitor picture as one 500 ms animation and rejects other frame sets',async()=>{
