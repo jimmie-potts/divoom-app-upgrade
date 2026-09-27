@@ -20,4 +20,4 @@ The Hub's [app verification contract](https://github.com/jimmie-potts/agent-devi
 ## Risks / Trade-offs
 
 - A run serves the checkout's build. Rebuilding that checkout, including another run's `start`, changes what a live preview serves. `doctor` re-hashes `/` and reports the change, and `restart` makes a new candidate.
-- The guard covers the server process, every process it forks (including the media worker) and every worker thread; any other public process start is refused, and the launch empties `NODE_OPTIONS`. Internal bindings (`process.binding`) and native addons are out of scope: a preload cannot guard them.
+- The guard covers the server process, every fork of Node (including the media worker) and every file-based worker thread; any other public process start, a fork of another program and an eval worker are refused, and the launch empties `NODE_OPTIONS`. It observes public API use by the app and its dependencies and is not a sandbox against hostile code already in the process, such as a side-effecting `toString`, internal bindings (`process.binding`) or native addons.

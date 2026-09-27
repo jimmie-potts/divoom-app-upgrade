@@ -38,15 +38,15 @@ Through the public Node.js APIs, the transport guard SHALL block and record, bef
 - **THEN** the connection is refused and recorded, and the no-physical-transport check fails; a connection to the process's own listening port is allowed
 
 ### Requirement: Guarded code execution
-A process the server forks and every worker thread it starts SHALL run under the same guard, even when the caller replaces `execArgv` or `env`, and fork options SHALL be honored as Node reads them. Every other process start the public API offers (`spawn`, `exec`, `execFile`, their Sync forms, `ChildProcess#spawn`, `process.execve`) SHALL be refused and recorded. The launch SHALL empty `NODE_OPTIONS`. Internal bindings and native addons are out of scope.
+A fork of Node and every file-based worker thread SHALL run under the same guard, even when the caller replaces `execArgv` or `env`, with fork options honored as Node reads them. Every other public process start SHALL be refused and recorded, including a fork of another program and an eval worker. The launch SHALL empty `NODE_OPTIONS`. The guard is not a sandbox against hostile code already in the process (side-effecting `toString`, internal bindings, native addons).
 
 #### Scenario: Forked children and workers
 - **WHEN** a guarded process forks a child with replaced arguments and environment, as the media worker does, or with an undefined argument list before its options, or starts a worker with an empty `execArgv`
 - **THEN** each child or worker keeps its options, its connection is refused and recorded, and an upload still renders in the guarded media worker
 
 #### Scenario: Other process starts
-- **WHEN** a guarded process calls each other public way to start or replace a process
-- **THEN** every call is refused and recorded, and nothing it would have started reaches the network
+- **WHEN** a guarded process calls each other public way to start or replace a process, forks another program as `execPath`, or starts an eval worker
+- **THEN** every call is refused and recorded without the eval source, and nothing it would have started runs or reaches the network
 
 #### Scenario: Inherited preload
 - **WHEN** the caller's `NODE_OPTIONS` imports a module, for the server or for a forked child

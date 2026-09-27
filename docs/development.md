@@ -186,10 +186,14 @@ Each run:
   connection, every TCP connection except to the run's own port, and every
   other process start (`spawn`, `exec`, `execFile` and their Sync forms,
   `ChildProcess#spawn` and `process.execve`). Installed services such as the
-  Hub on 8788 are refused like a device. A process the server forks, such as
-  the media worker, and every worker thread run under the same guard, even
-  when their caller replaces `execArgv` or `env`. Internal bindings
-  (`process.binding`) and native addons are out of scope. `start` runs the
+  Hub on 8788 are refused like a device. A fork of Node, such as the media
+  worker, and every file-based worker thread run under the same guard, even
+  when their caller replaces `execArgv` or `env`; a fork of another program
+  and an eval worker are refused. The guard observes and refuses public API
+  use by the app and its dependencies. It is not a sandbox against
+  deliberately hostile code already running in the server process, such as
+  values with a side-effecting `toString`, internal bindings
+  (`process.binding`) or native addons. `start` runs the
   `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
   them. Every capture step ends by asserting that the run has recorded no
   attempt. A failed start names known causes, such as

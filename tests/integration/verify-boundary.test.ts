@@ -1,6 +1,6 @@
 import {afterEach,expect,it} from 'vitest';
 import {execFile} from 'node:child_process';
-import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,readFile,readdir,rm,symlink,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import dgram from 'node:dgram';
 import {createServer} from 'node:net';
@@ -278,6 +278,35 @@ it('runs worker threads under the guard even when execArgv or env is replaced',a
  const record=await readTransportLog(transportLog(runtimeDir));
  expect(record.workers).toHaveLength(3);
  expect(record.blocked).toEqual(Array.from({length:3},()=>expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port})));
+},SPAWNS);
+
+it('refuses eval workers without logging their source, and forks of any program but Node',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp'),marker=join(runtimeDir,'other-program-ran');
+ const otherProgram=join(runtimeDir,'fake-node.sh');
+ await writeFile(otherProgram,`#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`,{mode:0o755});
+ const nodeAlias=join(runtimeDir,'node-alias');await symlink(process.execPath,nodeAlias);
+ const child=join(runtimeDir,'child.mjs');
+ await writeFile(child,`import net from 'node:net';const s=net.connect({port:${listener.port},host:'127.0.0.1'});s.once('connect',()=>{s.destroy();process.send('connected');});s.once('error',()=>process.send('refused'));`);
+ const result=await guarded(runtimeDir,`
+  import {Worker} from 'node:worker_threads';import {fork} from 'node:child_process';
+  const outcomes={};
+  try{new Worker("/* EVAL-SOURCE-CANARY */ require('node:net').connect(${listener.port},'127.0.0.1')",{eval:true});outcomes.evalWorker='started';}catch{outcomes.evalWorker='refused';}
+  try{fork(${JSON.stringify(child)},[],{execPath:${JSON.stringify(otherProgram)},stdio:'ignore'});outcomes.otherProgram='started';}catch{outcomes.otherProgram='refused';}
+  // Node itself through another path to the same binary is still a guarded fork.
+  outcomes.nodeAlias=await new Promise(resolve=>{const c=fork(${JSON.stringify(child)},[],{execPath:${JSON.stringify(nodeAlias)}});c.once('message',resolve);c.once('exit',code=>resolve('exited '+code));});
+  console.log(JSON.stringify(outcomes));`);
+ expect(result).toEqual({evalWorker:'refused',otherProgram:'refused',nodeAlias:'refused'});
+ await new Promise(resolve=>setTimeout(resolve,300));
+ expect(listener.received()).toBe(0);
+ await expect(readFile(marker),'the other program ran').rejects.toMatchObject({code:'ENOENT'});
+ const record=await readTransportLog(transportLog(runtimeDir));
+ expect(record.blocked).toEqual([
+  expect.objectContaining({api:'Worker(eval)',module:'<eval>'}),
+  expect.objectContaining({api:'child_process.fork',program:'fake-node.sh'}),
+  expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port}),
+ ]);
+ expect(record.forks).toEqual([expect.objectContaining({module:'child.mjs'})]);
+ expect(await readFile(transportLog(runtimeDir),'utf8')).not.toContain('EVAL-SOURCE-CANARY');
 },SPAWNS);
 
 it('refuses ChildProcess#spawn and process.execve and records each',async()=>{

@@ -7,11 +7,15 @@
 // start and TCP connection except to the process's own listening port, so
 // installed services on loopback are refused like a physical device. Each
 // attempt is recorded, so "no physical transport and no installed state
-// reached" is an observation rather than an assumption. Internal bindings
-// (process.binding) and native addons are out of scope.
+// reached" is an observation rather than an assumption.
+//
+// Scope: the guard observes and refuses the app's and its dependencies' use of
+// public APIs. It is not a sandbox against deliberately hostile code already
+// running in the server process, for example values with a side-effecting
+// toString, internal bindings (process.binding) or native addons.
 import childProcess from 'node:child_process';
 import dgram from 'node:dgram';
-import {appendFileSync} from 'node:fs';
+import {appendFileSync,realpathSync} from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import {syncBuiltinESMExports} from 'node:module';
@@ -70,10 +74,10 @@ for(const method of ['bind','connect','send'] as const){
  Object.defineProperty(dgram.Socket.prototype,method,{configurable:true,writable:true,value(){record({event:'blocked',api:`dgram.${method}`});throw refusal();}});
 }
 
-// Child processes and threads. A fork or a worker thread runs under this guard
-// with the run's settings; every other way the public API offers to start a
-// process or replace this one is refused. Internal bindings (process.binding)
-// and native addons are outside what a preload can guard.
+// Child processes and threads. A fork of Node or a file-based worker thread
+// runs under this guard with the run's settings; every other way the public API
+// offers to start a process or replace this one is refused, including a fork of
+// another program and an eval worker.
 const guardUrl=import.meta.url;
 /** The run's settings a guarded child needs; NODE_OPTIONS is emptied so no preload runs before the guard. */
 function guardedEnv(env:NodeJS.ProcessEnv|undefined):NodeJS.ProcessEnv {
@@ -81,6 +85,9 @@ function guardedEnv(env:NodeJS.ProcessEnv|undefined):NodeJS.ProcessEnv {
 }
 const withGuard=(execArgv:readonly string[])=>execArgv.includes(guardUrl)?[...execArgv]:['--import',guardUrl,...execArgv];
 const fork=childProcess.fork;
+const programOf=(file:unknown)=>basename(String(file).trim().split(/\s+/)[0]??'');
+/** The resolved path of a program, or the path itself when it cannot be resolved. */
+function realPath(path:string):string {try{return realpathSync(path);}catch{return path;}}
 /** Set only while guardedFork calls Node's fork, which spawns through ChildProcess#spawn. */
 let forking=false;
 function guardedFork(this:unknown,modulePath:string|URL,...rest:unknown[]){
@@ -89,12 +96,15 @@ function guardedFork(this:unknown,modulePath:string|URL,...rest:unknown[]){
  if(rest[0]==null)options=rest[1] as childProcess.ForkOptions|undefined;
  else if(typeof rest[0]==='object'&&!Array.isArray(rest[0]))options=rest[0] as childProcess.ForkOptions;
  else{args=rest[0] as string[];options=rest[1] as childProcess.ForkOptions|undefined;}
+ // A fork runs Node with the guard; another program given as execPath would run unguarded.
+ if(options?.execPath!==undefined&&realPath(String(options.execPath))!==realPath(process.execPath)){
+  record({event:'blocked',api:'child_process.fork',program:programOf(options.execPath)});throw refusal();
+ }
  const guarded:childProcess.ForkOptions={...options,execArgv:withGuard(options?.execArgv??process.execArgv),env:guardedEnv(options?.env)};
  record({event:'fork',module:basename(String(modulePath))});
  forking=true;
  try{return fork.call(this,modulePath,args,guarded);}finally{forking=false;}
 }
-const programOf=(file:unknown)=>basename(String(file).trim().split(/\s+/)[0]??'');
 const spawners=['spawn','spawnSync','exec','execSync','execFile','execFileSync'] as const;
 const refusedSpawns=Object.fromEntries(spawners.map(name=>[name,(file:unknown)=>{
  record({event:'blocked',api:`child_process.${name}`,program:programOf(file)});throw refusal();
@@ -114,6 +124,8 @@ const Worker=workerThreads.Worker;
 /** A worker thread always preloads the guard, even when its caller replaces execArgv or env. */
 class GuardedWorker extends Worker {
  constructor(filename:string|URL,options:import('node:worker_threads').WorkerOptions={}){
+  // An eval worker's source is code, not a file: it would run before a preload could guard it, and is never logged.
+  if(options.eval){record({event:'blocked',api:'Worker(eval)',module:'<eval>'});throw refusal();}
   super(filename,{...options,execArgv:withGuard(options.execArgv??process.execArgv),
    ...(options.env&&typeof options.env==='object'?{env:guardedEnv(options.env as NodeJS.ProcessEnv)}:{})});
   record({event:'worker',module:basename(String(filename))});
