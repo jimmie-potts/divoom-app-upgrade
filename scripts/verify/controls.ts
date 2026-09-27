@@ -37,6 +37,15 @@ const faults:Record<string,{step:string;description:string;inject:Fault}>={
     await route.fulfill({response});
    });
   }},
+ 'control-hub-feed-stale':{step:'hub-sessions',description:'the page\'s monitor view reports the Hub feed stale and drops its sessions',
+  inject:async page=>{
+   await page.route('**/api/integration/v1/view',async route=>{
+    const response=await route.fetch();
+    const view=await response.json() as {source:{connection:string;snapshot:{sessions:unknown[]}|null}};
+    view.source.connection='stale';if(view.source.snapshot)view.source.snapshot.sessions=[];
+    await route.fulfill({response,json:view});
+   });
+  }},
  'control-retry-new-identity':{step:'lost-response-recovery',description:'a retried Next is resent under a fresh identity',
   inject:async(page,url)=>{
    await page.route('**/api/player/commands',async route=>{

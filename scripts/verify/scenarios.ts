@@ -5,6 +5,7 @@
 import {mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import sharp from 'sharp';
+import {HUB_CONTROLLER_PRINCIPAL,HUB_OWNER_ID,HUB_PAIRED,hubFeed,pairingTokens,readPairingToken} from './pairing.ts';
 import {assertSeedable,type OwnerContext} from './run-environment.ts';
 
 type RGB=readonly [number,number,number];
@@ -38,22 +39,30 @@ export const PLAYLIST='Verification loop';
 /** The synthetic agent session shown in the Monitor tab. */
 export const SESSION={title:'Synthetic verification task',project:'VERIFY-PIXOO',projectId:'verify-project',sessionId:'verify-session-1'};
 
-export interface ScenarioDefinition {description:string;playlist:readonly MediaKey[]|null;session:boolean}
+export interface ScenarioDefinition {
+ description:string;playlist:readonly MediaKey[]|null;session:boolean;
+ /** Paired with a Hub run: its session feed replaces the embedded owner, and its controller credential is registered. */
+ hub?:boolean;
+}
 export const scenarioDefinitions={
  'library-playlist':{description:`Three synthetic media, the playlist "${PLAYLIST}" (quadrants, blink, stripes) and one synthetic agent session`,playlist:['quadrants','blink','stripes'],session:true},
  empty:{description:'No media, no playlists and no agent sessions',playlist:null,session:false},
+ [HUB_PAIRED]:{description:`Paired with the Hub run named by --input hub-feed: the three synthetic media and "${PLAYLIST}", the Hub's session feed as a remote owner and the Hub's controller credential, with no local sessions. Write hub-feed-token and hub-controller-token into the run directory before this reseed`,
+  playlist:['quadrants','blink','stripes'],session:false,hub:true},
 } as const satisfies Record<string,ScenarioDefinition>;
 export type ScenarioName=keyof typeof scenarioDefinitions;
 export const defaultScenario:ScenarioName='library-playlist';
 
-export interface SeedInput {runId:string;dataDir:string;scenario:string}
+export interface SeedInput {runId:string;dataDir:string;scenario:string;runtimeDir?:string;inputs?:Readonly<Record<string,string>>}
 /** Write one scenario into the run's empty data directory, before the server starts. */
-export async function seedScenario({dataDir,scenario}:SeedInput,owner:OwnerContext={}):Promise<void> {
+export async function seedScenario({dataDir,scenario,runtimeDir,inputs}:SeedInput,owner:OwnerContext={}):Promise<void> {
  if(!Object.hasOwn(scenarioDefinitions,scenario))throw new Error(`Unknown scenario ${scenario}`);
  const definition:ScenarioDefinition=scenarioDefinitions[scenario as ScenarioName];
+ // A paired seed checks its input and both token files before it writes anything.
+ const paired=definition.hub?await pairing(runtimeDir,inputs):undefined;
  const data=await assertSeedable(dataDir,owner);
  // Built modules load here, not at module load: the core builds the checkout before it seeds.
- const [{Library},{provisionCredential,revokeCredential}]=await Promise.all([import('@pixoo/library'),import('../../apps/server/dist/mcp-config.js')]);
+ const [{Library},{provisionCredential,registerCredential,revokeCredential}]=await Promise.all([import('@pixoo/library'),import('../../apps/server/dist/mcp-config.js')]);
  if(definition.playlist){
   const library=await Library.open({directory:join(data,'library')});
   try{
@@ -69,11 +78,25 @@ export async function seedScenario({dataDir,scenario}:SeedInput,owner:OwnerConte
  }
  const monitor=join(data,'agent-monitor');
  await mkdir(monitor,{mode:0o700});
- await writeFile(join(monitor,'config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'verify-owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}),{mode:0o600});
+ // Standalone runs embed their own owner. A paired run reads the Hub's feed as the existing remote source does:
+ // the private configuration holds the Hub owner, its monitor endpoint and the feed token Pixoo presents.
+ const config=paired?{version:1,mode:'remote',ownerId:HUB_OWNER_ID,endpoint:paired.monitorEndpoint,token:paired.feedToken}
+  :{version:1,mode:'embedded',ownerId:'verify-owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]};
+ await writeFile(join(monitor,'config.json'),JSON.stringify(config),{mode:0o600});
  // The monitor requires a credential store to start. The seed credential is revoked and its token never stored.
  const token=await provisionCredential(monitor,'verify-seed',['control']);
  try{if(definition.session)await seedSession(data,token);}
  finally{await revokeCredential(monitor,'verify-seed');}
+ // The Hub presents its controller token to the controller API; the backend's store keeps only its digest.
+ if(paired)await registerCredential(data,HUB_CONTROLLER_PRINCIPAL,paired.controllerToken,['read','control']);
+}
+
+/** The Hub run from the `hub-feed` input and the two tokens the orchestrator wrote into the run directory. */
+async function pairing(runtimeDir:string|undefined,inputs:Readonly<Record<string,string>>|undefined){
+ const hub=hubFeed(inputs);
+ if(!runtimeDir)throw new Error(`${HUB_PAIRED} needs the run directory that holds its tokens`);
+ const feedToken=await readPairingToken(runtimeDir,pairingTokens.feed),controllerToken=await readPairingToken(runtimeDir,pairingTokens.controller);
+ return {...hub,feedToken,controllerToken};
 }
 
 /** Post one synthetic lifecycle event through the actual monitor route of an in-process simulator app with no listener. */

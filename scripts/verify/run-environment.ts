@@ -7,6 +7,7 @@ import {userInfo} from 'node:os';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {installedPorts} from './installed-ports.ts';
+import {HUB_PAIRED,hubFeed} from './pairing.ts';
 
 export const checkoutRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');
 export const transportGuard=fileURLToPath(new URL('./transport-guard.ts',import.meta.url));
@@ -16,7 +17,7 @@ export {installedPorts};
 /** The guard's record of blocked transport attempts. It lives beside `data/`, so a reseed keeps it. */
 export function transportLog(runtimeDir:string):string {return join(runtimeDir,'pixoo-transport.jsonl');}
 
-export interface LaunchInput {runtimeDir:string;dataDir:string;port:number;node:string}
+export interface LaunchInput {runtimeDir:string;dataDir:string;port:number;node:string;scenario?:string;inputs?:Readonly<Record<string,string>>}
 export interface LaunchSpec {argv:string[];env:Record<string,string>;cwd:string}
 /**
  * The server process for one run. Every Pixoo setting the run depends on is
@@ -25,14 +26,22 @@ export interface LaunchSpec {argv:string[];env:Record<string,string>;cwd:string}
  * setting before the server reads its configuration. NODE_OPTIONS is emptied so
  * no inherited preload runs before the guard. The guard also refuses to start
  * the server unless the environment it finally receives selects the simulator.
+ *
+ * Only `hub-paired` declares a paired port, the Hub run's from the `hub-feed`
+ * input, and enables the native controller API for that Hub. Every other
+ * scenario sets APP_VERIFY_PAIRED_PORTS empty, so an inherited value never
+ * pairs a run or keeps an inherited controller setting.
  */
-export function launchSpec({runtimeDir,dataDir,port,node}:LaunchInput):LaunchSpec {
+export function launchSpec({runtimeDir,dataDir,port,node,scenario,inputs}:LaunchInput):LaunchSpec {
  if(!Number.isInteger(port)||port<0||port>65535)throw new Error('Port must be an integer from 0 through 65535');
  if(installedPorts.includes(port))throw new Error(`Port ${port} is an installed port; a verification run never binds it`);
  if(!isAbsolute(runtimeDir)||!isAbsolute(dataDir))throw new Error('Run directories must be absolute');
+ const hub=scenario===HUB_PAIRED?hubFeed(inputs):undefined;
+ if(hub&&hub.port===port)throw new Error('hub-feed names this run\'s own port; it must name the Hub run');
  return {
   argv:[node,'--import',pathToFileURL(transportGuard).href,serverEntry],
-  env:{NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:dataDir,PIXOO_PORT:String(port),PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog(runtimeDir)},
+  env:{NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:dataDir,PIXOO_PORT:String(port),PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog(runtimeDir),
+   APP_VERIFY_PAIRED_PORTS:hub?String(hub.port):'',...(hub?{PIXOO_CONTROLLER_ENABLED:'1'}:{})},
   cwd:checkoutRoot,
  };
 }

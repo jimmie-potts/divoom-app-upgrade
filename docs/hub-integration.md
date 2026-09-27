@@ -107,3 +107,13 @@ to advertise modes unsupported. When monitoring and the native controller are
 both enabled, the [Pixoo integration extension](hub-controller-api.md#pixoo-integration-extension)
 exposes Monitor/Media selection, filters and cadence through protected
 `pixoo-integration/1.0` routes.
+
+## Verification pairing
+
+The `hub-paired` verification scenario pairs a disposable Pixoo run with a
+disposable Hub run for the Hub's integrated preview
+([Hub #495](https://github.com/jimmie-potts/agent-device-hub/issues/495)). The
+Hub run remains the only agent-state owner. Pixoo reads its feed through the
+existing remote session source and serves it the native controller API; no
+installed service, owner state or device is involved. See
+[Hub-paired runs](development.md#hub-paired-runs).

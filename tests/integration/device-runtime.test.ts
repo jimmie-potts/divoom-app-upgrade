@@ -142,7 +142,19 @@ it('keeps saved hardware settings in simulator mode without using an injected tr
  expect((await app.inject('/api/device')).json()).toMatchObject({mode:'simulator',configuration,activeConfiguration:null,connected:false});
  expect((await app.inject({method:'POST',url:'/api/device/probe',headers,payload:{}})).json()).toMatchObject({mode:'simulator',available:true,connected:false});
  const requestId=(await app.inject('/api/player')).json().nextRequestId;
+ const zero={admitted:0,succeeded:0},writer=async()=>(await app.inject('/api/device/simulator')).json();
+ expect(await writer()).toEqual({mode:'simulator',writer:{probe:{admitted:1,succeeded:1},uploadAnimation:zero,setBrightness:zero,setScreen:zero}});
  expect((await app.inject({method:'PATCH',url:'/api/device/display',headers,payload:{requestId,brightness:10}})).statusCode).toBe(200);expect(requests).toBe(0);
+ expect((await writer()).writer.setBrightness).toEqual({admitted:1,succeeded:1});
+ // A retry of the same request replays its outcome; only a new command reaches the writer.
+ expect((await app.inject({method:'PATCH',url:'/api/device/display',headers,payload:{requestId,brightness:10}})).statusCode).toBe(200);
+ expect((await writer()).writer.setBrightness).toEqual({admitted:1,succeeded:1});
+});
+it('serves simulator writer counts only in simulator mode',async()=>{
+ const {app,server}=await appFixture();
+ const response=await app.inject('/api/device/simulator');
+ expect([response.statusCode,response.json().error.code]).toEqual([404,'not-found']);
+ expect(server.requests).toHaveLength(0);
 });
 it.each(['missing','malformed','oversized','symlink','public-target','unsupported-profile'])('rejects %s settings before acquiring ownership or creating the library',async invalid=>{
  const dataDir=await directory(),deviceLockDirectoryForTests=await directory();

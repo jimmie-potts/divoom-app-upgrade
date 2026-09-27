@@ -141,6 +141,14 @@ player commands and returns a player snapshot. Off pauses orchestration; on does
 not resume. Device writes with possible prior effects pause playback and retain
 the uncertainty marker until fresh explicit intent.
 
+`GET /device/simulator` reports what reached the simulator's serialized writer
+since startup: `{mode:"simulator",writer:{probe,uploadAnimation,setBrightness,setScreen}}`,
+each `{admitted,succeeded}`. `admitted` counts operations the writer queued;
+`succeeded` counts those that completed. A replayed request identity adds
+nothing. Scripted checks, such as a paired verification run's orchestrator,
+use it to count commands. It returns 404 in device mode and never contacts a
+device.
+
 Device composition reuses the validated private IPv4 transport on port 80 and
 `/post`, with no redirects. The separately invoked spike remains outside these
 routes; reset-ID and raw protocol commands are not exposed.

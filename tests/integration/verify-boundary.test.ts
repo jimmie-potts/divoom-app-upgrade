@@ -11,7 +11,7 @@ import sharp from 'sharp';
 import {checkNoPhysicalTransport,checkSimulatorMode,failureCause,probeHealth,readTransportLog} from '../../scripts/verify/readiness.ts';
 import {launchSpec,transportGuard,transportLog} from '../../scripts/verify/run-environment.ts';
 import {seedScenario} from '../../scripts/verify/scenarios.ts';
-import {launch,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.js';
+import {launch,listenLoopback,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.js';
 
 const cleanup:(()=>Promise<unknown>)[]=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
@@ -128,7 +128,8 @@ const attempts=`
  import net from 'node:net';
  const tcp=(port,host='127.0.0.1')=>new Promise((resolve)=>{const socket=net.connect({port,host});socket.once('connect',()=>{socket.destroy();resolve('connected');});socket.once('error',()=>resolve('refused'));});
  const unix=(path)=>new Promise((resolve)=>{const socket=net.connect(path);socket.once('connect',()=>{socket.destroy();resolve('connected');});socket.once('error',()=>resolve('refused'));});`;
-const guardContext=(runtimeDir:string,port:number)=>({runId:'r',root:process.cwd(),runtimeDir,dataDir:join(runtimeDir,'data'),scenario:'library-playlist',url:`http://127.0.0.1:${port}/`,port,signal:AbortSignal.timeout(1000)});
+const guardContext=(runtimeDir:string,port:number,scenario='library-playlist',inputs:Record<string,string>={})=>({runId:'r',root:process.cwd(),runtimeDir,dataDir:join(runtimeDir,'data'),scenario,inputs,url:`http://127.0.0.1:${port}/`,port,signal:AbortSignal.timeout(1000)});
+const hubPaired=(runtimeDir:string,port:number,hubPort:number)=>guardContext(runtimeDir,port,'hub-paired',{'hub-feed':`http://127.0.0.1:${hubPort}/`});
 
 it('negative control: the guard observes and blocks the physical transport path and any other outbound connection',async()=>{
  const runtimeDir=await temporary('verify-guard-');
@@ -167,23 +168,100 @@ it('refuses and logs loopback connections to installed services, other local por
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,otherPort))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/6 transport attempts blocked: net\.connect 127\.0\.0\.1:8788/)});
 },SPAWNS);
 
-it('allows only the process\'s own listening port, and records a declared paired port as another target',async()=>{
+it('allows only the process\'s own listening port',async()=>{
  const runtimeDir=await temporary('verify-guard-');
- const paired=createServer(socket=>socket.destroy());await new Promise<void>(resolve=>paired.listen(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise(resolve=>paired.close(resolve)));
- const pairedPort=(paired.address() as {port:number}).port;
  const own=await guarded(runtimeDir,`${attempts}
   const server=net.createServer(socket=>socket.destroy());await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const port=server.address().port;const result=[port,await tcp(port),await tcp(port,'localhost')];server.close();console.log(JSON.stringify(result));`) as [number,string,string];
  expect(own.slice(1)).toEqual(['connected','connected']);
- let record=await readTransportLog(transportLog(runtimeDir));
+ const record=await readTransportLog(transportLog(runtimeDir));
  expect(record.blocked).toEqual([]);
  expect(record.allowed).toEqual([expect.objectContaining({port:own[0],target:'own'}),expect.objectContaining({port:own[0],target:'own'})]);
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,own[0]))).toEqual({outcome:'passed'});
- // A paired port (reserved for a later hub-paired scenario) is reachable only when declared, and never passes as the run's own traffic.
- expect(await guarded(runtimeDir,`${attempts} console.log(JSON.stringify(await tcp(${pairedPort})));`,{APP_VERIFY_PAIRED_PORTS:String(pairedPort),TEST_BACKSTOP_ALLOW:String(pairedPort)})).toBe('connected');
+},SPAWNS);
+
+/** A listener this test owns, standing in for the paired Hub run's port, which is never an installed port. */
+async function listener(){
+ const server=createServer(socket=>socket.destroy());const port=await listenLoopback(server);cleanup.push(()=>new Promise(resolve=>server.close(resolve)));
+ return port;
+}
+/** A guarded process that serves `port` (0 for any) and connects to itself and to each of `targets`. */
+const serving=(port:number,targets:number[])=>`${attempts}
+ const server=net.createServer(socket=>socket.destroy());await new Promise(resolve=>server.listen(${port},'127.0.0.1',resolve));
+ const own=server.address().port,result=[own,await tcp(own)];for(const target of ${JSON.stringify(targets)})result.push(await tcp(target));
+ await new Promise(resolve=>server.close(resolve));console.log(JSON.stringify(result));`;
+
+it('accepts a Hub connection only from a launch that declared that port, while the serving process is paired as its scenario expects',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),hub=await listener(),elsewhere=await listener();
+ // A hub-paired launch declares the Hub port, reaches it, and passes only in hub-paired with that hub-feed.
+ const [port,...reached]=await guarded(runtimeDir,serving(0,[hub]),{APP_VERIFY_PAIRED_PORTS:String(hub),TEST_BACKSTOP_ALLOW:String(hub)}) as [number,...string[]];
+ expect(reached).toEqual(['connected','connected']);
+ let record=await readTransportLog(transportLog(runtimeDir));
+ expect(record.allowed.at(-1)).toMatchObject({port:hub,target:'paired'});
+ expect(record.armed.at(-1)).toMatchObject({paired:[hub]});
+ expect(await checkNoPhysicalTransport(hubPaired(runtimeDir,port,hub))).toEqual({outcome:'passed'});
+ expect(await checkNoPhysicalTransport(hubPaired(runtimeDir,port,elsewhere))).toEqual({outcome:'failed',reason:`the process serving port ${port} is paired with ${hub}; hub-paired expects ${elsewhere}`});
+ expect(await checkNoPhysicalTransport(guardContext(runtimeDir,port))).toEqual({outcome:'failed',reason:`the process serving port ${port} is paired with ${hub}; library-playlist expects no port`});
+ expect(await checkNoPhysicalTransport(guardContext(runtimeDir,port,'hub-paired'))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/needs --input hub-feed/)});
+ // After a reseed to a standalone scenario on the same port, the earlier declared connection stays accepted, and the unpaired server passes only there.
+ expect(await guarded(runtimeDir,serving(port,[]))).toEqual([port,'connected']);
+ expect(await checkNoPhysicalTransport(guardContext(runtimeDir,port))).toEqual({outcome:'passed'});
+ expect(await checkNoPhysicalTransport(hubPaired(runtimeDir,port,hub))).toEqual({outcome:'failed',reason:`the process serving port ${port} is paired with no port; hub-paired expects ${hub}`});
+ // Undeclared, the same Hub port is refused and recorded, which fails the check in any scenario.
+ expect(await guarded(runtimeDir,`${attempts} console.log(JSON.stringify(await tcp(${hub})));`,{APP_VERIFY_PAIRED_PORTS:''})).toBe('refused');
  record=await readTransportLog(transportLog(runtimeDir));
- expect(record.allowed.at(-1)).toMatchObject({port:pairedPort,target:'paired'});
- expect(await checkNoPhysicalTransport(guardContext(runtimeDir,own[0]))).toMatchObject({outcome:'failed',reason:expect.stringMatching(new RegExp(`1 connection to another local port: 127\\.0\\.0\\.1:${pairedPort}`))});
+ expect(record.blocked).toEqual([expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:hub})]);
+ expect(await checkNoPhysicalTransport(guardContext(runtimeDir,port))).toEqual({outcome:'failed',reason:`1 transport attempts blocked: net.connect 127.0.0.1:${hub}`});
+},SPAWNS);
+
+it('negative control: a paired launch still refuses installed ports, other local ports and a device request, and fails the check',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),hub=await listener(),other=await listener();
+ const outcomes=await guarded(runtimeDir,`${attempts}
+  import {createDeviceTransport} from ${JSON.stringify(pathToFileURL(join(process.cwd(),'packages/device/dist/http-transport.js')).href)};
+  const server=net.createServer(socket=>socket.destroy());await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const result=[server.address().port,await tcp(${hub}),await tcp(8788),await tcp(41230,'localhost'),await tcp(${other}),
+   await tcp(${hub},'localhost'),await tcp(${hub},'127.0.0.2'),await tcp(${hub},'::ffff:127.0.0.1'),
+   await fetch('http://127.0.0.1:8787/api/health').then(()=>'connected',()=>'refused'),
+   await createDeviceTransport('192.168.255.254')({Command:'Channel/GetIndex'},AbortSignal.timeout(2000)).then(()=>'sent',()=>'refused')];
+  server.close();console.log(JSON.stringify(result));`,{APP_VERIFY_PAIRED_PORTS:String(hub),TEST_BACKSTOP_ALLOW:String(hub)}) as [number,...string[]];
+ expect(outcomes.slice(1)).toEqual(['connected','refused','refused','refused','refused','refused','refused','refused','refused']);
+ const {blocked,allowed}=await readTransportLog(transportLog(runtimeDir));
+ expect(allowed).toEqual([expect.objectContaining({host:'127.0.0.1',port:hub,target:'paired'})]);
+ // The Hub's port is paired only on 127.0.0.1, the hub-feed origin, never on another loopback name or address.
+ expect(blocked).toEqual([
+  expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:8788}),
+  expect.objectContaining({api:'net.connect',host:'localhost',port:41230}),
+  expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:other}),
+  expect.objectContaining({api:'net.connect',host:'localhost',port:hub}),
+  expect.objectContaining({api:'net.connect',host:'127.0.0.2',port:hub}),
+  expect.objectContaining({api:'net.connect',host:'::ffff:127.0.0.1',port:hub}),
+  expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:8787}),
+  expect.objectContaining({api:'http.request',host:'192.168.255.254',port:80}),
+ ]);
+ expect(await checkNoPhysicalTransport(hubPaired(runtimeDir,outcomes[0],hub))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/^8 transport attempts blocked: net\.connect 127\.0\.0\.1:8788, /)});
+},SPAWNS);
+
+it('accepts a recorded Hub connection only on the hub-feed host, 127.0.0.1',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),at=new Date().toISOString();
+ const log=(host:string)=>[{at,pid:1,event:'armed',paired:[41999],removed:[]},{at,pid:1,event:'listening',address:'127.0.0.1',port:41705},
+  {at,pid:1,event:'allowed',api:'net.connect',host,port:41999,target:'paired'}].map(entry=>JSON.stringify(entry)).join('\n')+'\n';
+ await writeFile(transportLog(runtimeDir),log('127.0.0.1'));
+ expect(await checkNoPhysicalTransport(hubPaired(runtimeDir,41705,41999))).toEqual({outcome:'passed'});
+ for(const host of ['localhost','127.0.0.2','::1','::ffff:127.0.0.1']){
+  await writeFile(transportLog(runtimeDir),log(host));
+  expect(await checkNoPhysicalTransport(hubPaired(runtimeDir,41705,41999)),host).toEqual({outcome:'failed',reason:`1 connection to another local port: ${host}:41999`});
+ }
+},SPAWNS);
+
+it('keeps the native controller setting only in a paired launch, with the default identity',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),hub=await listener();
+ const inherited={PIXOO_CONTROLLER_ENABLED:'1',PIXOO_CONTROLLER_ID:'owner-controller'};
+ const read=`console.log(JSON.stringify([process.env.PIXOO_CONTROLLER_ENABLED??null,process.env.PIXOO_CONTROLLER_ID??null]));`;
+ expect(await guarded(runtimeDir,read,inherited)).toEqual([null,null]);
+ expect(await guarded(runtimeDir,read,{...inherited,APP_VERIFY_PAIRED_PORTS:''})).toEqual([null,null]);
+ expect(await guarded(runtimeDir,read,{...inherited,APP_VERIFY_PAIRED_PORTS:String(hub)})).toEqual(['1',null]);
+ expect((await readTransportLog(transportLog(runtimeDir))).armed.map(entry=>entry.removed)).toEqual([
+  ['PIXOO_CONTROLLER_ENABLED','PIXOO_CONTROLLER_ID'],['PIXOO_CONTROLLER_ENABLED','PIXOO_CONTROLLER_ID'],['PIXOO_CONTROLLER_ID']]);
 },SPAWNS);
 
 /** A listener this test owns, counting every connection or datagram it receives. */

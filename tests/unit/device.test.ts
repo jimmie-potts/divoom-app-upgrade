@@ -202,6 +202,27 @@ describe('fake device adapter', () => {
     clock.advance(5000);
     expect(device.effects).toEqual([]);
   });
+  it('counts admitted and successful operations by kind, even without history', async () => {
+    const clock = new ManualClock();
+    const device = new FakeDeviceAdapter({ clock, latencyMs: 5, recordHistory: false });
+    const zero = { admitted: 0, succeeded: 0 };
+    expect(device.counts).toEqual({ probe: zero, uploadAnimation: zero, setBrightness: zero, setScreen: zero });
+    const applied = device.setBrightness(25, { generation: 0 });
+    expect(await device.setBrightness(101, { generation: 0 })).toMatchObject({ ok: false, code: 'invalid-input' });
+    clock.advance(5);
+    expect(await applied).toMatchObject({ ok: true });
+    const retired = device.setBrightness(30, { generation: 0 });
+    device.invalidateGeneration();
+    expect(await retired).toMatchObject({ ok: false, code: 'stale-generation' });
+    expect(await device.setBrightness(40, { generation: 0 })).toMatchObject({ ok: false, code: 'stale-generation' });
+    const probe = device.probe({ generation: 1 }); clock.advance(5);
+    expect(await probe).toMatchObject({ ok: true });
+    const counts = device.counts;
+    expect(counts).toEqual({ probe: { admitted: 1, succeeded: 1 }, uploadAnimation: zero, setBrightness: { admitted: 2, succeeded: 1 }, setScreen: zero });
+    counts.setBrightness.admitted = 99;
+    expect(device.counts.setBrightness).toEqual({ admitted: 2, succeeded: 1 });
+    expect([device.operations, device.effects]).toEqual([[], []]);
+  });
   it('rejects invalid fake setup and fault parameters', () => {
     for (const value of [-1, NaN, Infinity]) {
       expect(() => new FakeDeviceAdapter({ latencyMs: value })).toThrow(RangeError);

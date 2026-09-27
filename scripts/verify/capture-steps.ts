@@ -5,15 +5,19 @@
 // transition or rendering fails; the monitor canvas is compared with the
 // server's exact picture. Simulator pixels are the desired 64×64 content and
 // never evidence of what a physical display shows.
-import {createHash} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import sharp from 'sharp';
 import type {Locator,Page} from '@playwright/test';
-import {checkNoPhysicalTransport,checkSimulatorMode} from './readiness.ts';
+import {HUB_PAIRED,hubFeed,hubSessions,pairingTokens,readPairingToken,type FeedView} from './pairing.ts';
+import {checkHubFeed,checkNoPhysicalTransport,checkSimulatorMode,readTransportLog,type CheckOutcome} from './readiness.ts';
+import {transportLog} from './run-environment.ts';
 import {PLAYLIST,SESSION,defaultScenario,syntheticMedia,type MediaKey} from './scenarios.ts';
 
 /** The part of the shared core's capture context these steps use, with Playwright's page type. */
 export interface StepContext {
  page:Page;url:string;port:number;runId:string;scenario:string;runtimeDir:string;signal:AbortSignal;
+ /** The run's inputs and the extra endpoints its ready line announced (core 1.1). */
+ inputs:Readonly<Record<string,string>>;endpoints:Readonly<Record<string,string>>;
  /**
   * Every check throws or rejects on a mismatch and returns nothing. The core
   * fails a check that returns `false`, but another falsy result, such as a
@@ -35,8 +39,9 @@ const WAIT=5000;
 const text=(t:StepContext,value:string|RegExp)=>t.page.getByText(value,typeof value==='string'?{exact:true}:{}).first().waitFor({timeout:WAIT});
 const tab=(t:StepContext,name:string)=>t.page.getByRole('navigation',{name:'Controller views'}).getByRole('button',{name,exact:true}).click({timeout:WAIT});
 async function api<T>(t:StepContext,path:string):Promise<T> {
- const response=await fetch(new URL(path,t.url),{signal:t.signal});
- if(!response.ok)throw new Error(`${path} answered ${response.status}`);
+ const url=new URL(path,t.url),response=await fetch(url,{signal:t.signal});
+ // The full URL: the core redacts a bare route in a reason as if it were a file path.
+ if(!response.ok)throw new Error(`${url.href} answered ${response.status}`);
  return response.json() as Promise<T>;
 }
 interface PlayerSnapshot {player:{state:string;intent:string;itemId:string|null;generation:number};session:{id:string;playlist:{items:{id:string}[]}}|null}
@@ -131,6 +136,22 @@ async function playerShows(t:StepContext,item:number,key:MediaKey):Promise<Buffe
  return rgb;
 }
 async function click(t:StepContext,name:string):Promise<void> {await t.page.getByRole('button',{name,exact:true}).click({timeout:WAIT});}
+/** Wait until the Monitor canvas equals the server's exact rendition; return its pixels. */
+async function monitorPicture(t:StepContext):Promise<Buffer> {
+ const canvas=t.page.locator('canvas[aria-label="Exact monitor preview"]');let monitor:Buffer=Buffer.alloc(0);
+ await eventually(async()=>{
+  const view=await api<{dashboard:{rendition:{frames:number[][]}|null}}>(t,'/api/integration/v1/view');
+  const frame=Number(await canvas.getAttribute('data-frame')??0),expected=view.dashboard.rendition?.frames[frame];
+  monitor=await pixels(canvas);
+  return expected&&monitor.equals(Buffer.from(expected))?null:'canvas differs from the server rendition';
+ });
+ return monitor;
+}
+interface HubSession {identity:{sessionId:string};label?:string;title?:{value:string};project?:string;projectId?:string}
+type WriterCounts=Record<'probe'|'uploadAnimation'|'setBrightness'|'setScreen',{admitted:number;succeeded:number}>;
+/** How the Monitor tab names a session and its project. */
+const sessionName=(session:HubSession)=>session.label??session.title?.value??session.identity.sessionId;
+const projectLine=(session:HubSession)=>`Project: ${session.project??session.projectId??'No project'}`;
 
 export const captureSteps:Record<string,Step>={
  'library-selection':{
@@ -204,15 +225,8 @@ export const captureSteps:Record<string,Step>={
    await click(t,'Show monitor');
    await t.expect('Show monitor selects Monitor and activates presentation',async()=>{await text(t,'Selected mode: Monitor');await text(t,'Monitor presentation active');});
    await t.expect('Show monitor paused playback on the backend',async()=>{await eventually(async()=>{const {player:p}=await player(t);return p.intent==='paused'?null:`intent is ${p.intent}`;});});
-   const canvas=t.page.locator('canvas[aria-label="Exact monitor preview"]');let monitor:Buffer=Buffer.alloc(0);
-   await t.expect('the monitor preview shows the exact server picture',async()=>{
-    await eventually(async()=>{
-     const view=await api<{dashboard:{rendition:{frames:number[][]}|null}}>(t,'/api/integration/v1/view');
-     const frame=Number(await canvas.getAttribute('data-frame')??0),expected=view.dashboard.rendition?.frames[frame];
-     monitor=await pixels(canvas);
-     return expected&&monitor.equals(Buffer.from(expected))?null:'canvas differs from the server rendition';
-    });
-   });
+   let monitor:Buffer=Buffer.alloc(0);
+   await t.expect('the monitor preview shows the exact server picture',async()=>{monitor=await monitorPicture(t);});
    await saveSimulatorResult(t,'monitor',monitor,'Monitor tab exact preview canvas');
    await click(t,'Select Media');
    await t.expect('Select Media deactivates presentation',async()=>{await text(t,'Selected mode: Media');await text(t,'Monitor presentation inactive');});
@@ -257,6 +271,91 @@ export const captureSteps:Record<string,Step>={
    });
    await playerShows(t,2,'blink');
    await t.page.unroute('**/api/player/commands');
+   await noPhysicalTransport(t);
+  },
+ },
+ 'hub-sessions':{
+  scenario:HUB_PAIRED,
+  timeoutMs:45000,
+  description:'Paired with a Hub run: the Monitor shows the Hub-fed sessions from a current feed at the Hub\'s revision, and the controller API takes one Hub command to the writer once',
+  run:async t=>{
+   await openPage(t);
+   let hub:FeedView={};
+   await t.expect('the Hub feed is current, from verify-owner, at the revision the Hub serves',async()=>{
+    let outcome:CheckOutcome={outcome:'failed',reason:'not checked'};
+    await eventually(async()=>{outcome=await checkHubFeed(t);return outcome.outcome==='passed'?null:outcome.reason;},15000);
+    hub=await hubSessions(t.runtimeDir,hubFeed(t.inputs),t.signal);
+   });
+   const sessions=(hub.snapshot?.sessions??[]) as HubSession[];
+   await tab(t,'Monitor');
+   await t.expect('the Monitor lists every Hub session and its project from a current source',async()=>{
+    if(!sessions.length)throw new Error('the Hub serves no sessions');
+    await text(t,'Monitor state connected');await text(t,/^Source: current · Collector: /);
+    for(const session of sessions){
+     await t.page.getByRole('heading',{name:sessionName(session),exact:true}).waitFor({timeout:WAIT});
+     await text(t,projectLine(session));
+    }
+   });
+   let monitor:Buffer=Buffer.alloc(0);
+   await t.expect('the monitor preview shows the exact server picture of the Hub-fed sessions',async()=>{monitor=await monitorPicture(t);});
+   await saveSimulatorResult(t,'hub-monitor',monitor,'Monitor tab exact preview canvas of the Hub-fed sessions');
+   await t.expect('the controller endpoint answers the Hub\'s credential with the default identity and refuses a request without it',async()=>{
+    const base=t.endpoints.controller;if(!base)throw new Error('the run does not announce its controller endpoint');
+    const token=await readPairingToken(t.runtimeDir,pairingTokens.controller);
+    for(const path of ['controller/v1/snapshot','controller/pixoo-integration/v1/snapshot']){
+     const response=await fetch(new URL(path,base),{headers:{authorization:`Bearer ${token}`},signal:t.signal});
+     if(!response.ok)throw new Error(`${path} answered ${response.status}`);
+     const {identity}=await response.json() as {identity?:{controllerId?:string;deviceId?:string}};
+     if(identity?.controllerId!=='pixoo-controller'||identity.deviceId!=='pixoo-local')throw new Error(`${path} names ${identity?.controllerId}/${identity?.deviceId}`);
+    }
+    const anonymous=await fetch(new URL('controller/v1/snapshot',base),{signal:t.signal});
+    if(anonymous.status!==401)throw new Error(`a request without the Hub's credential answered ${anonymous.status}`);
+   });
+   // The Hub's command path, as the Hub sends it: one command, its replay, and another token. Assumes no concurrent command.
+   const writer=async()=>(await api<{writer:WriterCounts}>(t,'/api/device/simulator')).writer;
+   const controller=async(path:string,token:string,body?:unknown)=>{
+    const response=await fetch(new URL(path,t.endpoints.controller),{method:body===undefined?'GET':'POST',signal:t.signal,
+     headers:{authorization:`Bearer ${token}`,...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    return {status:response.status,text:await response.text()};
+   };
+   const brightness=async(token:string)=>{
+    const snapshot=JSON.parse((await controller('controller/v1/snapshot',token)).text) as {identity:{controllerId:string;deviceId:string};nextRequestId:unknown;configurationRevision:number;generation:unknown};
+    return {apiVersion:'1.0',controllerId:snapshot.identity.controllerId,deviceId:snapshot.identity.deviceId,requestId:snapshot.nextRequestId,
+     expectedConfigurationRevision:snapshot.configurationRevision,expectedGeneration:snapshot.generation,command:{kind:'brightness.set',percent:25}};
+   };
+   await t.expect('one brightness.set with the Hub\'s token reaches the writer once, and its replay returns the same receipt',async()=>{
+    if(!t.endpoints.controller)throw new Error('the run does not announce its controller endpoint');
+    const token=await readPairingToken(t.runtimeDir,pairingTokens.controller),command=await brightness(token),before=await writer();
+    const first=await controller('controller/v1/commands',token,command);
+    const {outcome}=JSON.parse(first.text) as {outcome?:string};
+    if(first.status!==200||outcome==='failed')throw new Error(`the command answered ${first.status} ${String(outcome)}`);
+    let after=before;
+    await eventually(async()=>{after=await writer();return after.setBrightness.admitted===before.setBrightness.admitted+1&&after.setBrightness.succeeded===before.setBrightness.succeeded+1?null:`setBrightness went from ${JSON.stringify(before.setBrightness)} to ${JSON.stringify(after.setBrightness)}`;});
+    const replay=await controller('controller/v1/commands',token,command);
+    if(replay.status!==first.status||replay.text!==first.text)throw new Error('the replay did not return the original receipt');
+    await new Promise(resolve=>setTimeout(resolve,500));
+    const afterReplay=await writer();
+    if(JSON.stringify(afterReplay)!==JSON.stringify(after))throw new Error(`the replay reached the writer: ${JSON.stringify(afterReplay.setBrightness)}`);
+    await t.attach('controller-command.json',JSON.stringify({command:'brightness.set',status:first.status,outcome,replayIdentical:true,writer:{before,after,afterReplay}},null,1)+'\n');
+   });
+   await t.expect('another token reads nothing and sends nothing to the writer',async()=>{
+    const hub=await readPairingToken(t.runtimeDir,pairingTokens.controller),command=await brightness(hub),before=await writer();
+    for(const token of [await readPairingToken(t.runtimeDir,pairingTokens.feed),randomBytes(32).toString('base64url')]){
+     const read=await controller('controller/v1/snapshot',token),sent=await controller('controller/v1/commands',token,command);
+     if(read.status!==401||sent.status!==401)throw new Error(`another token answered ${read.status} to a read and ${sent.status} to a command`);
+    }
+    await new Promise(resolve=>setTimeout(resolve,300));
+    if(JSON.stringify(await writer())!==JSON.stringify(before))throw new Error('a command with another token reached the writer');
+   });
+   await t.expect('the transport log allows only this run\'s port and the Hub feed port, and records the feed reads',async()=>{
+    const {allowed,blocked}=await readTransportLog(transportLog(t.runtimeDir)),hubPort=hubFeed(t.inputs).port;
+    const hub=(entry:{host?:string;port?:number})=>entry.host==='127.0.0.1'&&entry.port===hubPort;
+    const toHub=allowed.filter(entry=>entry.target==='paired'&&hub(entry)).length;
+    if(!toHub)throw new Error(`no connection to the Hub feed 127.0.0.1:${hubPort} is recorded`);
+    const other=allowed.filter(entry=>entry.port!==t.port&&!hub(entry));
+    if(other.length||blocked.length)throw new Error(`${other.length} other connections and ${blocked.length} blocked attempts are recorded`);
+    await t.attach('transport-allowed.json',JSON.stringify({runPort:t.port,hubPort,allowed:{own:allowed.length-toHub,hub:toHub},blocked:0},null,1)+'\n');
+   });
    await noPhysicalTransport(t);
   },
  },

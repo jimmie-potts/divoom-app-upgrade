@@ -32,19 +32,42 @@ async function reseed(run:Awaited<ReturnType<typeof started>>,scenario:string):P
  return server;
 }
 
-it('loads every plug-in module under plain Node type stripping and registers its scenarios, checks, steps and fresh flags',async()=>{
+it('loads every plug-in module under plain Node type stripping and registers its scenarios, inputs, checks, steps and fresh flags',async()=>{
  const script=`const p=(await import(${JSON.stringify(pathToFileURL(join(process.cwd(),'scripts/verify/plugin.ts')).href)})).default;
   console.log(JSON.stringify({app:p.app,defaultScenario:p.defaultScenario,scenarios:Object.keys(p.scenarios),checks:p.checks.map(c=>c.id+(c.doctor?':doctor':'')),steps:Object.keys(p.captureSteps),
+   inputs:Object.fromEntries(Object.entries(p.inputs).map(([name,input])=>[name,input.required??false])),
+   required:Object.fromEntries(Object.entries(p.scenarios).map(([name,scenario])=>[name,scenario.requiredInputs??[]])),
    fresh:Object.entries(p.captureSteps).filter(([,step])=>step.fresh).map(([name])=>name),
-   unscoped:Object.entries(p.captureSteps).filter(([,step])=>step.scenario!=='library-playlist').map(([name])=>name),
+   pinned:Object.fromEntries(Object.entries(p.captureSteps).map(([name,step])=>[name,step.scenario??null])),
    cause:typeof p.readiness.failureCause,
    components:p.components.map(c=>c.id+':'+c.kind),artifact:p.build.artifact,version:p.build.version}));`;
  const {stdout}=await promisify(execFile)(process.execPath,['--input-type=module','-e',script],{env:{PATH:process.env.PATH},timeout:20000});
- expect(JSON.parse(stdout)).toEqual({app:'pixoo',defaultScenario:'library-playlist',scenarios:['library-playlist','empty'],checks:['simulator-mode:doctor','no-physical-transport:doctor'],
-  steps:['library-selection','playlist-progression','playback-controls','monitor-media','lost-response-recovery','device-boundary','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-retry-new-identity'],
-  fresh:['playlist-progression','playback-controls','monitor-media','lost-response-recovery','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-retry-new-identity'],
-  unscoped:['device-boundary'],cause:'function',
-  components:['pixoo-server:actual','web-ui:actual','device-transport:simulated','media:simulated','agent-sessions:simulated'],artifact:{route:'/'},version:'0.0.0'});
+ const standalone='library-playlist';
+ expect(JSON.parse(stdout)).toEqual({app:'pixoo',defaultScenario:'library-playlist',scenarios:['library-playlist','empty','hub-paired'],checks:['simulator-mode:doctor','no-physical-transport:doctor','hub-feed:doctor'],
+  steps:['library-selection','playlist-progression','playback-controls','monitor-media','lost-response-recovery','hub-sessions','device-boundary','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-hub-feed-stale','control-retry-new-identity'],
+  inputs:{'hub-feed':false},required:{'library-playlist':[],empty:[],'hub-paired':['hub-feed']},
+  fresh:['playlist-progression','playback-controls','monitor-media','lost-response-recovery','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-hub-feed-stale','control-retry-new-identity'],
+  pinned:{'library-selection':standalone,'playlist-progression':standalone,'playback-controls':standalone,'monitor-media':standalone,'lost-response-recovery':standalone,'hub-sessions':'hub-paired','device-boundary':null,
+   'control-wrong-frame':standalone,'control-duplicate-next':standalone,'control-select-media-resumes':standalone,'control-hub-feed-stale':'hub-paired','control-retry-new-identity':standalone},
+  cause:'function',
+  components:['pixoo-server:actual','web-ui:actual','controller-api:actual','device-transport:simulated','media:simulated','agent-sessions:simulated'],artifact:{route:'/'},version:'0.0.0'});
+},SPAWNS);
+
+it('announces the controller endpoint from a hub-paired launch onward, and never before',async()=>{
+ const {default:plugin}=await import('../../scripts/verify/plugin.ts');
+ const run=await makeRun();cleanup.push(run.remove);
+ const line='Pixoo simulator listening on http://127.0.0.1:41705',node=process.execPath,inputs={'hub-feed':'http://127.0.0.1:41999/'};
+ const announce=async(scenario:string,endpointPorts:Record<string,number>)=>{
+  await plugin.launch({...run,port:41705,node,scenario,inputs,endpointPorts});
+  return plugin.readiness.line(line);
+ };
+ expect(await announce('library-playlist',{})).toEqual({url:'http://127.0.0.1:41705/'});
+ const paired=await announce('hub-paired',{});
+ expect(paired).toEqual({url:'http://127.0.0.1:41705/',endpoints:{controller:'http://127.0.0.1:41705/'}});
+ // The core holds a recorded endpoint to its port, so every later scenario of that run announces it again.
+ expect(await announce('library-playlist',{controller:41705})).toEqual(paired);
+ expect(await announce('empty',{controller:41705})).toEqual(paired);
+ expect(plugin.readiness.line('Pixoo device listening on http://127.0.0.1:41705')).toBeUndefined();
 },SPAWNS);
 
 it('keeps two concurrent runs apart and reseeds one on its recorded port without touching the other',async()=>{
