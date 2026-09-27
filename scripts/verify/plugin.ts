@@ -46,7 +46,7 @@ const plugin:AppPlugin={
  components:[
   {id:'pixoo-server',kind:'actual',note:'Fastify server from apps/server/dist/main.js with the library, player and embedded monitor'},
   {id:'web-ui',kind:'actual',note:'apps/web/dist served by the same process'},
-  {id:'device-transport',kind:'simulated',note:'PIXOO_MODE=simulator selects the fake adapter; scripts/verify/transport-guard.ts blocks and records any physical request'},
+  {id:'device-transport',kind:'simulated',note:'PIXOO_MODE=simulator selects the fake adapter; scripts/verify/transport-guard.ts blocks and records any physical request or connection to installed local services'},
   {id:'media',kind:'simulated',note:'synthetic 64x64 PNG and GIF fixtures from scripts/verify/scenarios.ts'},
   {id:'agent-sessions',kind:'simulated',note:'one synthetic lifecycle event posted at seed with a revoked run-generated credential'},
  ],

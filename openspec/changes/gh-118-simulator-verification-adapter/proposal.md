@@ -5,7 +5,7 @@
 ## What Changes
 
 - Add `npm run verify -- <operation>`, a wrapper that passes the Pixoo plug-in to the vendored shared core.
-- Launch the built server with explicit simulator, data directory and port settings, preloaded with a transport guard that refuses non-simulator startup and blocks and records physical transport.
+- Launch the built server with explicit simulator, data directory and port settings, preloaded with a transport guard that refuses non-simulator startup and blocks and records physical transport and any connection to installed local services.
 - Seed named synthetic scenarios into a private data directory that is outside every checkout and apart from the owner's normal state.
 - Add capture steps with named assertions against fixture pixels and backend state, labelled 64×64 simulator results, and `control-*` negative controls that must fail.
 - Add the feature map to the development guide.

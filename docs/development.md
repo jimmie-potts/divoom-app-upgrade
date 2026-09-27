@@ -174,8 +174,10 @@ Each run:
   under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
   never decide the mode, data directory or port.
 - preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
-  unless the simulator is selected, and it blocks and records every outbound
-  HTTP request and non-loopback connection. `start` runs the
+  unless the simulator is selected. It blocks and records every outbound HTTP
+  request, UDP socket and Unix socket connection, and every TCP connection
+  except to the run's own port, so installed services such as the Hub on 8788
+  are refused like a device. `start` runs the
   `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
   them. Every capture step ends by asserting that the run has recorded no
   attempt. A failed start names known causes, such as

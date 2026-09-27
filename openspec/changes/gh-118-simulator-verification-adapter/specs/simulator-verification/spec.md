@@ -12,7 +12,7 @@
 - **THEN** `doctor` reports the served artifact digest as changed rather than matching
 
 ### Requirement: Simulator-only runs
-A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator. It SHALL block and record every outbound HTTP request and non-loopback connection before it leaves the process. A run SHALL NOT bind an installed port.
+A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator. It SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. A later paired scenario MAY allow explicitly declared loopback ports of another disposable run, never an installed port. A run SHALL NOT bind an installed port.
 
 #### Scenario: Ambient device settings
 - **WHEN** a run starts while the caller selects device mode, the owner's data directory and the installed port, and the run's data holds a saved device target
@@ -25,6 +25,10 @@ A verification run SHALL launch the built server with explicit simulator mode, t
 #### Scenario: Physical transport attempt
 - **WHEN** code in a guarded process calls the device transport or fetches a non-loopback address
 - **THEN** the call fails without a connection, and the recorded attempt fails the no-physical-transport check
+
+#### Scenario: Installed loopback service
+- **WHEN** code in a guarded process connects to `127.0.0.1:8788`, another local port or a Unix socket
+- **THEN** the connection is refused and recorded, and the no-physical-transport check fails; a connection to the process's own listening port is allowed
 
 ### Requirement: Private synthetic data
 Seeding SHALL write only into an empty real directory outside every Git checkout, including through symlink aliases. That directory SHALL NOT be, contain or lie inside the owner's normal data and lock directories or an inherited data directory. Scenarios SHALL use only generated 64×64 fixtures, one playlist and synthetic agent sessions. Any credential SHALL be generated for the run, revoked after seeding and never stored in plain text.
