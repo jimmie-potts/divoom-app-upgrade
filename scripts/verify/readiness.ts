@@ -1,6 +1,6 @@
 // Readiness and simulated-boundary checks for a Pixoo verification run.
 import {readFile} from 'node:fs/promises';
-import {HUB_OWNER_ID,HUB_PAIRED,hubFeed,hubSessions,pixooFeed} from './pairing.ts';
+import {HUB_OWNER_ID,HUB_PAIRED,hubFeed,pixooFeed,readHubFeed,type HubRead} from './pairing.ts';
 import {transportLog} from './run-environment.ts';
 
 export interface ProbeInput {
@@ -103,8 +103,8 @@ function describe(e:TransportEntry):string {
  * Nothing outside the run was attempted or reached: no blocked attempt (a
  * device, another host, an installed loopback service, a Unix or UDP socket,
  * a spawned or replaced process), and no connection to a local port other
- * than the one this run serves, except a paired Hub port that the connecting
- * process's own launch declared. Only a `hub-paired` launch declares one.
+ * than the one this run serves, except a paired Hub port on 127.0.0.1 that the
+ * connecting process's own launch declared. Only a `hub-paired` launch declares one.
  * The guard is loaded in the process serving this port, and that process is
  * paired with exactly the `hub-feed` port in `hub-paired` and with no port in
  * any other scenario. The log spans the whole run, so a connection a paired
@@ -113,7 +113,7 @@ function describe(e:TransportEntry):string {
 export async function checkNoPhysicalTransport(input:ProbeInput):Promise<CheckOutcome> {
  const record=await readTransportLog(transportLog(input.runtimeDir));
  if(record.blocked.length)return {outcome:'failed',reason:`${record.blocked.length} transport attempts blocked: ${record.blocked.map(describe).join(', ')}`};
- const other=record.entries.filter((e,index)=>e.event==='allowed'&&e.port!==input.port&&!(e.target==='paired'&&declaredPairing(record.entries,e.pid,index)?.includes(e.port!)));
+ const other=record.entries.filter((e,index)=>e.event==='allowed'&&e.port!==input.port&&!(e.target==='paired'&&e.host==='127.0.0.1'&&declaredPairing(record.entries,e.pid,index)?.includes(e.port!)));
  if(other.length)return {outcome:'failed',reason:`${other.length} connection${other.length===1?'':'s'} to another local port: ${other.map(e=>`${e.host}:${e.port}`).join(', ')}`};
  const serving=record.listening.at(-1);
  if(!serving||serving.port!==input.port)return {outcome:'failed',reason:`the transport guard is not recorded in the process serving port ${input.port}`};
@@ -126,17 +126,41 @@ export async function checkNoPhysicalTransport(input:ProbeInput):Promise<CheckOu
  return {outcome:'passed'};
 }
 
-/** Pause between feed reads while the Hub may advance its revision. */
+/** Pause between feed reads while the Hub may advance its revision or Pixoo may poll again. */
 const pause=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
+/** Why a read of the Hub did not serve the feed, as a clause. */
+const unserved=(read:Exclude<HubRead,{kind:'served'}>)=>read.kind==='refused'?`the Hub refuses the feed token (${read.status})`:read.kind==='unreachable'?`the Hub is not reachable (${read.cause})`:`the Hub feed is unreadable: ${read.reason}`;
+/**
+ * How long after a launch a Hub that refuses the feed token or cannot be
+ * reached still counts as a pairing in progress. The check runs right after
+ * the `hub-paired` reseed, before the orchestrator configures the Hub; a later
+ * `doctor` that still sees no current feed reports the pairing as broken.
+ */
+export const PAIRING_GRACE_MS=60000;
+/** The server's uptime, from its own diagnostics. */
+async function uptimeMs(url:string,signal?:AbortSignal):Promise<number> {
+ const target=new URL('/api/diagnostics',url),response=await fetch(target,{...(signal?{signal}:{}),headers:{accept:'application/json'}});
+ if(!response.ok)throw new Error(`${target.href} answered ${response.status}`);
+ const {uptimeMs:value}=await response.json() as {uptimeMs?:unknown};
+ if(typeof value!=='number')throw new Error(`${target.href} reports no uptime`);
+ return value;
+}
 /**
  * In `hub-paired`: Pixoo's remote feed is current, from the Hub's owner, at
- * the revision the Hub serves. Pixoo's read refreshes the feed first. A launch
- * whose feed has not yet been current (the Hub does not accept the feed token
- * yet, or is not reachable yet) is `skipped`, so a reseed before the Hub is
- * configured does not fail; a feed that was current and is now stale fails.
- * Skipped in every other scenario. Reads only; doctor repeats it.
+ * the revision the Hub serves. Pixoo's read refreshes the feed first; the
+ * check then reads the Hub itself with the feed token.
+ *
+ * While this launch has never had a current feed, the check is `skipped` only
+ * when the Hub refuses the token or cannot be reached, and only within
+ * `graceMs` of the launch: a reseed before the Hub is configured must not
+ * fail, and a pairing that never completes must. When the Hub serves a feed that Pixoo still
+ * does not apply, it fails with the cause: another owner, a feed Pixoo
+ * refuses, or an error status. A feed that was current and is now stale fails,
+ * naming a Hub whose revisions restarted below Pixoo's, and a revision that
+ * never settles fails. Skipped in every other scenario. Reads only; doctor
+ * repeats it.
  */
-export async function checkHubFeed(input:ProbeInput):Promise<CheckOutcome> {
+export async function checkHubFeed(input:ProbeInput,graceMs=PAIRING_GRACE_MS):Promise<CheckOutcome> {
  if(input.scenario!==HUB_PAIRED)return {outcome:'skipped',reason:`the run is not paired with a Hub (scenario ${input.scenario??'unknown'})`};
  let problem='';
  try{
@@ -144,13 +168,32 @@ export async function checkHubFeed(input:ProbeInput):Promise<CheckOutcome> {
   for(let attempt=0;attempt<5;attempt++){
    if(attempt)await pause(250);
    const pixoo=await pixooFeed(input.url,input.signal);
-   if(pixoo.connection==='unavailable')return {outcome:'skipped',reason:'the Hub feed has not been current since this launch; the Hub may not accept the feed token yet'};
-   if(pixoo.connection!=='current')return {outcome:'failed',reason:`the Hub feed is ${String(pixoo.connection)} at revision ${String(pixoo.snapshot?.revision)}`};
+   const read=await readHubFeed(input.runtimeDir,hub,input.signal);
+   if(pixoo.connection==='unavailable'){
+    if(read.kind==='refused'||read.kind==='unreachable'){
+     const seen=read.kind==='refused'?`the Hub refuses the feed token (${read.status})`:`the Hub is not reachable (${read.cause})`,up=await uptimeMs(input.url,input.signal);
+     if(up>=graceMs)return {outcome:'failed',reason:`${seen}, and this launch has had no current feed in ${Math.floor(up/1000)} s`};
+     return {outcome:'skipped',reason:`${seen}; this launch has not had a current feed yet`};
+    }
+    if(read.kind==='error')return {outcome:'failed',reason:unserved(read)};
+    if(read.view.ownerId!==HUB_OWNER_ID)return {outcome:'failed',reason:`the Hub serves owner ${String(read.view.ownerId)}, expected ${HUB_OWNER_ID}`};
+    // Pixoo may not have polled since the Hub began accepting the token; the next read refreshes again.
+    problem=`Pixoo refuses the feed the Hub serves at revision ${String(read.view.snapshot?.revision)}`;
+    continue;
+   }
+   if(pixoo.connection!=='current'){
+    const last=Number(pixoo.snapshot?.revision),stale=`the Hub feed is ${String(pixoo.connection)} at revision ${String(pixoo.snapshot?.revision)}`;
+    if(read.kind!=='served')return {outcome:'failed',reason:`${stale}; ${unserved(read)}`};
+    const served=Number(read.view.snapshot?.revision);
+    if(read.view.ownerId===HUB_OWNER_ID&&served<last)return {outcome:'failed',reason:`${stale}; the Hub now serves revision ${served}, below it, so reseed this run hub-paired`};
+    problem=read.view.ownerId===HUB_OWNER_ID?`${stale}; Pixoo refuses the feed the Hub serves at revision ${String(read.view.snapshot?.revision)}`:`${stale}; the Hub serves owner ${String(read.view.ownerId)}, expected ${HUB_OWNER_ID}`;
+    continue;
+   }
    if(pixoo.ownerId!==HUB_OWNER_ID)return {outcome:'failed',reason:`the feed owner is ${String(pixoo.ownerId)}, expected ${HUB_OWNER_ID}`};
-   const served=await hubSessions(input.runtimeDir,hub,input.signal);
-   if(served.ownerId!==HUB_OWNER_ID)return {outcome:'failed',reason:`the Hub reports owner ${String(served.ownerId)}, expected ${HUB_OWNER_ID}`};
-   if(pixoo.snapshot?.revision===served.snapshot?.revision&&typeof served.snapshot?.revision==='number')return {outcome:'passed'};
-   problem=`Pixoo applied revision ${String(pixoo.snapshot?.revision)}, the Hub serves revision ${String(served.snapshot?.revision)}`;
+   if(read.kind!=='served')return {outcome:'failed',reason:`Pixoo's feed is current, but ${unserved(read)}`};
+   if(read.view.ownerId!==HUB_OWNER_ID)return {outcome:'failed',reason:`the Hub serves owner ${String(read.view.ownerId)}, expected ${HUB_OWNER_ID}`};
+   if(pixoo.snapshot?.revision===read.view.snapshot?.revision&&typeof read.view.snapshot?.revision==='number')return {outcome:'passed'};
+   problem=`Pixoo applied revision ${String(pixoo.snapshot?.revision)}, the Hub serves revision ${String(read.view.snapshot?.revision)}`;
   }
  }catch(error){return {outcome:'failed',reason:`the Hub feed is unreadable: ${reason(error)}`};}
  return {outcome:'failed',reason:problem};

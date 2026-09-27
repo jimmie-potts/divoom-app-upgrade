@@ -36,7 +36,7 @@ A verification run SHALL launch the built server with explicit simulator mode, t
 - **THEN** the guard removes both, while a paired launch keeps the controller enabled with its default identity
 
 ### Requirement: Observed transport boundary
-Through the public Node.js APIs, the transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port and to a port its own launch declared as paired, so installed loopback services are refused like a device. Records SHALL name hosts and ports, never URL paths. Only a `hub-paired` launch SHALL declare a paired port, the `hub-feed` port, and never an installed port.
+Through the public Node.js APIs, the transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port and to a port its own launch declared as paired, on `127.0.0.1` only, so installed loopback services are refused like a device. Records SHALL name hosts and ports, never URL paths. Only a `hub-paired` launch SHALL declare a paired port, the `hub-feed` port, and never an installed port.
 
 #### Scenario: Physical transport attempt
 - **WHEN** code in a guarded process calls the device transport or fetches a non-loopback address
@@ -47,8 +47,8 @@ Through the public Node.js APIs, the transport guard SHALL block and record, bef
 - **THEN** the connection is refused and recorded, and the no-physical-transport check fails; a connection to the process's own listening port is allowed
 
 #### Scenario: Paired launch reaching beyond the Hub
-- **WHEN** a process launched with the Hub port declared connects to that port, to an installed port, to another local port and sends a device request
-- **THEN** only the Hub connection is allowed and recorded as paired, the other attempts are refused and recorded, and the check fails in `hub-paired`
+- **WHEN** a process launched with the Hub port declared connects to that port on `127.0.0.1`, to the same port through another loopback name or address, to an installed port and to another local port, and sends a device request
+- **THEN** only the connection to `127.0.0.1` is allowed and recorded as paired, the other attempts are refused and recorded, and the check fails in `hub-paired`
 
 ### Requirement: Guarded code execution
 A fork of Node and every file-based worker thread SHALL run under the same guard, even when the caller replaces `execArgv` or `env`, with fork options honored as Node reads them. Every other public process start SHALL be refused and recorded, including a fork of another program and an eval worker. The launch SHALL empty `NODE_OPTIONS`. The guard is not a sandbox against hostile code already in the process (side-effecting `toString`, internal bindings, native addons).
@@ -81,7 +81,7 @@ Seeding SHALL write only into an empty real directory outside every Git checkout
 - **THEN** no file in the data directory holds the controller token, and only the 0600 remote configuration holds the feed token
 
 ### Requirement: Readiness and boundary checks
-A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a health read reporting simulator mode without connectivity. Start checks SHALL confirm simulator mode through health and device settings, and a guard record for the serving port with no transport attempt. A connection to another port SHALL pass only when the connecting process's own launch declared it paired. The serving process SHALL be paired with exactly the `hub-feed` port in `hub-paired` and with no port otherwise. The `hub-feed` check SHALL pass in `hub-paired` when Pixoo's feed is current, from `verify-owner`, at the Hub's revision. It SHALL be skipped while the launch has never had a current feed and in other scenarios, and SHALL fail when a current feed turns stale. A failed start SHALL be named by a fixed cause line for known server and guard failures, without copying server output.
+A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a health read reporting simulator mode without connectivity. Start checks SHALL confirm simulator mode through health and device settings, and a guard record for the serving port with no transport attempt. A connection to another port SHALL pass only when it went to `127.0.0.1` and the connecting process's own launch declared it paired. The serving process SHALL be paired with exactly the `hub-feed` port in `hub-paired` and with no port otherwise. The `hub-feed` check SHALL pass in `hub-paired` when Pixoo's feed is current, from `verify-owner`, at the Hub's revision. While the launch has had no current feed, it SHALL be skipped only when the Hub refuses the feed token or cannot be reached, and only within a grace period after the launch. It SHALL otherwise fail, naming what the Hub answered or served. It SHALL fail when a current feed turns stale or the revisions do not settle, and SHALL be skipped in other scenarios. A failed start SHALL be named by a fixed cause line for known server and guard failures, without copying server output.
 
 #### Scenario: Occupied recorded port
 - **WHEN** a relaunch after reseeding finds its recorded port occupied
@@ -97,7 +97,19 @@ A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a he
 
 #### Scenario: Lost Hub feed
 - **WHEN** the Hub becomes unreachable after the feed was current, and then returns
-- **THEN** the `hub-feed` check fails with the stale revision, then passes again without a restart
+- **THEN** the `hub-feed` check fails with the stale revision and the connection cause, then passes again without a restart
+
+#### Scenario: Hub feed that Pixoo refuses
+- **WHEN** the Hub accepts the feed token but serves another owner, a feed Pixoo refuses or an error status before Pixoo's feed was ever current
+- **THEN** the `hub-feed` check fails naming that owner, the refused revision or the status, never the token
+
+#### Scenario: Pairing that never completes
+- **WHEN** the Hub still refuses the feed token or cannot be reached after the grace period
+- **THEN** the `hub-feed` check fails naming the refusal or the connection cause
+
+#### Scenario: Hub reseeded after pairing
+- **WHEN** the Hub's revisions restart below the revision Pixoo applied
+- **THEN** the `hub-feed` check fails naming both revisions and the reseed of Pixoo `hub-paired` that recovers it
 
 ### Requirement: Assertive capture steps
 Capture steps SHALL drive the actual page and record named assertions for library selection, playlist progression, playback controls, Monitor/Media transitions, recovery from a lost command response, the device boundary and Hub pairing. Pixel assertions SHALL compare drawn pixels with fixture definitions or with the server's exact monitor picture. Each step SHALL end by asserting that the run has recorded no transport attempt.
@@ -112,7 +124,7 @@ Capture steps SHALL drive the actual page and record named assertions for librar
 
 #### Scenario: Hub-fed Monitor
 - **WHEN** `hub-sessions` runs on a paired run
-- **THEN** the feed is current at the Hub's revision, the Monitor lists every Hub session and project, the canvas equals the server picture, the controller endpoint answers the Hub's token with the default identity and refuses a request without it, and only the run's port and the Hub port were reached
+- **THEN** the feed is current at the Hub's revision, the Monitor lists every Hub session and project, the canvas equals the server picture, the controller endpoint answers the Hub's token with the default identity and refuses a request without it, one `brightness.set` with the Hub's token reaches the writer exactly once and its replay returns the same receipt, the feed token and a random token get 401 and reach no writer, and only the run's port and the Hub port on `127.0.0.1` were reached
 
 ### Requirement: Labelled simulator results
 Saved 64×64 results SHALL include an exact PNG, an enlarged copy and a label that marks them as simulator rendering, not physical display evidence.

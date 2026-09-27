@@ -29,8 +29,8 @@ if(!log)throw new Error('Pixoo transport guard: APP_VERIFY_TRANSPORT_LOG is requ
 if(process.env.PIXOO_MODE!=='simulator')throw new Error('Pixoo transport guard: a verification run requires PIXOO_MODE=simulator');
 const path:string=log;
 /**
- * Loopback ports of another disposable run this run may reach: the Hub run's
- * port, which only a `hub-paired` launch declares. Every launch sets the
+ * Ports of another disposable run this run may reach on 127.0.0.1: the Hub
+ * run's port, which only a `hub-paired` launch declares. Every launch sets the
  * variable, empty when the run is not paired. Never an installed port.
  */
 function pairedPorts():ReadonlySet<number> {
@@ -147,7 +147,8 @@ net.Socket.prototype.connect=function(this:net.Socket,...args:unknown[]){
  // Only a string path is a Unix socket; the http Agent passes `path: null` for TCP.
  if(typeof options.path==='string')return refuse({socketPath:options.path});
  const host=options.host??'localhost',port=Number(options.port);
- const target=!loopback(host)||installedPorts.includes(port)?undefined:own.has(port)?'own':paired.has(port)?'paired':undefined;
+ // A paired port is the Hub run's origin, http://127.0.0.1:<port>/: only that exact host, never another loopback name or address.
+ const target=!loopback(host)||installedPorts.includes(port)?undefined:own.has(port)?'own':host==='127.0.0.1'&&paired.has(port)?'paired':undefined;
  if(!target)return refuse({host,port});
  record({event:'allowed',api:'net.connect',host,port,target});
  return (connect as (...values:unknown[])=>net.Socket).apply(this,args);

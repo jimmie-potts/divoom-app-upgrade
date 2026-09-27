@@ -38,9 +38,9 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
  try{
   if(runtime.activeConfiguration)releaseOwner=await acquireDeviceOwner(runtime.activeConfiguration.ip,options.deviceLockDirectoryForTests);
   library=await Library.open({directory:join(dataDir,'library')});
-  const simulator=runtime.activeConfiguration?undefined:new FakeDeviceAdapter({recordHistory:false});
-  const device=simulator??(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration!.ip,
-   profile:{...PIXOO64_SMOKE_PROFILE,evidence:'observed',readyDelayMs:0}},options.transportForTests));
+  let simulator:FakeDeviceAdapter|undefined;
+  const device=runtime.activeConfiguration?(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration.ip,
+   profile:{...PIXOO64_SMOKE_PROFILE,evidence:'observed',readyDelayMs:0}},options.transportForTests)):(simulator=new FakeDeviceAdapter({recordHistory:false}));
   await assertRuntimeDirectory(dataDir);
   player=await Player.open({store:new LibraryPlaybackStore(library,{profile,stillDelayMs:runtime.mode==='device'?500:100}),device,pauseOnUncertain:runtime.mode==='device'});
   const active=player;

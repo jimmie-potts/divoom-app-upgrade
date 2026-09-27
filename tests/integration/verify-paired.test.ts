@@ -99,7 +99,7 @@ it('pairs with a Hub run: tolerates a rejected and a dropped feed, shows its ses
  // The Hub is not configured for this run yet: the feed stays unavailable, the check is skipped, and nothing fails.
  await eventually(()=>Promise.resolve(hub.reads.rejected),count=>count>0);
  expect(await pixooView(server)).toMatchObject({connection:'unavailable',ownerId:'verify-owner',snapshot:null});
- expect(await checkHubFeed(context())).toEqual({outcome:'skipped',reason:expect.stringMatching(/not been current since this launch/)});
+ expect(await checkHubFeed(context())).toEqual({outcome:'skipped',reason:'the Hub refuses the feed token (401); this launch has not had a current feed yet'});
  expect(await checkNoPhysicalTransport(context())).toEqual({outcome:'passed'});
 
  // Once the Hub accepts the feed token, Pixoo shows its sessions at its revision, and follows the next event.
@@ -128,7 +128,7 @@ it('pairs with a Hub run: tolerates a rejected and a dropped feed, shows its ses
 
  // An unreachable Hub turns the feed stale and fails the check; it recovers to current without a restart.
  hub.setFeed('drop');
- expect(await eventually(()=>checkHubFeed(context()),outcome=>outcome.outcome==='failed')).toEqual({outcome:'failed',reason:expect.stringMatching(/^the Hub feed is stale at revision \d+$/)});
+ expect(await eventually(()=>checkHubFeed(context()),outcome=>outcome.outcome==='failed')).toEqual({outcome:'failed',reason:expect.stringMatching(/^the Hub feed is stale at revision \d+; the Hub is not reachable \(connection reset\)$/)});
  hub.setFeed('accept');
  expect((await eventually(()=>checkHubFeed(context()),outcome=>outcome.outcome==='passed')).outcome).toBe('passed');
 
@@ -162,3 +162,42 @@ it('names routes by their full URL in reasons, which the core\'s redaction keeps
  expect(await probeHealth(context)).toEqual({ok:false,reason:`health unreadable: ${origin}/api/health answered 500`});
  expect(await checkHubFeed(context)).toEqual({outcome:'failed',reason:`the Hub feed is unreadable: ${origin}/api/integration/v1/sessions answered 500`});
 });
+
+it('skips hub-feed only while the Hub refuses the token or is unreachable, and fails with the cause when Pixoo refuses what the Hub serves',async()=>{
+ const run=await pairedRun(),hub:StandInHub=await standInHub(run.tokens.feed);cleanup.push(()=>hub.close());
+ await hub.event('session.started');
+ const inputs={'hub-feed':hub.origin};
+ await seedScenario({...run,scenario:HUB_PAIRED,inputs});
+ hub.setFeed('drop');
+ const server=await launch(launchSpec({...run,port:0,node:process.execPath,scenario:HUB_PAIRED,inputs}),process.env);cleanup.push(()=>server.stop());
+ const check=()=>checkHubFeed({...run,url:server.url,port:server.port,scenario:HUB_PAIRED,inputs,signal:AbortSignal.timeout(10000)});
+ // Not yet reachable, then refusing the token: the pairing may still be in progress, so the check is skipped.
+ expect(await check()).toEqual({outcome:'skipped',reason:'the Hub is not reachable (connection reset); this launch has not had a current feed yet'});
+ hub.setFeed('reject');
+ expect(await check()).toEqual({outcome:'skipped',reason:'the Hub refuses the feed token (401); this launch has not had a current feed yet'});
+ // Past the grace period a pairing that never completed is broken, not in progress.
+ expect(await checkHubFeed({...run,url:server.url,port:server.port,scenario:HUB_PAIRED,inputs,signal:AbortSignal.timeout(10000)},0))
+  .toEqual({outcome:'failed',reason:expect.stringMatching(/^the Hub refuses the feed token \(401\), and this launch has had no current feed in \d+ s$/)});
+ // The Hub accepts the token but serves what Pixoo refuses: each fails with its cause, never as a token problem.
+ hub.setFeed('accept');
+ hub.serve({owner:'other-owner'});
+ expect(await check()).toEqual({outcome:'failed',reason:'the Hub serves owner other-owner, expected verify-owner'});
+ hub.serve({malformed:true});
+ expect(await check()).toEqual({outcome:'failed',reason:`Pixoo refuses the feed the Hub serves at revision ${hub.revision()}`});
+ hub.serve({status:500});
+ expect(await check()).toMatchObject({outcome:'failed',reason:expect.stringMatching(/^the Hub feed is unreadable: http:\/\/127\.0\.0\.1:\d+\/api\/monitor\/v1\/sessions answered 500$/)});
+ expect((await pixooView(server)).connection).toBe('unavailable');
+ hub.serve({});
+ expect((await eventually(check,outcome=>outcome.outcome==='passed')).outcome).toBe('passed');
+ // A Hub that advances on every read never settles at one revision within the retries.
+ hub.serve({advance:true});
+ expect(await check()).toEqual({outcome:'failed',reason:expect.stringMatching(/^Pixoo applied revision \d+, the Hub serves revision \d+$/)});
+ hub.serve({});
+ expect((await eventually(check,outcome=>outcome.outcome==='passed')).outcome).toBe('passed');
+ // A Hub reseed restarts its revisions below what Pixoo applied: Pixoo stays stale until it is paired again.
+ const applied=(await pixooView(server)).snapshot!.revision;
+ await hub.reset();
+ expect(await eventually(check,outcome=>outcome.outcome==='failed')).toEqual({outcome:'failed',
+  reason:`the Hub feed is stale at revision ${applied}; the Hub now serves revision ${hub.revision()}, below it, so reseed this run hub-paired`});
+ expect((await readTransportLog(transportLog(run.runtimeDir))).blocked).toEqual([]);
+},SPAWNS);

@@ -109,7 +109,12 @@ test('hub-paired: the Monitor shows a stand-in Hub\'s sessions and its control f
    await nonEmpty(reference.screenshot);await nonEmpty(reference.video);
    await sixtyFour(join(reference.outputDir,'simulator-64x64-hub-monitor.png'));
    expect(JSON.parse(await readFile(join(reference.outputDir,'transport-allowed.json'),'utf8'))).toMatchObject({runPort:run.server.port,hubPort:hub.port,allowed:{hub:expect.any(Number)},blocked:0});
-   expect(reference.assertions.map(assertion=>assertion.name)).toContain('the Monitor lists every Hub session and its project from a current source');
+   expect(reference.assertions.map(assertion=>assertion.name)).toEqual(expect.arrayContaining(['the Monitor lists every Hub session and its project from a current source',
+    'one brightness.set with the Hub\'s token reaches the writer once, and its replay returns the same receipt','another token reads nothing and sends nothing to the writer']));
+   const command=JSON.parse(await readFile(join(reference.outputDir,'controller-command.json'),'utf8'));
+   expect(command).toMatchObject({command:'brightness.set',status:200,replayIdentical:true});
+   expect(command.writer.after.setBrightness.admitted-command.writer.before.setBrightness.admitted).toBe(1);
+   expect(command.writer.afterReplay).toEqual(command.writer.after);
    const log=await readFile(reference.log,'utf8');
    for(const token of Object.values(tokens))expect(log).not.toContain(token);
    const control=await capture(info,run,'control-hub-feed-stale');

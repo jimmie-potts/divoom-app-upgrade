@@ -16,3 +16,4 @@
 - [x] 3.1 Vendor the released `@jimmie-potts/app-verify` 1.1.0 archive with its checksum and source receipt, and pin it in the consumer test.
 - [x] 3.2 Local real-unit run from a clean candidate: standalone reference steps, then `hub-paired` against a stand-in Hub feed and controller caller, doctor, handoff, controls after handoff and stop.
 - [x] 3.3 `npm run check`, `npm run test:browser` and both workflow checks pass without credentials or devices; synchronize and archive the change.
+- [x] 3.4 Review round 1 on PR #124: `hub-feed` names what the Hub answered, skips only a refused or unreachable Hub within the grace period, and fails an owner mismatch, a refused feed, a revision that never settles and a Hub reseed below Pixoo's revision. The guard pairs only `127.0.0.1`. `hub-sessions` asserts one command, its replay and other tokens. Each is proven by new or failing-first tests.

@@ -60,7 +60,7 @@ const plugin:AppPlugin={
  checks:[
   {id:'simulator-mode',doctor:true,run:checkSimulatorMode},
   {id:'no-physical-transport',doctor:true,run:checkNoPhysicalTransport},
-  {id:'hub-feed',doctor:true,run:checkHubFeed},
+  {id:'hub-feed',doctor:true,run:context=>checkHubFeed(context)},
  ],
  captureSteps:{...captureSteps,...controlSteps},
 };

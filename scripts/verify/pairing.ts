@@ -90,8 +90,34 @@ async function feed(url:URL,headers:Record<string,string>,signal?:AbortSignal):P
 export function pixooFeed(url:string,signal?:AbortSignal):Promise<FeedView> {
  return feed(new URL('/api/integration/v1/sessions',url),{},signal);
 }
-/** The Hub's own feed, read with the run's feed token, as Pixoo's remote source reads it. */
+/** What the Hub answered the run's feed token: its feed, a refusal of the token, no connection, or another status. */
+export type HubRead={kind:'served';view:FeedView}|{kind:'refused';status:number}|{kind:'unreachable';cause:string}|{kind:'error';reason:string};
+/** What a failed connection saw, from undici's cause code; never the error text, which could carry a URL with a token. */
+function connectionCause(error:unknown):string {
+ const code=(error as {cause?:{code?:unknown}})?.cause?.code;
+ if(code==='ECONNREFUSED')return 'connection refused';
+ if(code==='ECONNRESET'||code==='UND_ERR_SOCKET')return 'connection reset';
+ return typeof code==='string'&&/^[A-Z_]{1,40}$/.test(code)?code:'no connection';
+}
+/**
+ * Read the Hub's own feed with the run's feed token, as Pixoo's remote source
+ * reads it, and classify the answer. A failed connection is `unreachable`;
+ * an abort of `signal` and an unreadable token file still throw.
+ */
+export async function readHubFeed(runtimeDir:string,hub:HubFeed,signal?:AbortSignal):Promise<HubRead> {
+ const token=await readPairingToken(runtimeDir,pairingTokens.feed),url=new URL('api/monitor/v1/sessions?snapshotVersion=1.2',hub.origin);
+ let response:Response;
+ try{response=await fetch(url,{headers:{accept:'application/json',authorization:`Bearer ${token}`,'x-pixoo-request':'1'},redirect:'error',...(signal?{signal}:{})});}
+ catch(error){if(signal?.aborted)throw error;return {kind:'unreachable',cause:connectionCause(error)};}
+ if(response.status===401||response.status===403){await response.body?.cancel();return {kind:'refused',status:response.status};}
+ // The full URL without its query: the core redacts a bare route in a reason as if it were a file path.
+ if(!response.ok){await response.body?.cancel();return {kind:'error',reason:`${url.origin}${url.pathname} answered ${response.status}`};}
+ try{return {kind:'served',view:await response.json() as FeedView};}
+ catch{return {kind:'error',reason:`${url.origin}${url.pathname} answered with a body that is not JSON`};}
+}
+/** The Hub's feed, or an error naming why the Hub did not serve it. */
 export async function hubSessions(runtimeDir:string,hub:HubFeed,signal?:AbortSignal):Promise<FeedView> {
- const token=await readPairingToken(runtimeDir,pairingTokens.feed);
- return feed(new URL('api/monitor/v1/sessions?snapshotVersion=1.2',hub.origin),{authorization:`Bearer ${token}`,'x-pixoo-request':'1'},signal);
+ const read=await readHubFeed(runtimeDir,hub,signal);
+ if(read.kind==='served')return read.view;
+ throw new Error(read.kind==='refused'?`the Hub refuses the feed token (${read.status})`:read.kind==='unreachable'?`the Hub is not reachable (${read.cause})`:read.reason);
 }
