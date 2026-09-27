@@ -95,6 +95,18 @@ It bundles the lifecycle contract; its exact public dependency is Ajv 8.20.0.
 The archive retains its upstream licenses. Pixoo owns the production storage
 adapter and authenticated host transport; the shared reducer remains upstream.
 
+## Shared verification core
+
+`@jimmie-potts/app-verify` 1.0.0 is a private development dependency consumed
+from the committed archive of the
+[app-verify-v1.0.0 release](https://github.com/jimmie-potts/agent-device-hub/releases/tag/app-verify-v1.0.0).
+Its SHA-256 is `f2106ea7ddd00169e325ea23fc2af022b7b2c4da5577ca9e06e72c908843433f`.
+The [source receipt](../vendor/app-verify-1.0.0-source-receipt.json) pins Hub
+PR #552 and source revision `4e7d095ea369db2b564c8debb130a7fddf997235`. The
+package has no runtime dependencies; Playwright is its optional peer, supplied
+by this repository's pinned `@playwright/test`. The consumer test verifies the
+archive, the receipt and every installed manifest hash.
+
 ## Shared controller contract
 
 The server pins `@jimmie-potts/device-contracts` 1.0.0 from the private

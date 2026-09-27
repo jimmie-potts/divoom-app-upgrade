@@ -70,6 +70,9 @@ npm run test:browser
 checks. Browser tests cover desktop/mobile uploads, transforms, editing, player controls, reconnect, command retry and readiness failure/retry. All tests use isolated data without a device. See
 [development](docs/development.md) for individual commands and platform details,
 [dependency licenses](docs/dependencies.md), and [the SDLC](docs/sdlc.md) for delivery.
+[Simulator verification runs](docs/development.md#simulator-verification-runs)
+start a disposable simulator copy with synthetic media, capture proof and leave
+a leased preview; their feature map lists each step's actions and observations.
 
 The seven npm workspaces are web and server applications plus core, device,
 media, library and playback packages. Core owns readiness validation. The device package includes a

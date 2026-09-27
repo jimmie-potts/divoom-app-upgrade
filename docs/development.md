@@ -137,6 +137,118 @@ Do not claim physical behavior from the readiness API or simulator page.
 diagnostics commands. Run application checks and browser checks sequentially in
 one worktree because both rebuild the production web assets.
 
+## Simulator verification runs
+
+`npm run verify -- <operation>` starts a disposable copy of this application,
+drives it, keeps proof and leaves a preview under a lease, for an agent or the
+owner. The shared core `@jimmie-potts/app-verify` is vendored from the Hub. It
+implements the operations, receipt, supervisor unit, lease, proof directories
+and capture harness of the Hub's
+[app verification contract](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/app-verification.md).
+`scripts/verify/` supplies only the Pixoo plug-in. The vendored release and
+its pins are described in [dependencies](dependencies.md#shared-verification-core).
+
+Runs need Linux with a `systemd --user` manager and Node 24.5 or later in the
+24.x line. The wrapper exits with status 3 under any other Node. `capture` also
+needs Chromium from `npx playwright install chromium`. From the worktree root:
+
+```bash
+fnm exec --using=.nvmrc -- npm run verify -- help
+fnm exec --using=.nvmrc -- npm run verify -- start
+fnm exec --using=.nvmrc -- npm run verify -- capture <run-id> playlist-progression
+fnm exec --using=.nvmrc -- npm run verify -- handoff <run-id> --reset library-playlist
+fnm exec --using=.nvmrc -- npm run verify -- stop <run-id>
+```
+
+Proof goes to the canonical checkout's `.local/evidence/verify/<run-id>/` and
+runtime state to `~/.local/state/app-verify/<run-id>/`. `stop` removes only
+the runtime state.
+
+Each run:
+
+- builds with `npm run build` on `start` and `restart`, then serves this
+  checkout's build. `help`, `doctor` and `stop` need no build.
+- shares the served build with every other run from the same checkout. A
+  later build there, including another run's `start`, replaces what a running
+  preview serves. `doctor` reports the served page's digest as `changed`;
+  `capture` does not check it, so run `doctor` before citing captures from a
+  checkout that was rebuilt, and use `restart` for a new candidate.
+- launches `apps/server/dist/main.js` on `127.0.0.1:0` with
+  `PIXOO_MODE=simulator`, monitoring enabled and a private `PIXOO_DATA_DIR`
+  under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
+  never decide the mode, data directory or port, and the guard removes any
+  other inherited `PIXOO_*` setting, such as MCP or controller flags, before
+  the server reads its configuration. `NODE_OPTIONS` is emptied, so no
+  inherited preload runs before the guard.
+- preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
+  unless the simulator is selected. Through the public Node.js APIs it blocks
+  and records every outbound HTTP request, UDP socket and Unix socket
+  connection, every TCP connection except to the run's own port, and every
+  other process start (`spawn`, `exec`, `execFile` and their Sync forms,
+  `ChildProcess#spawn` and `process.execve`). Installed services such as the
+  Hub on 8788 are refused like a device. A fork of Node, such as the media
+  worker, and every file-based worker thread run under the same guard, even
+  when their caller replaces `execArgv` or `env`; a fork of another program
+  and an eval worker are refused. The guard observes and refuses public API
+  use by the app and its dependencies. It is not a sandbox against
+  deliberately hostile code already running in the server process, such as
+  values with a side-effecting `toString`, internal bindings
+  (`process.binding`) or native addons. `start` runs the
+  `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
+  them. Every capture step ends by asserting that the run has recorded no
+  attempt. A failed start names known causes, such as
+  `pixoo-transport-guard: simulator mode required` or
+  `pixoo-start-failed: port in use`, without copying server output.
+- rejects a data directory inside a Git checkout, one reached through a
+  symlink alias, or one that overlaps the owner's normal data and lock
+  directories or an inherited `PIXOO_DATA_DIR`. It seeds only an empty
+  directory.
+
+Simulator pixels are the desired 64×64 content. They never establish what a
+physical display shows, and saved results are labelled as simulator rendering.
+
+### Feature map
+
+The default scenario `library-playlist` seeds `verify-quadrants.png`,
+`verify-blink.gif` (two frames, 500 ms each) and `verify-stripes.png`, the
+playlist "Verification loop" in that order, and one synthetic agent session,
+"Synthetic verification task" in project VERIFY-PIXOO. The `empty` scenario
+seeds no media, playlists or sessions.
+
+| Feature | Entry | Capture step | Deterministic action | Expected observation |
+| --- | --- | --- | --- | --- |
+| Library | Library tab | `library-selection` | Select each synthetic medium | Its heading, `64 × 64 · N frames` and preview pixels equal to the fixture; saves `library-quadrants` |
+| Playlist | Playlists, then Player | `playlist-progression` | Open the playlist, then Play playlist, Next, Next, Previous | A new session shows items 1, 2, 3 and 2 with their exact first frames, and the server is on item 2; saves `player-item-2` |
+| Playback | Player | `playback-controls` | Play playlist, Pause, Resume, Stop, reload | Intent paused, active, then stopped on item 1; the stopped session survives the reload |
+| 64×64 rendering | Library and Player previews, Monitor canvas | `library-selection`, `playlist-progression`, `monitor-media` | Read the 64×64 pixels the page draws | Fixture pixels, or the server's exact monitor picture; a PNG, an 8× copy and a simulator label |
+| Monitor/Media | Monitor tab | `monitor-media` | Play playlist, Show monitor, Select Media, then Resume in Player | Monitor active with playback paused and the canvas equal to the server picture; Media leaves playback paused; Resume continues item 1 in Media; saves `monitor` |
+| Recovery | Player | `lost-response-recovery` | Drop the Next response after the server applied it, then Retry command | Uncertain notice; the retry reuses the request identity; item 2 once with the generation unchanged |
+| Device boundary | Settings | `device-boundary` | Probe simulator | Simulator labels; health and device settings report the simulator; no transport attempt |
+
+Each negative control runs a step with a known-wrong behavior injected between
+the page and the server, and must report failed:
+
+| Control | Wrong behavior | Detected by |
+| --- | --- | --- |
+| `control-wrong-frame` | Every rendition frame is served as the stripes fixture | `library-selection` preview pixels |
+| `control-duplicate-next` | Every Next is applied twice under a fresh identity | `playlist-progression` item 2 |
+| `control-select-media-resumes` | Select Media also resumes playback | `monitor-media` paused check |
+| `control-retry-new-identity` | A retried Next is resent under a fresh identity | `lost-response-recovery` single effect |
+
+Steps that change state, and every control, are marked `fresh`: the core
+reseeds and relaunches the run on its port before driving them. For proof a
+delivery cites, capture only the reference steps before `handoff`; the Hub's
+delivery preflight rejects a verified set holding a capture that did not
+pass. Run the controls after `handoff`, where they land in `after-handoff/`
+and still report failed.
+
+`npm run test:browser` runs every step and control through the core's
+unsupervised `runCaptureStep` against the actual server. `npm test` covers the
+launch environment, data directory guard, transport guard, concurrent runs
+and reseeding. Neither needs `systemd --user`. The supervisor, lease, handoff
+and restart are tested in the core's own suite. Adapter changes that affect
+them need a local run against real units, recorded in the PR.
+
 ## Shared lifecycle contract conformance
 
 `npm test` and `npm run check` run the released lifecycle package consumer test
