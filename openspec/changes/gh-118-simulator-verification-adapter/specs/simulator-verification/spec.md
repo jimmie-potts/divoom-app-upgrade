@@ -38,11 +38,15 @@ Seeding SHALL write only into an empty real directory outside every Git checkout
 - **THEN** each run keeps its own port and state, and the reseeded run shows only the new scenario
 
 ### Requirement: Readiness and boundary checks
-A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a health read reporting simulator mode without connectivity. Start checks SHALL confirm simulator mode through health and device settings, and a guard record for the serving port with no transport attempt.
+A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a health read reporting simulator mode without connectivity. Start checks SHALL confirm simulator mode through health and device settings, and a guard record for the serving port with no transport attempt. A failed start SHALL be named by a fixed cause line for known server and guard failures, without copying server output.
 
 #### Scenario: Occupied recorded port
 - **WHEN** a relaunch after reseeding finds its recorded port occupied
-- **THEN** the server exits and its error names the port
+- **THEN** the server exits and the failure is named `pixoo-start-failed: port in use`
+
+#### Scenario: Unknown server output
+- **WHEN** the server's error output matches no known failure, even if it contains a token or path
+- **THEN** no cause line is reported
 
 ### Requirement: Assertive capture steps
 Capture steps SHALL drive the actual page and record named assertions for library selection, playlist progression, playback controls, Monitor/Media transitions, recovery from a lost command response and the device boundary. Pixel assertions SHALL compare drawn pixels with fixture definitions or with the server's exact monitor picture. Each step SHALL end by asserting that the run has recorded no transport attempt. Saved 64×64 results SHALL include an exact PNG, an enlarged copy and a label that marks them as simulator rendering, not physical display evidence.

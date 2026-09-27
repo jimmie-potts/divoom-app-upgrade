@@ -5,10 +5,11 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {promisify} from 'node:util';
-import {checkNoPhysicalTransport,checkSimulatorMode,probeHealth,readTransportLog} from '../../scripts/verify/readiness.ts';
+import {readFile} from 'node:fs/promises';
+import {checkNoPhysicalTransport,checkSimulatorMode,failureCause,probeHealth,readTransportLog} from '../../scripts/verify/readiness.ts';
 import {launchSpec,transportGuard,transportLog} from '../../scripts/verify/run-environment.ts';
 import {seedScenario} from '../../scripts/verify/scenarios.ts';
-import {launch,makeRun,type LaunchedRun} from '../helpers/verify-run.js';
+import {launch,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.js';
 
 const cleanup:(()=>Promise<unknown>)[]=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
@@ -51,12 +52,23 @@ it('keeps a run in simulator mode under ambient device settings and records no p
  expect(await readTransportLog(transportLog(run.runtimeDir))).toMatchObject({blocked:[],listening:[{pid:server.child.pid,port:server.port}]});
  expect(await readdir(run.ownerData)).toEqual([]);
  expect(await readdir(run.ownerHome)).toEqual([]);
+ // The core gives the app a private HOME; the server and guard need nothing else from it.
+ const environ=(await readFile(`/proc/${server.child.pid}/environ`,'utf8')).split('\0');
+ expect(environ).toContain(`HOME=${join(run.runtimeDir,'home')}`);
+ expect(environ.filter(entry=>entry.startsWith('PIXOO_')).sort()).toEqual(['PIXOO_DATA_DIR='+run.dataDir,'PIXOO_MODE=simulator','PIXOO_MONITOR_ENABLED=1','PIXOO_PORT=0']);
 });
+async function startFailure(spec:Parameters<typeof launch>[0],ambient:NodeJS.ProcessEnv):Promise<StartError> {
+ const error=await launch(spec,ambient).then(()=>undefined,(caught:unknown)=>caught);
+ if(!(error instanceof StartError))throw new Error(`expected a failed start, got ${String(error)}`);
+ return error;
+}
 
 it('negative control: a launch that loses its simulator setting never starts, even with a saved device target',async()=>{
  const run=await hostileRun();
  const leaked={...run.spec,env:{...run.spec.env}};delete (leaked.env as Record<string,string|undefined>).PIXOO_MODE;
- await expect(launch(leaked,run.ambient)).rejects.toThrow(/exited 1: .*PIXOO_MODE=simulator/);
+ const failed=await startFailure(leaked,run.ambient);
+ expect(failed.message).toMatch(/exited 1: .*PIXOO_MODE=simulator/);
+ expect(failureCause(failed.stderr.join('\n'))).toBe('pixoo-transport-guard: simulator mode required');
  expect(await readTransportLog(transportLog(run.runtimeDir))).toMatchObject({blocked:[],listening:[]});
 });
 
@@ -82,5 +94,7 @@ it('negative control: the guard observes and blocks the physical transport path 
 it('refuses to start the server when the transport guard has no log',async()=>{
  const run=await hostileRun();
  const spec={...run.spec,env:{...run.spec.env}};delete (spec.env as Record<string,string|undefined>).APP_VERIFY_TRANSPORT_LOG;
- await expect(launch(spec,run.ambient)).rejects.toThrow(/exited 1: .*APP_VERIFY_TRANSPORT_LOG/);
+ const failed=await startFailure(spec,run.ambient);
+ expect(failed.message).toMatch(/exited 1: .*APP_VERIFY_TRANSPORT_LOG/);
+ expect(failureCause(failed.stderr.join('\n'))).toBe('pixoo-transport-guard: transport log required');
 });

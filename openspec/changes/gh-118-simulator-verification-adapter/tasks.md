@@ -9,7 +9,7 @@
 ## 2. Shared core integration
 
 - [x] 2.1 Add the `verify` wrapper with its Node 24.5 check and type the plug-in as the core's `AppPlugin`, with read-only checks repeated by `doctor`.
-- [x] 2.2 Mark state-changing steps and controls `fresh`; save the 64×64 results with `t.attach`, failing when it is unavailable; run the browser checks through `runCaptureStep`.
+- [x] 2.2 Mark state-changing steps and controls `fresh`; save the 64×64 results with the core's `t.attach`; name known start failures with fixed cause lines; run the browser checks through `runCaptureStep`.
 - [x] 2.3 Run start under ambient device settings, doctor, reference and control captures, handoff, extend, a post-handoff capture, stop, restart, two concurrent runs with a reseed, a one-minute lease expiry and a failed start against real user units; stop everything started.
 - [ ] 2.4 Vendor the released `@jimmie-potts/app-verify` archive with its checksum and receipt, and repeat 2.3 from a clean candidate.
 

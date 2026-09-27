@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 import type {Locator,Page} from '@playwright/test';
 import {checkNoPhysicalTransport,checkSimulatorMode} from './readiness.ts';
-import {PLAYLIST,SESSION,syntheticMedia,type MediaKey} from './scenarios.ts';
+import {PLAYLIST,SESSION,defaultScenario,syntheticMedia,type MediaKey} from './scenarios.ts';
 
 /** The part of the shared core's capture context these steps use, with Playwright's page type. */
 export interface StepContext {
@@ -22,13 +22,13 @@ export interface StepContext {
  expect(name:string,check:()=>Promise<void>):Promise<void>;
  note(message:string):void;
  screenshot(name:string):Promise<void>;
- /**
-  * Save a file into the capture directory. Optional only until the vendored
-  * core provides it: without it the 64×64 assertion fails, never skips.
-  */
- attach?(name:string,content:string|Uint8Array):Promise<void>;
+ /** Save a file into the capture directory; handoff freezes it with the capture. */
+ attach(name:string,content:string|Uint8Array):Promise<void>;
 }
-/** A capture step. `fresh` asks the core to reseed and relaunch the run before a step that changes state. */
+/**
+ * A capture step. `scenario` names the seed it needs; with `fresh`, the core
+ * reseeds that scenario and relaunches the run before a step that changes state.
+ */
 export interface Step {description:string;scenario?:string;fresh?:boolean;timeoutMs?:number;run(t:StepContext):Promise<void>}
 
 const WAIT=5000;
@@ -80,7 +80,6 @@ async function shows(locator:Locator,key:MediaKey,frame=0):Promise<Buffer> {
 /** Save the inspectable 64×64 result: exact PNG, an 8× nearest-neighbour copy and a label. */
 async function saveSimulatorResult(t:StepContext,name:string,rgb:Buffer,source:string):Promise<void> {
  await t.expect(`the 64×64 simulator result "${name}" is saved and labelled`,async()=>{
-  if(!t.attach)throw new Error('this harness cannot save capture files');
   const raw={raw:{width:64,height:64,channels:3 as const}};
   await t.attach(`simulator-64x64-${name}.png`,await sharp(rgb,raw).png().toBuffer());
   await t.attach(`simulator-64x64-${name}-x8.png`,await sharp(rgb,raw).resize(512,512,{kernel:'nearest'}).png().toBuffer());
@@ -135,6 +134,7 @@ async function click(t:StepContext,name:string):Promise<void> {await t.page.getB
 
 export const captureSteps:Record<string,Step>={
  'library-selection':{
+  scenario:defaultScenario,
   description:'Selecting each synthetic medium shows its exact 64×64 effective preview and frame count',
   run:async t=>{
    await openPage(t);await tab(t,'Library');
@@ -157,6 +157,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'playlist-progression':{
+  scenario:defaultScenario,
   fresh:true,
   description:`Play "${PLAYLIST}", then Next, Next and Previous show items 1, 2, 3 and 2 with their exact first frames`,
   run:async t=>{
@@ -173,6 +174,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'playback-controls':{
+  scenario:defaultScenario,
   fresh:true,
   description:'Pause, Resume and Stop change intent without moving the item, and a reload keeps the stopped session',
   run:async t=>{
@@ -189,6 +191,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'monitor-media':{
+  scenario:defaultScenario,
   fresh:true,
   description:'Show monitor pauses playback and shows the exact monitor picture; Select Media leaves playback paused until Resume',
   run:async t=>{
@@ -225,6 +228,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'lost-response-recovery':{
+  scenario:defaultScenario,
   fresh:true,
   description:'A Next whose response is lost is retried with the same identity and advances exactly once',
   run:async t=>{

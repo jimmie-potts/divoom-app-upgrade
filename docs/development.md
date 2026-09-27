@@ -178,7 +178,9 @@ Each run:
   HTTP request and non-loopback connection. `start` runs the
   `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
   them. Every capture step ends by asserting that the run has recorded no
-  attempt.
+  attempt. A failed start names known causes, such as
+  `pixoo-transport-guard: simulator mode required` or
+  `pixoo-start-failed: port in use`, without copying server output.
 - rejects a data directory inside a Git checkout, one reached through a
   symlink alias, or one that overlaps the owner's normal data and lock
   directories or an inherited `PIXOO_DATA_DIR`. It seeds only an empty

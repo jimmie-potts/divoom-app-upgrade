@@ -8,7 +8,7 @@ import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {captureSteps} from './capture-steps.ts';
 import {controlSteps} from './controls.ts';
-import {checkNoPhysicalTransport,checkSimulatorMode,probeHealth,readyLine} from './readiness.ts';
+import {checkNoPhysicalTransport,checkSimulatorMode,failureCause,probeHealth,readyLine} from './readiness.ts';
 import {assertPrivateDataDir,checkoutRoot,launchSpec} from './run-environment.ts';
 import {defaultScenario,scenarioDefinitions,seedScenario} from './scenarios.ts';
 
@@ -42,7 +42,7 @@ const plugin:AppPlugin={
   await assertPrivateDataDir(context.dataDir);
   return launchSpec(context);
  },
- readiness:{line:readyLine,probe:probeHealth},
+ readiness:{line:readyLine,probe:probeHealth,failureCause},
  components:[
   {id:'pixoo-server',kind:'actual',note:'Fastify server from apps/server/dist/main.js with the library, player and embedded monitor'},
   {id:'web-ui',kind:'actual',note:'apps/web/dist served by the same process'},
