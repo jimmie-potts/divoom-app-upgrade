@@ -1,5 +1,16 @@
 ## ADDED Requirements
 
+### Requirement: Adapter command
+`npm run verify -- <operation>` SHALL pass the Pixoo plug-in to the vendored shared verification core, which owns the run lifecycle, receipt and proof. The wrapper SHALL refuse a Node version outside 24.5 through 24.x before loading the plug-in. `start` and `restart` SHALL build the checkout before seeding. Steps that change state, and every control, SHALL be marked for a fresh reseed.
+
+#### Scenario: Unsupported Node
+- **WHEN** the wrapper runs under Node 22
+- **THEN** it prints one JSON result naming the Node requirement and exits with status 3 without starting a run
+
+#### Scenario: Rebuilt checkout under a live preview
+- **WHEN** the checkout is rebuilt with different web sources while a run serves it
+- **THEN** `doctor` reports the served artifact digest as changed rather than matching
+
 ### Requirement: Simulator-only runs
 A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator. It SHALL block and record every outbound HTTP request and non-loopback connection before it leaves the process. A run SHALL NOT bind an installed port.
 

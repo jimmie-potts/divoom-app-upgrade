@@ -29,13 +29,15 @@ async function reseed(run:Awaited<ReturnType<typeof started>>,scenario:string):P
  return server;
 }
 
-it('loads every plug-in module under plain Node type stripping and registers its scenarios, checks and steps',async()=>{
+it('loads every plug-in module under plain Node type stripping and registers its scenarios, checks, steps and fresh flags',async()=>{
  const script=`const p=(await import(${JSON.stringify(pathToFileURL(join(process.cwd(),'scripts/verify/plugin.ts')).href)})).default;
-  console.log(JSON.stringify({app:p.app,defaultScenario:p.defaultScenario,scenarios:Object.keys(p.scenarios),checks:p.checks.map(c=>c.id),steps:Object.keys(p.captureSteps),
+  console.log(JSON.stringify({app:p.app,defaultScenario:p.defaultScenario,scenarios:Object.keys(p.scenarios),checks:p.checks.map(c=>c.id+(c.doctor?':doctor':'')),steps:Object.keys(p.captureSteps),
+   fresh:Object.entries(p.captureSteps).filter(([,step])=>step.fresh).map(([name])=>name),
    components:p.components.map(c=>c.id+':'+c.kind),artifact:p.build.artifact,version:p.build.version}));`;
  const {stdout}=await promisify(execFile)(process.execPath,['--input-type=module','-e',script],{env:{PATH:process.env.PATH},timeout:20000});
- expect(JSON.parse(stdout)).toEqual({app:'pixoo',defaultScenario:'library-playlist',scenarios:['library-playlist','empty'],checks:['simulator-mode','no-physical-transport'],
+ expect(JSON.parse(stdout)).toEqual({app:'pixoo',defaultScenario:'library-playlist',scenarios:['library-playlist','empty'],checks:['simulator-mode:doctor','no-physical-transport:doctor'],
   steps:['library-selection','playlist-progression','playback-controls','monitor-media','lost-response-recovery','device-boundary','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-retry-new-identity'],
+  fresh:['playlist-progression','playback-controls','monitor-media','lost-response-recovery','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-retry-new-identity'],
   components:['pixoo-server:actual','web-ui:actual','device-transport:simulated','media:simulated','agent-sessions:simulated'],artifact:{route:'/'},version:'0.0.0'});
 });
 

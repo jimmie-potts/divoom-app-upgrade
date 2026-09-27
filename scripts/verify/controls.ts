@@ -50,6 +50,6 @@ const faults:Record<string,{step:string;description:string;inject:Fault}>={
 
 export const controlSteps:Record<string,Step>=Object.fromEntries(Object.entries(faults).map(([name,fault])=>{
  const base=captureSteps[fault.step]!;
- return [name,{...base,description:`Negative control, must fail: ${fault.step} while ${fault.description}`,
+ return [name,{...base,fresh:true,description:`Negative control, must fail: ${fault.step} while ${fault.description}`,
   run:async t=>{t.note(`injected known-wrong behavior: ${fault.description}`);await fault.inject(t.page,t.url);await base.run(t);}} satisfies Step];
 }));

@@ -139,28 +139,46 @@ one worktree because both rebuild the production web assets.
 
 ## Simulator verification runs
 
-`npm run verify -- <operation>` starts a disposable copy of this application for
-an agent or the owner, drives it, keeps proof and leaves a preview under a
-lease. The shared core `@jimmie-potts/app-verify` implements the Hub's
-[app verification contract](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/app-verification.md):
-operations, receipt, supervisor unit, lease, proof directories and capture
-harness. `scripts/verify/` supplies only the Pixoo plug-in. Runs need Linux
-with a `systemd --user` manager and Node 24.5 or later; `capture` also needs
-Chromium from `npx playwright install chromium`.
+`npm run verify -- <operation>` starts a disposable copy of this application,
+drives it, keeps proof and leaves a preview under a lease, for an agent or the
+owner. The shared core `@jimmie-potts/app-verify` is vendored from the Hub. It
+implements the operations, receipt, supervisor unit, lease, proof directories
+and capture harness of the Hub's
+[app verification contract](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/app-verification.md).
+`scripts/verify/` supplies only the Pixoo plug-in.
+
+Runs need Linux with a `systemd --user` manager and Node 24.5 or later in the
+24.x line. The wrapper exits with status 3 under any other Node. `capture` also
+needs Chromium from `npx playwright install chromium`. From the worktree root:
+
+```bash
+fnm exec --using=.nvmrc -- npm run verify -- help
+fnm exec --using=.nvmrc -- npm run verify -- start
+fnm exec --using=.nvmrc -- npm run verify -- capture <run-id> playlist-progression
+fnm exec --using=.nvmrc -- npm run verify -- handoff <run-id> --reset library-playlist
+fnm exec --using=.nvmrc -- npm run verify -- stop <run-id>
+```
+
+Proof goes to the canonical checkout's `.local/evidence/verify/<run-id>/` and
+runtime state to `~/.local/state/app-verify/<run-id>/`. `stop` removes only
+the runtime state.
 
 Each run:
 
-- builds with `npm run build`, then serves this checkout's build. Rebuilding
-  the checkout changes what a running preview serves.
+- builds with `npm run build` on `start` and `restart`, then serves this
+  checkout's build. A later build in the same checkout, including another
+  run's `start`, replaces what a running preview serves. `doctor` reports the
+  served page's digest as `changed`; use `restart` for a new candidate.
 - launches `apps/server/dist/main.js` on `127.0.0.1:0` with
   `PIXOO_MODE=simulator`, monitoring enabled and a private `PIXOO_DATA_DIR`
   under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
   never decide the mode, data directory or port.
 - preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
   unless the simulator is selected, and it blocks and records every outbound
-  HTTP request and non-loopback connection. The start checks `simulator-mode`
-  and `no-physical-transport`, and every capture step ends by asserting that
-  the run has recorded no attempt.
+  HTTP request and non-loopback connection. `start` runs the
+  `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
+  them. Every capture step ends by asserting that the run has recorded no
+  attempt.
 - rejects a data directory inside a Git checkout, one reached through a
   symlink alias, or one that overlaps the owner's normal data and lock
   directories or an inherited `PIXOO_DATA_DIR`. It seeds only an empty
@@ -197,9 +215,15 @@ the page and the server, and must report failed:
 | `control-select-media-resumes` | Select Media also resumes playback | `monitor-media` paused check |
 | `control-retry-new-identity` | A retried Next is resent under a fresh identity | `lost-response-recovery` single effect |
 
-`npm run test:browser` runs every step and control against the actual server.
-`npm test` covers the launch environment, data directory guard, transport
-guard, concurrent runs and reseeding.
+Steps that change state, and every control, are marked `fresh`: the core
+reseeds and relaunches the run on its port before driving them.
+
+`npm run test:browser` runs every step and control through the core's
+unsupervised `runCaptureStep` against the actual server. `npm test` covers the
+launch environment, data directory guard, transport guard, concurrent runs
+and reseeding. Neither needs `systemd --user`. The supervisor, lease, handoff
+and restart are tested in the core's own suite. Adapter changes that affect
+them need a local run against real units, recorded in the PR.
 
 ## Shared lifecycle contract conformance
 

@@ -11,16 +11,20 @@ import type {Locator,Page} from '@playwright/test';
 import {checkNoPhysicalTransport,checkSimulatorMode} from './readiness.ts';
 import {PLAYLIST,SESSION,syntheticMedia,type MediaKey} from './scenarios.ts';
 
-/** The subset of the shared core's capture context these steps use, plus `attach` for files. */
+/** The part of the shared core's capture context these steps use, with Playwright's page type. */
 export interface StepContext {
  page:Page;url:string;port:number;runId:string;scenario:string;runtimeDir:string;signal:AbortSignal;
  expect(name:string,check:()=>unknown):Promise<void>;
  note(message:string):void;
  screenshot(name:string):Promise<void>;
- /** Save a file beside the capture's screenshot. Pending in the shared core's interface. */
- attach?(name:string,body:Uint8Array|string):Promise<void>;
+ /**
+  * Save a file into the capture directory. Optional only until the vendored
+  * core provides it: without it the 64×64 assertion fails, never skips.
+  */
+ attach?(name:string,content:string|Uint8Array):Promise<void>;
 }
-export interface Step {description:string;scenario?:string;timeoutMs?:number;run(t:StepContext):Promise<void>}
+/** A capture step. `fresh` asks the core to reseed and relaunch the run before a step that changes state. */
+export interface Step {description:string;scenario?:string;fresh?:boolean;timeoutMs?:number;run(t:StepContext):Promise<void>}
 
 const WAIT=5000;
 const text=(t:StepContext,value:string|RegExp)=>t.page.getByText(value,typeof value==='string'?{exact:true}:{}).first().waitFor({timeout:WAIT});
@@ -148,6 +152,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'playlist-progression':{
+  fresh:true,
   description:`Play "${PLAYLIST}", then Next, Next and Previous show items 1, 2, 3 and 2 with their exact first frames`,
   run:async t=>{
    await openPage(t);await playFromStart(t);
@@ -163,6 +168,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'playback-controls':{
+  fresh:true,
   description:'Pause, Resume and Stop change intent without moving the item, and a reload keeps the stopped session',
   run:async t=>{
    await openPage(t);await playFromStart(t);
@@ -178,6 +184,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'monitor-media':{
+  fresh:true,
   description:'Show monitor pauses playback and shows the exact monitor picture; Select Media leaves playback paused until Resume',
   run:async t=>{
    await openPage(t);await playFromStart(t);
@@ -213,6 +220,7 @@ export const captureSteps:Record<string,Step>={
   },
  },
  'lost-response-recovery':{
+  fresh:true,
   description:'A Next whose response is lost is retried with the same identity and advances exactly once',
   run:async t=>{
    await openPage(t);await playFromStart(t);

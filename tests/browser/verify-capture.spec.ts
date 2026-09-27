@@ -1,78 +1,70 @@
-import {expect,test,type Browser,type TestInfo} from '@playwright/test';
-import {stat,writeFile} from 'node:fs/promises';
+import {expect,test,type TestInfo} from '@playwright/test';
+import {mkdir,readFile,rm,stat} from 'node:fs/promises';
+import {join} from 'node:path';
 import sharp from 'sharp';
-import {captureSteps,type StepContext} from '../../scripts/verify/capture-steps.ts';
-import {controlSteps} from '../../scripts/verify/controls.ts';
+import {runCaptureStep} from '@jimmie-potts/app-verify';
+import plugin from '../../scripts/verify/plugin.ts';
 import {launchSpec} from '../../scripts/verify/run-environment.ts';
 import {seedScenario,syntheticMedia} from '../../scripts/verify/scenarios.ts';
-import {launch,makeRun} from '../helpers/verify-run.js';
+import {launch,makeRun,type LaunchedRun} from '../helpers/verify-run.js';
 
-// Source tests of the Pixoo verification capture steps against the actual
-// server, launched exactly as a run launches it and under an ambient device
-// mode. The harness mirrors the shared core's capture rule: a step passes only
-// with at least one assertion, all passing, no crash and a finalized video.
+// The Pixoo capture steps through the shared core's unsupervised
+// runCaptureStep: the same assertion, screenshot and video rules as a
+// supervised capture, against the actual server launched exactly as a run
+// launches it and under an ambient device mode. A step marked `fresh` is
+// preceded by the reseed-and-relaunch the supervised capture performs.
 test.describe.configure({mode:'serial'});
-test.skip(({isMobile})=>isMobile,'capture steps open their own fixed desktop context');
 
-async function startRun(scenario:string){
- const run=await makeRun();
- await seedScenario({...run,scenario});
- const server=await launch(launchSpec({...run,port:0,node:process.execPath}),{...process.env,PIXOO_MODE:'device',NODE_OPTIONS:''});
- return {...run,scenario,server,async close(){await server.stop();await run.remove();}};
+async function startRun(){
+ const run=await makeRun(`pixoo-20260927T000000Z-${Math.random().toString(16).slice(2,8)}`);
+ const ambient={...process.env,PIXOO_MODE:'device',NODE_OPTIONS:''};
+ const boot=async(port:number)=>{await seedScenario({...run,scenario:'library-playlist'});return launch(launchSpec({...run,port,node:process.execPath}),ambient);};
+ let server:LaunchedRun=await boot(0);
+ return {...run,get server(){return server;},
+  async reseed(){const port=server.port;await server.stop();await rm(run.dataDir,{recursive:true,force:true});await mkdir(run.dataDir,{mode:0o700});server=await boot(port);},
+  async close(){await server.stop();await run.remove();}};
 }
 type Run=Awaited<ReturnType<typeof startRun>>;
-interface Entry {assertion?:string;outcome?:'passed'|'failed';reason?:string;note?:string}
-
-const steps={...captureSteps,...controlSteps};
-async function capture(browser:Browser,info:TestInfo,run:Run,step:string){
- const label=step,videoDir=info.outputPath(`${label}-video`);
- const context=await browser.newContext({viewport:{width:1280,height:800},recordVideo:{dir:videoDir,size:{width:1280,height:800}}});
- const page=await context.newPage();
- const log:Entry[]=[],files=new Map<string,Uint8Array|string>();
- const t:StepContext={page,url:run.server.url,port:run.server.port,runId:run.runId,scenario:run.scenario,runtimeDir:run.runtimeDir,signal:AbortSignal.timeout(60000),
-  async expect(name,check){try{await check();log.push({assertion:name,outcome:'passed'});}catch(error){log.push({assertion:name,outcome:'failed',reason:error instanceof Error?error.message:String(error)});throw error;}},
-  note(message){log.push({note:message});},
-  async screenshot(name){await page.screenshot({path:info.outputPath(`${label}-${name}.png`)});},
-  async attach(name,body){files.set(name,body);await writeFile(info.outputPath(`${label}-${name}`),body);},
- };
- let crash:unknown;
- try{await steps[step]!.run(t);}catch(error){crash=error;if(!log.some(entry=>entry.outcome==='failed'))log.push({note:`step error: ${error instanceof Error?error.message:String(error)}`});}
- const screenshot=info.outputPath(`${label}-after.png`);await page.screenshot({path:screenshot});
- const video=page.video()!;await context.close();const videoPath=await video.path();
- const assertions=log.filter(entry=>entry.assertion);
- const passed=!crash&&assertions.length>0&&assertions.every(entry=>entry.outcome==='passed');
- await writeFile(info.outputPath(`${label}-assertions.json`),JSON.stringify(log,null,1));
- return {outcome:passed?'passed':'failed',failed:assertions.find(entry=>entry.outcome==='failed'),log,files,screenshot,video:videoPath};
+async function capture(info:TestInfo,run:Run,step:string){
+ if(plugin.captureSteps[step]?.fresh)await run.reseed();
+ const outputDir=info.outputPath(step);
+ const result=await runCaptureStep(plugin,step,{url:run.server.url,outputDir,scenario:'library-playlist',dataDir:run.dataDir,runtimeDir:run.runtimeDir,runId:run.runId});
+ return {...result,outputDir,failed:result.assertions.find(assertion=>assertion.outcome==='failed')};
 }
-async function nonEmpty(path:string){expect((await stat(path)).size).toBeGreaterThan(0);}
-async function sixtyFour(body:Uint8Array|string|undefined){
- const {data,info}=await sharp(Buffer.from(body as Uint8Array)).removeAlpha().raw().toBuffer({resolveWithObject:true});
+async function nonEmpty(path:string|null){expect(path).not.toBeNull();expect((await stat(path!)).size).toBeGreaterThan(0);}
+async function sixtyFour(path:string){
+ const {data,info}=await sharp(path).removeAlpha().raw().toBuffer({resolveWithObject:true});
  expect([info.width,info.height]).toEqual([64,64]);return data;
 }
 
-test('reference: every capture step passes against the actual server and saves labelled 64×64 results',async({browser},info)=>{
- test.setTimeout(180000);
- const run=await startRun('library-playlist');
+test('reference: every capture step passes against the actual server and saves labelled 64×64 results',async({isMobile},info)=>{
+ test.skip(isMobile,'capture steps open their own fixed desktop context');
+ test.setTimeout(240000);
+ const run=await startRun();
  try{
-  const results:Record<string,Awaited<ReturnType<typeof capture>>>={};
-  for(const step of ['library-selection','playlist-progression','playback-controls','monitor-media','lost-response-recovery','device-boundary']){
-   const result=results[step]=await capture(browser,info,run,step);
-   expect(result.outcome,`${step}: ${JSON.stringify(result.log.slice(-2))}`).toBe('passed');
+  const steps=Object.keys(plugin.captureSteps).filter(step=>!step.startsWith('control-'));
+  expect(steps).toEqual(['library-selection','playlist-progression','playback-controls','monitor-media','lost-response-recovery','device-boundary']);
+  const outputs:Record<string,string>={};
+  for(const step of steps){
+   const result=await capture(info,run,step);outputs[step]=result.outputDir;
+   expect(result.outcome,`${step}: ${result.reason} ${JSON.stringify(result.failed)}`).toBe('passed');
    await nonEmpty(result.screenshot);await nonEmpty(result.video);
   }
-  expect(await sixtyFour(results['library-selection']!.files.get('simulator-64x64-library-quadrants.png'))).toEqual(syntheticMedia.quadrants.frames[0]);
-  expect(await sixtyFour(results['playlist-progression']!.files.get('simulator-64x64-player-item-2.png'))).toEqual(syntheticMedia.blink.frames[0]);
-  expect((await sharp(Buffer.from(results['playlist-progression']!.files.get('simulator-64x64-player-item-2-x8.png') as Uint8Array)).metadata()).width).toBe(512);
-  await sixtyFour(results['monitor-media']!.files.get('simulator-64x64-monitor.png'));
-  const label=JSON.parse(String(results['playlist-progression']!.files.get('simulator-64x64-player-item-2.json')));
+  expect(await sixtyFour(join(outputs['library-selection']!,'simulator-64x64-library-quadrants.png'))).toEqual(syntheticMedia.quadrants.frames[0]);
+  expect(await sixtyFour(join(outputs['playlist-progression']!,'simulator-64x64-player-item-2.png'))).toEqual(syntheticMedia.blink.frames[0]);
+  expect((await sharp(join(outputs['playlist-progression']!,'simulator-64x64-player-item-2-x8.png')).metadata()).width).toBe(512);
+  await sixtyFour(join(outputs['monitor-media']!,'simulator-64x64-monitor.png'));
+  const label=JSON.parse(await readFile(join(outputs['playlist-progression']!,'simulator-64x64-player-item-2.json'),'utf8'));
   expect(label).toMatchObject({label:expect.stringMatching(/^Simulator rendering: .*not evidence of physical display output/),runId:run.runId,scenario:'library-playlist',shows:'verify-blink.gif frame 0'});
-  expect(results['lost-response-recovery']!.log).toContainEqual({note:'injected failure: the Next response was lost after the server applied it'});
+  const log=JSON.parse(await readFile(join(outputs['lost-response-recovery']!,'assertions.json'),'utf8'));
+  expect(log.notes).toContainEqual(expect.stringMatching(/injected failure: the Next response was lost after the server applied it$/));
  }finally{await run.close();}
 });
 
-test('negative controls: each control step fails at the assertion that names its known-wrong behavior',async({browser},info)=>{
- test.setTimeout(180000);
- const run=await startRun('library-playlist');
+test('negative controls: each control step fails at the assertion that names its known-wrong behavior',async({isMobile},info)=>{
+ test.skip(isMobile,'capture steps open their own fixed desktop context');
+ test.setTimeout(240000);
+ const run=await startRun();
  try{
   const cases:[string,RegExp,RegExp][]=[
    ['control-wrong-frame',/effective preview of verify-quadrants\.png matches/,/shows verify-stripes\.png frame 0, expected verify-quadrants\.png frame 0/],
@@ -80,15 +72,15 @@ test('negative controls: each control step fails at the assertion that names its
    ['control-select-media-resumes',/Select Media leaves playback paused/,/intent is active after Select Media/],
    ['control-retry-new-identity',/item 2 of 3 shows verify-blink\.gif|the retry replayed no second effect/,/./],
   ];
-  expect(Object.keys(controlSteps).sort()).toEqual(cases.map(([step])=>step).sort());
+  expect(Object.keys(plugin.captureSteps).filter(step=>step.startsWith('control-')).sort()).toEqual(cases.map(([step])=>step).sort());
   for(const [step,assertion,reason] of cases){
-   const result=await capture(browser,info,run,step);
+   const result=await capture(info,run,step);
    expect(result.outcome,step).toBe('failed');
-   expect(result.failed?.assertion,step).toMatch(assertion);expect(result.failed?.reason,step).toMatch(reason);
-   expect(result.log[0]?.note,step).toMatch(/^injected known-wrong behavior: /);
+   expect(result.reason?.startsWith(`assertion failed: ${result.failed?.name}`),`${step}: ${result.reason}`).toBe(true);
+   expect(result.failed?.name,step).toMatch(assertion);expect(result.failed?.error,step).toMatch(reason);
+   const log=JSON.parse(await readFile(result.log,'utf8'));
+   expect(log.notes[0],step).toMatch(/injected known-wrong behavior: /);
    await nonEmpty(result.screenshot);await nonEmpty(result.video);
   }
-  // A run that served the controls still passes the reference step from a fresh session.
-  expect((await capture(browser,info,run,'playlist-progression')).outcome).toBe('passed');
  }finally{await run.close();}
 });

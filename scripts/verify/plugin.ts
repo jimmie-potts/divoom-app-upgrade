@@ -2,6 +2,7 @@
 // @jimmie-potts/app-verify). The core owns the run lifecycle; this file
 // supplies only what is specific to Pixoo. Node runs it directly with type
 // stripping.
+import type {AppPlugin} from '@jimmie-potts/app-verify';
 import {spawn} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -23,7 +24,7 @@ function build({root,signal}:{root:string;signal:AbortSignal}):Promise<void> {
  });
 }
 
-export default {
+const plugin:AppPlugin={
  app:'pixoo',
  repository:'jimmie-potts/divoom-app-upgrade',
  command:'npm run verify --',
@@ -34,6 +35,8 @@ export default {
   seed:(context:{runId:string;dataDir:string;scenario:string})=>seedScenario(context),
  }])),
  // The served page names its content-hashed bundle, so its digest changes with the web build.
+ // A run serves this checkout's build: rebuilding the checkout changes what a live preview serves,
+ // and doctor reports the changed digest.
  build:{version,artifact:{route:'/'},prepare:build},
  launch:async(context:{runtimeDir:string;dataDir:string;port:number;node:string})=>{
   await assertPrivateDataDir(context.dataDir);
@@ -47,9 +50,11 @@ export default {
   {id:'media',kind:'simulated',note:'synthetic 64x64 PNG and GIF fixtures from scripts/verify/scenarios.ts'},
   {id:'agent-sessions',kind:'simulated',note:'one synthetic lifecycle event posted at seed with a revoked run-generated credential'},
  ],
+ // Both checks only read the run, so doctor repeats them.
  checks:[
-  {id:'simulator-mode',run:checkSimulatorMode},
-  {id:'no-physical-transport',run:checkNoPhysicalTransport},
+  {id:'simulator-mode',doctor:true,run:checkSimulatorMode},
+  {id:'no-physical-transport',doctor:true,run:checkNoPhysicalTransport},
  ],
  captureSteps:{...captureSteps,...controlSteps},
 };
+export default plugin;
