@@ -63,17 +63,17 @@ export async function checkSimulatorMode(input:ProbeInput):Promise<CheckOutcome>
 }
 
 export interface TransportEntry {
- at:string;pid:number;event:'armed'|'listening'|'blocked'|'allowed'|'fork';api?:string;
+ at:string;pid:number;event:'armed'|'listening'|'blocked'|'allowed'|'fork'|'worker';api?:string;
  host?:string;port?:number;socketPath?:string;program?:string;module?:string;address?:string;target?:'own'|'paired';removed?:string[];
 }
-export interface TransportRecord {armed:TransportEntry[];listening:TransportEntry[];blocked:TransportEntry[];allowed:TransportEntry[];forks:TransportEntry[]}
+export interface TransportRecord {armed:TransportEntry[];listening:TransportEntry[];blocked:TransportEntry[];allowed:TransportEntry[];forks:TransportEntry[];workers:TransportEntry[]}
 /** The guard's log for the whole run; a missing log reads as empty, so it never passes the listening check. */
 export async function readTransportLog(path:string):Promise<TransportRecord> {
  let text='';
  try{text=await readFile(path,'utf8');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  const entries=text.split('\n').filter(Boolean).map(line=>JSON.parse(line) as TransportEntry);
  const only=(event:TransportEntry['event'])=>entries.filter(e=>e.event===event);
- return {armed:only('armed'),listening:only('listening'),blocked:only('blocked'),allowed:only('allowed'),forks:only('fork')};
+ return {armed:only('armed'),listening:only('listening'),blocked:only('blocked'),allowed:only('allowed'),forks:only('fork'),workers:only('worker')};
 }
 /** Where an attempt went: host and port, a Unix socket or a program name. URL paths and query strings are never recorded. */
 function describe(e:TransportEntry):string {
@@ -84,7 +84,7 @@ function describe(e:TransportEntry):string {
 /**
  * Nothing outside the run was attempted or reached: no blocked attempt (a
  * device, another host, an installed loopback service, a Unix or UDP socket,
- * a spawned process),
+ * a spawned or replaced process),
  * no connection to a local port other than the one this run serves, and the
  * guard is loaded in the process serving this port.
  */

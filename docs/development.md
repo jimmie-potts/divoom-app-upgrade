@@ -178,13 +178,18 @@ Each run:
   under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
   never decide the mode, data directory or port, and the guard removes any
   other inherited `PIXOO_*` setting, such as MCP or controller flags, before
-  the server reads its configuration.
+  the server reads its configuration. `NODE_OPTIONS` is emptied, so no
+  inherited preload runs before the guard.
 - preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
-  unless the simulator is selected. It blocks and records every outbound HTTP
-  request, UDP socket, Unix socket connection and process spawn, and every TCP
-  connection except to the run's own port, so installed services such as the
+  unless the simulator is selected. Through the public Node.js APIs it blocks
+  and records every outbound HTTP request, UDP socket and Unix socket
+  connection, every TCP connection except to the run's own port, and every
+  other process start (`spawn`, `exec`, `execFile` and their Sync forms,
+  `ChildProcess#spawn` and `process.execve`). Installed services such as the
   Hub on 8788 are refused like a device. A process the server forks, such as
-  the media worker, runs under the same guard. `start` runs the
+  the media worker, and every worker thread run under the same guard, even
+  when their caller replaces `execArgv` or `env`. Internal bindings
+  (`process.binding`) and native addons are out of scope. `start` runs the
   `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
   them. Every capture step ends by asserting that the run has recorded no
   attempt. A failed start names known causes, such as

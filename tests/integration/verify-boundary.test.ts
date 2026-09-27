@@ -4,7 +4,7 @@ import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import dgram from 'node:dgram';
 import {createServer} from 'node:net';
-import {join} from 'node:path';
+import {basename,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {promisify} from 'node:util';
 import sharp from 'sharp';
@@ -34,12 +34,16 @@ async function command(url:string,body:Record<string,unknown>){
  */
 async function hostileRun(){
  const ownerHome=await temporary('verify-owner-home-'),ownerData=await temporary('verify-owner-data-');
+ // An inherited preload that would run before the guard if NODE_OPTIONS reached the server.
+ const preloadMarker=join(ownerData,'..',`${basename(ownerData)}-preload-ran`),preload=join(ownerHome,'..',`${basename(ownerHome)}-preload.mjs`);
+ await writeFile(preload,`import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(preloadMarker)},'');`);
+ cleanup.push(()=>rm(preload,{force:true}));cleanup.push(()=>rm(preloadMarker,{force:true}));
  const run=await makeRun();cleanup.push(run.remove);
  await seedScenario({...run,scenario:'library-playlist'},{home:ownerHome,ambient:{PIXOO_DATA_DIR:ownerData}});
  await writeFile(join(run.dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.255.254',profile:'pixoo64-smoke-2026-09-06'}}));
- const ambient={...process.env,HOME:ownerHome,TMPDIR:join(run.runtimeDir,'tmp'),PIXOO_MODE:'device',PIXOO_DATA_DIR:ownerData,PIXOO_PORT:'8787',NODE_OPTIONS:'',
+ const ambient={...process.env,HOME:ownerHome,TMPDIR:join(run.runtimeDir,'tmp'),PIXOO_MODE:'device',PIXOO_DATA_DIR:ownerData,PIXOO_PORT:'8787',NODE_OPTIONS:`--import=${pathToFileURL(preload).href}`,
   PIXOO_MCP_ENABLED:'1',PIXOO_CONTROLLER_ENABLED:'1',PIXOO_CONTROLLER_DEVICE_ID:'owner-pixoo',PIXOO_DEVICE_IP:'192.168.255.254'};
- return {...run,ownerHome,ownerData,ambient,spec:launchSpec({...run,port:0,node:process.execPath})};
+ return {...run,ownerHome,ownerData,preloadMarker,ambient,spec:launchSpec({...run,port:0,node:process.execPath})};
 }
 const context=(run:{runId:string;root:string;runtimeDir:string;dataDir:string},url:string)=>({...run,scenario:'library-playlist',url,port:Number(new URL(url).port),signal:AbortSignal.timeout(5000)});
 
@@ -69,6 +73,7 @@ it('keeps a run in simulator mode under ambient device settings and records no p
  expect((await fetch(new URL('/controller/v1/snapshot',server.url))).status).toBe(404);
  expect(await readdir(run.ownerData)).toEqual([]);
  expect(await readdir(run.ownerHome)).toEqual([]);
+ await expect(readFile(run.preloadMarker),'an inherited NODE_OPTIONS preload ran before the guard').rejects.toMatchObject({code:'ENOENT'});
  // The core gives the app a private HOME; the server and guard need nothing else from it.
  const environ=(await readFile(`/proc/${server.child.pid}/environ`,'utf8')).split('\0');
  expect(environ).toContain(`HOME=${join(run.runtimeDir,'home')}`);
@@ -109,8 +114,10 @@ const backstop='data:text/javascript,'+encodeURIComponent(`
 /** Run a script under the transport guard (above the backstop) and return its JSON output. */
 async function guarded(runtimeDir:string,script:string,extra:Record<string,string>={}){
  const backstopLog=join(runtimeDir,'backstop.jsonl');
+ // A script file, never `-e`: a fork that inherits execArgv would otherwise re-run the script.
+ const file=join(runtimeDir,`probe-${Math.random().toString(16).slice(2,10)}.mjs`);await writeFile(file,script);
  try{
-  const {stdout}=await promisify(execFile)(process.execPath,['--import',backstop,'--import',pathToFileURL(transportGuard).href,'--input-type=module','-e',script],
+  const {stdout}=await promisify(execFile)(process.execPath,['--import',backstop,'--import',pathToFileURL(transportGuard).href,file],
    {env:{PATH:process.env.PATH,PIXOO_MODE:'simulator',APP_VERIFY_TRANSPORT_LOG:transportLog(runtimeDir),TEST_BACKSTOP_LOG:backstopLog,...extra},timeout:10000});
   return JSON.parse(stdout) as unknown;
  }finally{
@@ -227,6 +234,67 @@ it('runs a fork under the guard even with replaced execArgv and env, and refuses
  ]));
  expect(record.blocked.find(entry=>entry.api==='net.connect')?.pid).not.toBe(parent);
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,1))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/7 transport attempts blocked: /)});
+},SPAWNS);
+
+it('honors fork options passed after an undefined args list, and still guards the child',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp'),marker=join(runtimeDir,'preload-ran');
+ const preload=join(runtimeDir,'preload.mjs');await writeFile(preload,`import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(marker)},'');`);
+ const child=join(runtimeDir,'child.mjs');
+ await writeFile(child,`import net from 'node:net';
+  process.stdout.write('child-stdout');
+  const socket=net.connect({port:${listener.port},host:'127.0.0.1'});
+  const report=connected=>process.send({connected,marker:process.env.MARKER,execArgv:process.execArgv});
+  socket.once('connect',()=>{socket.destroy();report(true);});socket.once('error',()=>report(false));`);
+ const result=await guarded(runtimeDir,`
+  import {fork} from 'node:child_process';
+  const c=fork(${JSON.stringify(child)},undefined,{stdio:['ignore','pipe','ignore','ipc'],execArgv:['--max-old-space-size=200'],
+   env:{PATH:process.env.PATH,MARKER:'set',NODE_OPTIONS:${JSON.stringify(`--import=${pathToFileURL(preload).href}`)}}});
+  let stdout='';c.stdout.on('data',chunk=>stdout+=chunk);
+  const message=await new Promise(resolve=>{c.once('message',resolve);c.once('exit',code=>resolve({exited:code}));});
+  await new Promise(resolve=>c.once('close',resolve));
+  console.log(JSON.stringify({...message,stdout}));`) as {connected:boolean;marker:string;execArgv:string[];stdout:string};
+ expect(result).toMatchObject({connected:false,marker:'set',stdout:'child-stdout'});
+ expect(result.execArgv).toEqual(['--import',pathToFileURL(transportGuard).href,'--max-old-space-size=200']);
+ expect(listener.received()).toBe(0);
+ await expect(readFile(marker),'an inherited NODE_OPTIONS preload ran in the fork').rejects.toMatchObject({code:'ENOENT'});
+ const record=await readTransportLog(transportLog(runtimeDir));
+ expect(record.forks).toEqual([expect.objectContaining({module:'child.mjs'})]);
+ expect(record.blocked).toEqual([expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port})]);
+ expect(record.blocked[0]!.pid).not.toBe(record.forks[0]!.pid);
+},SPAWNS);
+
+it('runs worker threads under the guard even when execArgv or env is replaced',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp');
+ const worker=join(runtimeDir,'worker.mjs');
+ await writeFile(worker,`import net from 'node:net';import {parentPort} from 'node:worker_threads';
+  const socket=net.connect({port:${listener.port},host:'127.0.0.1'});
+  socket.once('connect',()=>{socket.destroy();parentPort.postMessage('connected');});socket.once('error',()=>parentPort.postMessage('refused'));`);
+ const result=await guarded(runtimeDir,`
+  import {Worker} from 'node:worker_threads';
+  const run=options=>new Promise(resolve=>{const w=new Worker(${JSON.stringify(worker)},options);w.once('message',value=>{resolve(value);w.terminate();});w.once('error',error=>resolve('error '+error.message));});
+  console.log(JSON.stringify([await run({}),await run({execArgv:[]}),await run({execArgv:[],env:{}})]));`);
+ expect(result).toEqual(['refused','refused','refused']);
+ expect(listener.received()).toBe(0);
+ const record=await readTransportLog(transportLog(runtimeDir));
+ expect(record.workers).toHaveLength(3);
+ expect(record.blocked).toEqual(Array.from({length:3},()=>expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port})));
+},SPAWNS);
+
+it('refuses ChildProcess#spawn and process.execve and records each',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp');
+ const child=join(runtimeDir,'connect.mjs');
+ await writeFile(child,`import net from 'node:net';net.connect({port:${listener.port},host:'127.0.0.1'}).once('connect',s=>process.exit(0));`);
+ const result=await guarded(runtimeDir,`
+  import {ChildProcess} from 'node:child_process';
+  const outcomes={};
+  try{new ChildProcess().spawn({file:process.execPath,args:[process.execPath,${JSON.stringify(child)}],stdio:['ignore','ignore','ignore']});outcomes.childProcess='started';}catch{outcomes.childProcess='refused';}
+  try{process.execve(process.execPath,[process.execPath,${JSON.stringify(child)}]);outcomes.execve='replaced';}catch{outcomes.execve='refused';}
+  console.log(JSON.stringify(outcomes));`);
+ expect(result).toEqual({childProcess:'refused',execve:'refused'});
+ await new Promise(resolve=>setTimeout(resolve,300));
+ expect(listener.received()).toBe(0);
+ const {blocked}=await readTransportLog(transportLog(runtimeDir));
+ expect(blocked).toEqual([expect.objectContaining({api:'ChildProcess.spawn',program:'node'}),expect.objectContaining({api:'process.execve',program:'node'})]);
 },SPAWNS);
 
 it('refuses UDP from new dgram.Socket and records HTTP attempts by host and port only',async()=>{

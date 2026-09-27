@@ -22,9 +22,9 @@ export interface LaunchSpec {argv:string[];env:Record<string,string>;cwd:string}
  * The server process for one run. Every Pixoo setting the run depends on is
  * explicit, so an inherited PIXOO_MODE, PIXOO_DATA_DIR or PIXOO_PORT never
  * decides it, and the transport guard removes any other inherited PIXOO_*
- * setting before the server reads its configuration. The guard also refuses to
- * start the server unless the environment it finally receives selects the
- * simulator.
+ * setting before the server reads its configuration. NODE_OPTIONS is emptied so
+ * no inherited preload runs before the guard. The guard also refuses to start
+ * the server unless the environment it finally receives selects the simulator.
  */
 export function launchSpec({runtimeDir,dataDir,port,node}:LaunchInput):LaunchSpec {
  if(!Number.isInteger(port)||port<0||port>65535)throw new Error('Port must be an integer from 0 through 65535');
@@ -32,7 +32,7 @@ export function launchSpec({runtimeDir,dataDir,port,node}:LaunchInput):LaunchSpe
  if(!isAbsolute(runtimeDir)||!isAbsolute(dataDir))throw new Error('Run directories must be absolute');
  return {
   argv:[node,'--import',pathToFileURL(transportGuard).href,serverEntry],
-  env:{PIXOO_MODE:'simulator',PIXOO_DATA_DIR:dataDir,PIXOO_PORT:String(port),PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog(runtimeDir)},
+  env:{NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:dataDir,PIXOO_PORT:String(port),PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog(runtimeDir)},
   cwd:checkoutRoot,
  };
 }

@@ -32,19 +32,30 @@ A verification run SHALL launch the built server with explicit simulator mode, t
 - **THEN** the server does not start and no transport attempt is recorded
 
 ### Requirement: Observed transport boundary
-The transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection, process spawn and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. A process the server forks SHALL run under the same guard. Records SHALL name hosts and ports, never URL paths. A later paired scenario MAY allow declared ports of another disposable run, never an installed port.
+Through the public Node.js APIs, the transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. Records SHALL name hosts and ports, never URL paths. A later paired scenario MAY allow declared ports of another disposable run, never an installed port.
 
 #### Scenario: Physical transport attempt
 - **WHEN** code in a guarded process calls the device transport or fetches a non-loopback address
 - **THEN** the call fails without a connection, and the recorded attempt fails the no-physical-transport check
 
-#### Scenario: Forked and spawned children
-- **WHEN** a guarded process forks a child with replaced arguments and environment, as the media worker does, and tries each other way to start a process
-- **THEN** the forked child's connection is refused and recorded, every other spawn is refused and recorded, and an upload still renders in the guarded media worker
-
 #### Scenario: Installed loopback service
 - **WHEN** code in a guarded process connects to `127.0.0.1:8788`, another local port or a Unix socket
 - **THEN** the connection is refused and recorded, and the no-physical-transport check fails; a connection to the process's own listening port is allowed
+
+### Requirement: Guarded code execution
+A process the server forks and every worker thread it starts SHALL run under the same guard, even when the caller replaces `execArgv` or `env`, and fork options SHALL be honored as Node reads them. Every other process start the public API offers (`spawn`, `exec`, `execFile`, their Sync forms, `ChildProcess#spawn`, `process.execve`) SHALL be refused and recorded. The launch SHALL empty `NODE_OPTIONS`. Internal bindings and native addons are out of scope.
+
+#### Scenario: Forked children and workers
+- **WHEN** a guarded process forks a child with replaced arguments and environment, as the media worker does, or with an undefined argument list before its options, or starts a worker with an empty `execArgv`
+- **THEN** each child or worker keeps its options, its connection is refused and recorded, and an upload still renders in the guarded media worker
+
+#### Scenario: Other process starts
+- **WHEN** a guarded process calls each other public way to start or replace a process
+- **THEN** every call is refused and recorded, and nothing it would have started reaches the network
+
+#### Scenario: Inherited preload
+- **WHEN** the caller's `NODE_OPTIONS` imports a module, for the server or for a forked child
+- **THEN** that module never runs
 
 ### Requirement: Private synthetic data
 Seeding SHALL write only into an empty real directory outside every Git checkout, including through symlink aliases. That directory SHALL NOT be, contain or lie inside the owner's normal data and lock directories or an inherited data directory. Scenarios SHALL use only generated 64×64 fixtures, one playlist and synthetic agent sessions. Any credential SHALL be generated for the run, revoked after seeding and never stored in plain text.

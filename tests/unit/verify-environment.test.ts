@@ -13,7 +13,7 @@ describe('launch command',()=>{
  it('launches the built server through the transport guard with explicit simulator settings only',()=>{
   const spec=launchSpec({runtimeDir:'/state/pixoo-run',dataDir:'/state/pixoo-run/data',port:0,node:'/opt/node/bin/node'});
   expect(spec.argv).toEqual(['/opt/node/bin/node','--import',expect.stringMatching(/^file:.*\/scripts\/verify\/transport-guard\.ts$/),resolve('apps/server/dist/main.js')]);
-  expect(spec.env).toEqual({PIXOO_MODE:'simulator',PIXOO_DATA_DIR:'/state/pixoo-run/data',PIXOO_PORT:'0',PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog('/state/pixoo-run')});
+  expect(spec.env).toEqual({NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:'/state/pixoo-run/data',PIXOO_PORT:'0',PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog('/state/pixoo-run')});
   expect(spec.cwd).toBe(resolve('.'));
   expect(launchSpec({runtimeDir:'/state/r',dataDir:'/state/r/data',port:41705,node:'node'}).env.PIXOO_PORT).toBe('41705');
  });
