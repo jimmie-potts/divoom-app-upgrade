@@ -82,7 +82,8 @@ export interface FeedView {ownerId?:unknown;connection?:unknown;snapshot?:{revis
 
 async function feed(url:URL,headers:Record<string,string>,signal?:AbortSignal):Promise<FeedView> {
  const response=await fetch(url,{headers:{accept:'application/json',...headers},redirect:'error',...(signal?{signal}:{})});
- if(!response.ok)throw new Error(`${url.pathname} answered ${response.status}`);
+ // The full URL without its query: the core redacts a bare route in a reason as if it were a file path.
+ if(!response.ok)throw new Error(`${url.origin}${url.pathname} answered ${response.status}`);
  return await response.json() as FeedView;
 }
 /** Pixoo's view of its remote feed. The read refreshes it from the Hub first, as the Monitor tab does. */

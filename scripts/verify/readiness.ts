@@ -45,8 +45,9 @@ export function failureCause(stderrTail:string):string|undefined {
 }
 
 async function json(url:string,path:string,signal?:AbortSignal):Promise<unknown> {
- const response=await fetch(new URL(path,url),{...(signal?{signal}:{}),headers:{accept:'application/json'}});
- if(!response.ok)throw new Error(`${path} answered ${response.status}`);
+ const target=new URL(path,url),response=await fetch(target,{...(signal?{signal}:{}),headers:{accept:'application/json'}});
+ // The full URL: the core redacts a bare route in a reason as if it were a file path.
+ if(!response.ok)throw new Error(`${target.href} answered ${response.status}`);
  return response.json();
 }
 const reason=(error:unknown)=>error instanceof Error?error.message:String(error);

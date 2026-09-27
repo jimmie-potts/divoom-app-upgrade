@@ -151,3 +151,14 @@ it('pairs with a Hub run: tolerates a rejected and a dropped feed, shows its ses
  expect(await checkNoPhysicalTransport(context('library-playlist'))).toEqual({outcome:'passed'});
  expect(await checkNoPhysicalTransport(context())).toMatchObject({outcome:'failed',reason:`the process serving port ${server.port} is paired with no port; hub-paired expects ${hub.port}`});
 },SPAWNS);
+
+it('names routes by their full URL in reasons, which the core\'s redaction keeps',async()=>{
+ const {createServer}=await import('node:http');
+ const failing=createServer((_request,response)=>{response.writeHead(500,{'content-type':'application/json'});response.end('{}');});
+ await new Promise<void>(resolve=>failing.listen(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise(resolve=>failing.close(resolve)));
+ const origin=`http://127.0.0.1:${(failing.address() as {port:number}).port}`;
+ const {probeHealth}=await import('../../scripts/verify/readiness.ts');
+ const run=await pairedRun(),context={...run,url:`${origin}/`,port:1,scenario:HUB_PAIRED,inputs:{'hub-feed':`${origin}/`}};
+ expect(await probeHealth(context)).toEqual({ok:false,reason:`health unreadable: ${origin}/api/health answered 500`});
+ expect(await checkHubFeed(context)).toEqual({outcome:'failed',reason:`the Hub feed is unreadable: ${origin}/api/integration/v1/sessions answered 500`});
+});

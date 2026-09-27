@@ -39,8 +39,9 @@ const WAIT=5000;
 const text=(t:StepContext,value:string|RegExp)=>t.page.getByText(value,typeof value==='string'?{exact:true}:{}).first().waitFor({timeout:WAIT});
 const tab=(t:StepContext,name:string)=>t.page.getByRole('navigation',{name:'Controller views'}).getByRole('button',{name,exact:true}).click({timeout:WAIT});
 async function api<T>(t:StepContext,path:string):Promise<T> {
- const response=await fetch(new URL(path,t.url),{signal:t.signal});
- if(!response.ok)throw new Error(`${path} answered ${response.status}`);
+ const url=new URL(path,t.url),response=await fetch(url,{signal:t.signal});
+ // The full URL: the core redacts a bare route in a reason as if it were a file path.
+ if(!response.ok)throw new Error(`${url.href} answered ${response.status}`);
  return response.json() as Promise<T>;
 }
 interface PlayerSnapshot {player:{state:string;intent:string;itemId:string|null;generation:number};session:{id:string;playlist:{items:{id:string}[]}}|null}

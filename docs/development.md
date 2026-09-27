@@ -284,7 +284,9 @@ is neither an installed service's nor the run's own. Tokens are never inputs.
 They never appear in a receipt, event, log line or failure detail, and a
 missing, readable-by-others or malformed token file fails the seed with a
 fixed line that names only the file. `stop` deletes both files with the run
-directory.
+directory. The files exist only after `start`, so `hub-paired` cannot be a
+run's first seed, and `restart` of a paired run stops it and then fails at
+seed. Stop it instead, start a new standalone run, write the files and reseed.
 
 The `hub-paired` seed:
 
