@@ -1,33 +1,41 @@
 ## ADDED Requirements
 
 ### Requirement: Adapter command
-`npm run verify -- <operation>` SHALL pass the Pixoo plug-in to the vendored shared verification core, which owns the run lifecycle, receipt and proof. The wrapper SHALL refuse a Node version outside 24.5 through 24.x before loading the plug-in. `start` and `restart` SHALL build the checkout before seeding. Steps that change state, and every control, SHALL be marked for a fresh reseed.
+`npm run verify -- <operation>` SHALL pass the Pixoo plug-in to the vendored shared verification core, which owns the run lifecycle, receipt and proof. The wrapper SHALL refuse a Node version outside 24.5 through 24.x before loading the plug-in, and the plug-in SHALL load without build output. `start` and `restart` SHALL build the checkout before seeding and report a failed build with a fixed line. Steps that change state, and every control, SHALL be marked for a fresh reseed.
 
 #### Scenario: Unsupported Node
 - **WHEN** the wrapper runs under Node 22
 - **THEN** it prints one JSON result naming the Node requirement and exits with status 3 without starting a run
+
+#### Scenario: Fresh checkout and failed build
+- **WHEN** `help` runs where no build output exists, or the build fails with private text in its output
+- **THEN** `help` answers with one JSON line, and the failed build is reported by exit code or signal without any of its output
 
 #### Scenario: Rebuilt checkout under a live preview
 - **WHEN** the checkout is rebuilt with different web sources while a run serves it
 - **THEN** `doctor` reports the served artifact digest as changed rather than matching
 
 ### Requirement: Simulator-only runs
-A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator. A run SHALL NOT bind an installed port.
+A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator, and SHALL remove every other inherited `PIXOO_*` setting before the server reads its configuration. A run SHALL NOT bind an installed port.
 
 #### Scenario: Ambient device settings
-- **WHEN** a run starts while the caller selects device mode, the owner's data directory and the installed port, and the run's data holds a saved device target
-- **THEN** health reports simulator mode without connectivity, playback and a probe send no physical request, and the owner's directories stay unchanged
+- **WHEN** a run starts while the caller selects device mode, the owner's data directory, the installed port, MCP and the native controller, and the run's data holds a saved device target
+- **THEN** health reports simulator mode without connectivity, playback, an upload and a probe send no physical request, the MCP and controller routes are absent, and the owner's directories stay unchanged
 
 #### Scenario: Lost simulator setting
 - **WHEN** the launch environment no longer selects the simulator
 - **THEN** the server does not start and no transport attempt is recorded
 
 ### Requirement: Observed transport boundary
-The transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. A later paired scenario MAY allow explicitly declared loopback ports of another disposable run, never an installed port.
+The transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection, process spawn and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. A process the server forks SHALL run under the same guard. Records SHALL name hosts and ports, never URL paths. A later paired scenario MAY allow declared ports of another disposable run, never an installed port.
 
 #### Scenario: Physical transport attempt
 - **WHEN** code in a guarded process calls the device transport or fetches a non-loopback address
 - **THEN** the call fails without a connection, and the recorded attempt fails the no-physical-transport check
+
+#### Scenario: Forked and spawned children
+- **WHEN** a guarded process forks a child with replaced arguments and environment, as the media worker does, and tries each other way to start a process
+- **THEN** the forked child's connection is refused and recorded, every other spawn is refused and recorded, and an upload still renders in the guarded media worker
 
 #### Scenario: Installed loopback service
 - **WHEN** code in a guarded process connects to `127.0.0.1:8788`, another local port or a Unix socket

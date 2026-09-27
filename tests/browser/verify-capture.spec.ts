@@ -70,7 +70,7 @@ test('negative controls: each control step fails at the assertion that names its
    ['control-wrong-frame',/effective preview of verify-quadrants\.png matches/,/shows verify-stripes\.png frame 0, expected verify-quadrants\.png frame 0/],
    ['control-duplicate-next',/item 2 of 3 shows verify-blink\.gif/,/the page shows Item 3 of 3/],
    ['control-select-media-resumes',/Select Media leaves playback paused/,/intent is active after Select Media/],
-   ['control-retry-new-identity',/item 2 of 3 shows verify-blink\.gif|the retry replayed no second effect/,/./],
+   ['control-retry-new-identity',/^the retry replayed no second effect$/,/^the retry changed playback$/],
   ];
   expect(Object.keys(plugin.captureSteps).filter(step=>step.startsWith('control-')).sort()).toEqual(cases.map(([step])=>step).sort());
   for(const [step,assertion,reason] of cases){
@@ -81,6 +81,11 @@ test('negative controls: each control step fails at the assertion that names its
    const log=JSON.parse(await readFile(result.log,'utf8'));
    expect(log.notes[0],step).toMatch(/injected known-wrong behavior: /);
    await nonEmpty(result.screenshot);await nonEmpty(result.video);
+  }
+  // The same run still passes reference steps after the controls: a fresh one, and one on the state they left.
+  for(const step of ['playlist-progression','device-boundary']){
+   const result=await capture(info,run,step);
+   expect(result.outcome,`${step} after the controls: ${result.reason}`).toBe('passed');
   }
  }finally{await run.close();}
 });

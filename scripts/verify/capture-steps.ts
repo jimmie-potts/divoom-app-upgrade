@@ -15,9 +15,9 @@ import {PLAYLIST,SESSION,defaultScenario,syntheticMedia,type MediaKey} from './s
 export interface StepContext {
  page:Page;url:string;port:number;runId:string;scenario:string;runtimeDir:string;signal:AbortSignal;
  /**
-  * Every check throws or rejects on a mismatch and returns nothing. The type
-  * refuses predicate-style checks, such as `() => locator.isVisible()`, whose
-  * `false` result would otherwise read as a pass.
+  * Every check throws or rejects on a mismatch and returns nothing. The core
+  * fails a check that returns `false`, but another falsy result, such as a
+  * `count()` of 0, would still pass; the type refuses any returned value.
   */
  expect(name:string,check:()=>Promise<void>):Promise<void>;
  note(message:string):void;
@@ -250,11 +250,12 @@ export const captureSteps:Record<string,Step>={
     if(bodies.length!==2)throw new Error(`${bodies.length} command requests were sent`);
     if(JSON.stringify(bodies[0])!==JSON.stringify(bodies[1]))throw new Error('the retry changed the request');
    });
-   await playerShows(t,2,'blink');
+   // The backend is the authority on effects, so check it before the page catches up with a second one.
    await t.expect('the retry replayed no second effect',async()=>{
     const after=await player(t);
     if(after.player.generation!==before.player.generation||after.player.itemId!==before.player.itemId)throw new Error('the retry changed playback');
    });
+   await playerShows(t,2,'blink');
    await t.page.unroute('**/api/player/commands');
    await noPhysicalTransport(t);
   },

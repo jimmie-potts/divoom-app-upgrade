@@ -167,18 +167,24 @@ the runtime state.
 Each run:
 
 - builds with `npm run build` on `start` and `restart`, then serves this
-  checkout's build. A later build in the same checkout, including another
-  run's `start`, replaces what a running preview serves. `doctor` reports the
-  served page's digest as `changed`; use `restart` for a new candidate.
+  checkout's build. `help`, `doctor` and `stop` need no build.
+- shares the served build with every other run from the same checkout. A
+  later build there, including another run's `start`, replaces what a running
+  preview serves. `doctor` reports the served page's digest as `changed`;
+  `capture` does not check it, so run `doctor` before citing captures from a
+  checkout that was rebuilt, and use `restart` for a new candidate.
 - launches `apps/server/dist/main.js` on `127.0.0.1:0` with
   `PIXOO_MODE=simulator`, monitoring enabled and a private `PIXOO_DATA_DIR`
   under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
-  never decide the mode, data directory or port.
+  never decide the mode, data directory or port, and the guard removes any
+  other inherited `PIXOO_*` setting, such as MCP or controller flags, before
+  the server reads its configuration.
 - preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
   unless the simulator is selected. It blocks and records every outbound HTTP
-  request, UDP socket and Unix socket connection, and every TCP connection
-  except to the run's own port, so installed services such as the Hub on 8788
-  are refused like a device. `start` runs the
+  request, UDP socket, Unix socket connection and process spawn, and every TCP
+  connection except to the run's own port, so installed services such as the
+  Hub on 8788 are refused like a device. A process the server forks, such as
+  the media worker, runs under the same guard. `start` runs the
   `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
   them. Every capture step ends by asserting that the run has recorded no
   attempt. A failed start names known causes, such as

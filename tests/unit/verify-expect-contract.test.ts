@@ -2,9 +2,10 @@ import {expect,it} from 'vitest';
 import {readFile} from 'node:fs/promises';
 import type {StepContext} from '../../scripts/verify/capture-steps.ts';
 
-// A capture check must throw or reject on a mismatch. A predicate-style check
-// that resolves `false` is not an assertion, so the step type refuses it; the
-// typecheck fails if either line below stops being an error.
+// A capture check must throw or reject on a mismatch. The core fails a check
+// that returns `false`, but another falsy result (a `count()` of 0) would pass,
+// so the step type refuses any returned value; the typecheck fails if either
+// line below stops being an error.
 export function refusedChecks(t:StepContext):void {
  // @ts-expect-error A boolean result is not an assertion.
  void t.expect('predicate',async()=>t.page.getByText('Item 2 of 3').isVisible());
