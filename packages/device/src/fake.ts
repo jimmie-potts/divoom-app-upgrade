@@ -6,6 +6,8 @@ import {
 
 export interface FakeDeviceOptions { clock?: Clock; latencyMs?: number; readyDelayMs?: number; recordHistory?: boolean }
 type OperationKind = 'probe' | 'uploadAnimation' | 'setBrightness' | 'setScreen';
+/** Per kind: operations the writer admitted to its queue, and those that completed successfully. */
+export type OperationCounts = Record<OperationKind, { admitted: number; succeeded: number }>;
 export interface OperationRecord {
   id: number;
   kind: OperationKind;
@@ -37,6 +39,8 @@ export class FakeDeviceAdapter implements DeviceAdapter {
   private active: Work | undefined;
   private records: OperationRecord[] = [];
   private recordedEffects: DeviceEffect[] = [];
+  private readonly counted: OperationCounts = { probe: { admitted: 0, succeeded: 0 }, uploadAnimation: { admitted: 0, succeeded: 0 },
+    setBrightness: { admitted: 0, succeeded: 0 }, setScreen: { admitted: 0, succeeded: 0 } };
 
   constructor(options: FakeDeviceOptions = {}) {
     this.clock = options.clock ?? systemClock;
@@ -48,6 +52,8 @@ export class FakeDeviceAdapter implements DeviceAdapter {
   }
   get operations(): readonly OperationRecord[] { return structuredClone(this.records); }
   get effects(): readonly DeviceEffect[] { return structuredClone(this.recordedEffects); }
+  /** Bounded counters kept even when history is disabled, so a simulator run can report what reached its writer. */
+  get counts(): OperationCounts { return structuredClone(this.counted); }
 
   setOnline(online: boolean): void {
     if (typeof online !== 'boolean') throw new TypeError('Online state must be boolean');
@@ -122,6 +128,7 @@ export class FakeDeviceAdapter implements DeviceAdapter {
           serviceMs: startedAtMs === null ? 0 : completedAtMs - startedAtMs };
         const priorEffects = count ? 'possible' : 'none';
         if(this.recordHistory)this.records.push({ id, kind, generation, timing: { ...timing }, outcome: code ?? 'success', priorEffects });
+        if(!code)this.counted[kind].succeeded++;
         resolve(code ? { ok: false, code, priorEffects, generation, timing } : { ok: true, value: value(), generation, timing });
         this.waiting = this.waiting.filter(item => item !== work);
         if (this.active === work) this.active = undefined;
@@ -162,6 +169,7 @@ export class FakeDeviceAdapter implements DeviceAdapter {
       if (code) { finish(code); return; }
       signal?.addEventListener('abort', abort, { once: true });
       cancelDeadline = this.clock.schedule(timeoutMs, () => { finish('timeout'); });
+      this.counted[kind].admitted++;
       this.waiting.push(work);
       this.pump();
     });

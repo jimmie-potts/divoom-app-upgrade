@@ -38,8 +38,9 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
  try{
   if(runtime.activeConfiguration)releaseOwner=await acquireDeviceOwner(runtime.activeConfiguration.ip,options.deviceLockDirectoryForTests);
   library=await Library.open({directory:join(dataDir,'library')});
-  const device=runtime.activeConfiguration?(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration.ip,
-   profile:{...PIXOO64_SMOKE_PROFILE,evidence:'observed',readyDelayMs:0}},options.transportForTests)):new FakeDeviceAdapter({recordHistory:false});
+  const simulator=runtime.activeConfiguration?undefined:new FakeDeviceAdapter({recordHistory:false});
+  const device=simulator??(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration!.ip,
+   profile:{...PIXOO64_SMOKE_PROFILE,evidence:'observed',readyDelayMs:0}},options.transportForTests));
   await assertRuntimeDirectory(dataDir);
   player=await Player.open({store:new LibraryPlaybackStore(library,{profile,stillDelayMs:runtime.mode==='device'?500:100}),device,pauseOnUncertain:runtime.mode==='device'});
   const active=player;
@@ -61,7 +62,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
    unsubscribe();events.close();
    try{await active.close();}finally{await physical?.close();}
   });
-  await deviceRoutes(app,dataDir,active,changed,runtime,service);
+  await deviceRoutes(app,dataDir,active,changed,runtime,service,simulator);
   await catalogRoutes(app,library,profile);
   app.addHook('onClose',close);
   return observed;

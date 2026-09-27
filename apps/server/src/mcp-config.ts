@@ -41,8 +41,14 @@ async function update(directory:string,change:(state:Credentials)=>Credentials):
  }catch{throw failure();}finally{await rm(temporary,{force:true});if(lock){await lock.close();await rm(lockPath,{force:true});}}
 }
 export async function provisionCredential(directory:string,id:string,scopes:('read'|'control')[]):Promise<string>{
- const token=randomBytes(32).toString('base64url'),entry=principal.parse({id,enabled:true,digest:createHash('sha256').update(token).digest('hex'),scopes});
- await update(directory,state=>{if(state.principals.some(p=>p.id===id))throw failure();return {...state,principals:[...state.principals,entry]};});return token;
+ const token=randomBytes(32).toString('base64url');
+ await registerCredential(directory,id,token,scopes);return token;
+}
+/** Register a token another party generated, such as a paired Hub's controller token. Only its digest is stored. */
+export async function registerCredential(directory:string,id:string,token:string,scopes:('read'|'control')[]):Promise<void>{
+ if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw failure();
+ const entry=principal.parse({id,enabled:true,digest:createHash('sha256').update(token).digest('hex'),scopes});
+ await update(directory,state=>{if(state.principals.some(p=>p.id===id))throw failure();return {...state,principals:[...state.principals,entry]};});
 }
 export async function revokeCredential(directory:string,id:string):Promise<void>{
  await update(directory,state=>{if(!state.principals.some(p=>p.id===id))throw failure();return {...state,principals:state.principals.map(p=>p.id===id?{...p,enabled:false}:p)};});

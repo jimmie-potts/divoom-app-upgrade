@@ -98,3 +98,6 @@ For long-lived simulator use, construct `FakeDeviceAdapter({recordHistory:false}
 Operations still execute through the same queue, but `effects` and `operations`
 remain empty. Recording defaults to true for test fixtures. Normal server startup
 disables it so repeated playback does not retain frame buffers indefinitely.
+`counts` stays available either way: for each operation kind, the number the
+writer admitted to its queue and the number that succeeded. The server exposes
+them as `GET /api/device/simulator`.
