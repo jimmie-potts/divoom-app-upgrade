@@ -5,9 +5,6 @@
 import {mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import sharp from 'sharp';
-import {Library} from '@pixoo/library';
-import {createApp} from '../../apps/server/dist/app.js';
-import {provisionCredential,revokeCredential} from '../../apps/server/dist/mcp-config.js';
 import {assertSeedable,type OwnerContext} from './run-environment.ts';
 
 type RGB=readonly [number,number,number];
@@ -55,6 +52,8 @@ export async function seedScenario({dataDir,scenario}:SeedInput,owner:OwnerConte
  if(!Object.hasOwn(scenarioDefinitions,scenario))throw new Error(`Unknown scenario ${scenario}`);
  const definition:ScenarioDefinition=scenarioDefinitions[scenario as ScenarioName];
  const data=await assertSeedable(dataDir,owner);
+ // Built modules load here, not at module load: the core builds the checkout before it seeds.
+ const [{Library},{provisionCredential,revokeCredential}]=await Promise.all([import('@pixoo/library'),import('../../apps/server/dist/mcp-config.js')]);
  if(definition.playlist){
   const library=await Library.open({directory:join(data,'library')});
   try{
@@ -79,6 +78,7 @@ export async function seedScenario({dataDir,scenario}:SeedInput,owner:OwnerConte
 
 /** Post one synthetic lifecycle event through the actual monitor route of an in-process simulator app with no listener. */
 async function seedSession(dataDir:string,token:string):Promise<void> {
+ const {createApp}=await import('../../apps/server/dist/app.js');
  const app=createApp({dataDir,mode:'simulator',monitorEnabled:true});
  try{
   const event={apiVersion:'1.1',title:{value:SESSION.title,source:'provider'},project:SESSION.project,projectId:SESSION.projectId,

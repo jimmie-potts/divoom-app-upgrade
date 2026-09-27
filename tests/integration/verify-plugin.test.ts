@@ -1,7 +1,8 @@
 import {afterEach,expect,it} from 'vitest';
 import {execFile} from 'node:child_process';
-import {mkdir,rm} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,readdir,rm,stat,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
+import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {promisify} from 'node:util';
@@ -68,4 +69,56 @@ it('fails a relaunch on an occupied recorded port and names the cause',async()=>
  expect(failed).toBeInstanceOf(StartError);
  expect((failed as StartError).message).toMatch(new RegExp(`exited 1: .*EADDRINUSE.*${port}`));
  expect(failureCause((failed as StartError).stderr.join('\n'))).toBe('pixoo-start-failed: port in use');
+},SPAWNS);
+
+it('leaves only a disabled, digest-only seed credential in the monitor store',async()=>{
+ for(const scenario of ['library-playlist','empty']){
+  const run=await makeRun(`pixoo-20260927T000000Z-${Math.random().toString(16).slice(2,8)}`);cleanup.push(run.remove);
+  await seedScenario({...run,scenario});
+  const path=join(run.dataDir,'agent-monitor','mcp-credentials.json');
+  expect(JSON.parse(await readFile(path,'utf8')),scenario).toEqual({version:1,principals:[{id:'verify-seed',enabled:false,digest:expect.stringMatching(/^[a-f0-9]{64}$/),scopes:['control']}]});
+  expect((await stat(path)).mode&0o777,scenario).toBe(0o600);
+ }
+},SPAWNS);
+
+const wrapper=join(process.cwd(),'scripts','verify.mjs');
+const stubNode=(version:string)=>'data:text/javascript,'+encodeURIComponent(`Object.defineProperty(process.versions,'node',{value:${JSON.stringify(version)}});`);
+it('refuses Node outside 24.5 through 24.x with one JSON line and exit status 3, before loading anything',async()=>{
+ const state=await mkdtemp(join(tmpdir(),'verify-node-state-'));cleanup.push(()=>rm(state,{recursive:true,force:true}));
+ for(const version of ['22.22.1','24.4.9','25.0.0']){
+  const result=await promisify(execFile)(process.execPath,['--import',stubNode(version),wrapper,'start'],{env:{PATH:process.env.PATH,APP_VERIFY_STATE_ROOT:state},timeout:10000}).then(()=>undefined,(error:{code:number;stdout:string;stderr:string})=>error);
+  expect(result?.code,version).toBe(3);
+  const lines=result!.stdout.trim().split('\n');
+  expect(lines,version).toHaveLength(1);
+  expect(JSON.parse(lines[0]!),version).toMatchObject({operation:'start',ok:false,error:'node-version',detail:expect.stringContaining(`Node ${version} cannot run the Pixoo adapter`)});
+  expect(result!.stderr,version).toBe('');
+ }
+ expect(await readdir(state)).toEqual([]);
+ const {stdout}=await promisify(execFile)(process.execPath,['--import',stubNode('24.5.0'),wrapper,'help'],{timeout:20000});
+ expect(JSON.parse(stdout)).toMatchObject({operation:'help',app:'pixoo'});
+},SPAWNS);
+
+// `help` and `start` run before the core's prepare builds the checkout, so the plug-in must load without any build output.
+// A resolve hook makes every module under this checkout's apps/*/dist and packages/*/dist unresolvable.
+async function withoutBuild():Promise<string> {
+ const directory=await mkdtemp(join(tmpdir(),'verify-no-build-'));cleanup.push(()=>rm(directory,{recursive:true,force:true}));
+ const built=new RegExp(`^${pathToFileURL(process.cwd()).href.replace(/[.*+?^${}()|[\]\\/]/g,'\\$&')}/(apps|packages)/[^/]+/dist/`);
+ await writeFile(join(directory,'hooks.mjs'),`const built=${built};
+export async function resolve(specifier,context,next){
+ const result=await next(specifier,context);
+ if(built.test(result.url))throw Object.assign(new Error('Cannot find module '+result.url),{code:'ERR_MODULE_NOT_FOUND'});
+ return result;
+}
+`);
+ await writeFile(join(directory,'register.mjs'),`import {register} from 'node:module';\nregister(${JSON.stringify(pathToFileURL(join(directory,'hooks.mjs')).href)});\n`);
+ return pathToFileURL(join(directory,'register.mjs')).href;
+}
+it('answers help as one JSON line when no build output exists',async()=>{
+ const hook=await withoutBuild();
+ const {stdout,stderr}=await promisify(execFile)(process.execPath,['--import',hook,wrapper,'help'],{timeout:20000});
+ expect(stdout.trim().split('\n')).toHaveLength(1);
+ expect(JSON.parse(stdout)).toMatchObject({operation:'help',app:'pixoo',defaultScenario:'library-playlist'});
+ expect(stderr).toBe('');
+ // The same hook makes a built module unresolvable, so the check cannot pass by accident.
+ await expect(promisify(execFile)(process.execPath,['--import',hook,'--input-type=module','-e',`await import(${JSON.stringify(pathToFileURL(join(process.cwd(),'apps/server/dist/config.js')).href)})`],{timeout:10000})).rejects.toMatchObject({stderr:expect.stringContaining('ERR_MODULE_NOT_FOUND')});
 },SPAWNS);

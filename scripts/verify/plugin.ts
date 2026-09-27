@@ -3,9 +3,9 @@
 // supplies only what is specific to Pixoo. Node runs it directly with type
 // stripping.
 import type {AppPlugin} from '@jimmie-potts/app-verify';
-import {spawn} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {runBuild} from './build.ts';
 import {captureSteps} from './capture-steps.ts';
 import {controlSteps} from './controls.ts';
 import {checkNoPhysicalTransport,checkSimulatorMode,failureCause,probeHealth,readyLine} from './readiness.ts';
@@ -13,16 +13,6 @@ import {assertPrivateDataDir,checkoutRoot,launchSpec} from './run-environment.ts
 import {defaultScenario,scenarioDefinitions,seedScenario} from './scenarios.ts';
 
 const {version}=JSON.parse(await readFile(join(checkoutRoot,'package.json'),'utf8')) as {version:string};
-
-/** Bring the served build up to date with the checkout before a run launches it. */
-function build({root,signal}:{root:string;signal:AbortSignal}):Promise<void> {
- return new Promise((resolve,reject)=>{
-  const child=spawn('npm',['run','build'],{cwd:root,signal,stdio:['ignore','ignore','pipe']});
-  let tail='';child.stderr.on('data',chunk=>{tail=(tail+String(chunk)).slice(-4000);});
-  child.once('error',reject);
-  child.once('exit',code=>code===0?resolve():reject(new Error(`npm run build exited ${code}: ${tail.trim().split('\n').at(-1)??''}`)));
- });
-}
 
 const plugin:AppPlugin={
  app:'pixoo',
@@ -35,9 +25,9 @@ const plugin:AppPlugin={
   seed:(context:{runId:string;dataDir:string;scenario:string})=>seedScenario(context),
  }])),
  // The served page names its content-hashed bundle, so its digest changes with the web build.
- // A run serves this checkout's build: rebuilding the checkout changes what a live preview serves,
- // and doctor reports the changed digest.
- build:{version,artifact:{route:'/'},prepare:build},
+ // Runs from one checkout share its build: rebuilding it changes what a live preview serves.
+ // doctor reports the changed digest; capture does not check it.
+ build:{version,artifact:{route:'/'},prepare:({root,signal})=>runBuild(root,signal)},
  launch:async(context:{runtimeDir:string;dataDir:string;port:number;node:string})=>{
   await assertPrivateDataDir(context.dataDir);
   return launchSpec(context);
