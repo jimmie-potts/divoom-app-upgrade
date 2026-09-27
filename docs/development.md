@@ -178,12 +178,14 @@ Each run:
   under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
   never decide the mode, data directory or port, and the guard removes any
   other inherited `PIXOO_*` setting, such as MCP or controller flags, before
-  the server reads its configuration. `NODE_OPTIONS` is emptied, so no
-  inherited preload runs before the guard.
+  the server reads its configuration. Only a `hub-paired` launch enables the
+  native controller API, as described under [Hub-paired runs](#hub-paired-runs).
+  `NODE_OPTIONS` is emptied, so no inherited preload runs before the guard.
 - preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
   unless the simulator is selected. Through the public Node.js APIs it blocks
   and records every outbound HTTP request, UDP socket and Unix socket
-  connection, every TCP connection except to the run's own port, and every
+  connection, every TCP connection except to the run's own port (and, in
+  `hub-paired`, the declared Hub port), and every
   other process start (`spawn`, `exec`, `execFile` and their Sync forms,
   `ChildProcess#spawn` and `process.execve`). Installed services such as the
   Hub on 8788 are refused like a device. A fork of Node, such as the media
@@ -193,10 +195,10 @@ Each run:
   use by the app and its dependencies. It is not a sandbox against
   deliberately hostile code already running in the server process, such as
   values with a side-effecting `toString`, internal bindings
-  (`process.binding`) or native addons. `start` runs the
-  `simulator-mode` and `no-physical-transport` checks and `doctor` repeats
-  them. Every capture step ends by asserting that the run has recorded no
-  attempt. A failed start names known causes, such as
+  (`process.binding`) or native addons. `start` and every reseed run the
+  `simulator-mode`, `no-physical-transport` and `hub-feed` checks, and
+  `doctor` repeats them. Every capture step ends by asserting that the run has
+  recorded no attempt. A failed start names known causes, such as
   `pixoo-transport-guard: simulator mode required` or
   `pixoo-start-failed: port in use`, without copying server output.
 - rejects a data directory inside a Git checkout, one reached through a
@@ -213,7 +215,9 @@ The default scenario `library-playlist` seeds `verify-quadrants.png`,
 `verify-blink.gif` (two frames, 500 ms each) and `verify-stripes.png`, the
 playlist "Verification loop" in that order, and one synthetic agent session,
 "Synthetic verification task" in project VERIFY-PIXOO. The `empty` scenario
-seeds no media, playlists or sessions.
+seeds no media, playlists or sessions. The `hub-paired` scenario seeds the
+same media and playlist, reads its sessions from a paired Hub run and seeds
+none of its own; see [Hub-paired runs](#hub-paired-runs).
 
 | Feature | Entry | Capture step | Deterministic action | Expected observation |
 | --- | --- | --- | --- | --- |
@@ -224,6 +228,7 @@ seeds no media, playlists or sessions.
 | Monitor/Media | Monitor tab | `monitor-media` | Play playlist, Show monitor, Select Media, then Resume in Player | Monitor active with playback paused and the canvas equal to the server picture; Media leaves playback paused; Resume continues item 1 in Media; saves `monitor` |
 | Recovery | Player | `lost-response-recovery` | Drop the Next response after the server applied it, then Retry command | Uncertain notice; the retry reuses the request identity; item 2 once with the generation unchanged |
 | Device boundary | Settings | `device-boundary` | Probe simulator | Simulator labels; health and device settings report the simulator; no transport attempt |
+| Hub pairing | Monitor tab, controller API | `hub-sessions` | In `hub-paired`, compare the feeds, open Monitor and read the controller snapshots with the Hub's token | A current feed from `verify-owner` at the Hub's revision; every Hub session and project listed; the canvas equal to the server picture; the default controller identity, and 401 without the token; only the run's port and the Hub port reached; saves `hub-monitor` |
 
 Each negative control runs a step with a known-wrong behavior injected between
 the page and the server, and must report failed:
@@ -233,6 +238,7 @@ the page and the server, and must report failed:
 | `control-wrong-frame` | Every rendition frame is served as the stripes fixture | `library-selection` preview pixels |
 | `control-duplicate-next` | Every Next is applied twice under a fresh identity | `playlist-progression` item 2 |
 | `control-select-media-resumes` | Select Media also resumes playback | `monitor-media` paused check |
+| `control-hub-feed-stale` | The page's monitor view reports the Hub feed stale and drops its sessions | `hub-sessions` Monitor list |
 | `control-retry-new-identity` | A retried Next is resent under a fresh identity | `lost-response-recovery` single effect |
 
 Steps that change state, and every control, are marked `fresh`: the core
@@ -243,11 +249,104 @@ pass. Run the controls after `handoff`, where they land in `after-handoff/`
 and still report failed.
 
 `npm run test:browser` runs every step and control through the core's
-unsupervised `runCaptureStep` against the actual server. `npm test` covers the
-launch environment, data directory guard, transport guard, concurrent runs
-and reseeding. Neither needs `systemd --user`. The supervisor, lease, handoff
-and restart are tested in the core's own suite. Adapter changes that affect
-them need a local run against real units, recorded in the PR.
+unsupervised `runCaptureStep` against the actual server, the `hub-paired`
+ones against a stand-in Hub feed. `npm test` covers the launch environment,
+data directory guard, transport guard, concurrent runs and reseeding, and
+runs a paired server against the stand-in feed with this test as the Hub's
+controller caller. Neither needs `systemd --user`. The supervisor, lease,
+handoff and restart are tested in the core's own suite. Adapter changes that
+affect them need a local run against real units, recorded in the PR.
+
+### Hub-paired runs
+
+The Hub's integrated preview
+([Hub #495](https://github.com/jimmie-potts/agent-device-hub/issues/495))
+pairs one Pixoo run with one Hub run. The Hub is the only agent-state owner:
+Pixoo reads its session feed as a remote consumer, and the Hub calls Pixoo's
+controller API. The Hub orchestrator drives this sequence:
+
+1. Start Pixoo standalone, then start the Hub run.
+2. Write two files into Pixoo's run directory (the receipt's
+   `owned.runtimeDir`, `~/.local/state/app-verify/<run-id>/` by default). Each
+   holds one 43-character base64url token with no newline, mode 0600:
+   - `hub-feed-token`: what Pixoo presents to the Hub's session feed. The Hub
+     grants it read and control scopes.
+   - `hub-controller-token`: what the Hub presents to Pixoo's controller API.
+3. Reseed Pixoo with
+   `npm run verify -- scenario <run-id> hub-paired --input hub-feed=http://127.0.0.1:<hub-port>/`.
+4. Reseed the Hub `integrated`. Its Pixoo controller points at
+   `<controller>controller/v1`, where `<controller>` is the endpoint that
+   Pixoo's reseed returned.
+
+`hub-feed` is the only input, optional for the plug-in and required by
+`hub-paired`. It must be exactly `http://127.0.0.1:<port>/`, on a port that
+is neither an installed service's nor the run's own. Tokens are never inputs.
+They never appear in a receipt, event, log line or failure detail, and a
+missing, readable-by-others or malformed token file fails the seed with a
+fixed line that names only the file. `stop` deletes both files with the run
+directory.
+
+The `hub-paired` seed:
+
+- writes the existing remote monitor configuration: owner `verify-owner`,
+  endpoint `<hub-feed>api/monitor/v1` and the feed token, mode 0600. Pixoo
+  polls `GET /api/monitor/v1/sessions?snapshotVersion=1.2` and refuses a
+  feed from any other owner. Acknowledgments use consumer `pixoo`.
+- registers the controller token as principal `hub` with read and control
+  scopes. The backend's credential store keeps only its SHA-256 digest.
+- seeds no local sessions and starts no embedded owner.
+
+The `hub-paired` launch adds `PIXOO_CONTROLLER_ENABLED=1` and
+`APP_VERIFY_PAIRED_PORTS=<hub-port>`. Every other launch sets
+`APP_VERIFY_PAIRED_PORTS` empty. The guard keeps `PIXOO_CONTROLLER_ENABLED`
+only in a paired launch, so an inherited value never pairs a run or enables
+the controller. The guard still removes the inherited identity settings, so
+the controller keeps its defaults: controller `pixoo-controller`, device
+`pixoo-local`, source `pixoo`.
+
+The controller serves `/controller/v1` and `/controller/pixoo-integration/v1`
+on the run's main origin. From the `hub-paired` launch on, the ready line
+announces that origin as endpoint `controller`. The core holds a recorded
+endpoint to its port, so every later reseed announces it again. Only a paired
+launch serves the controller routes; after a reseed to a standalone scenario
+they answer 404.
+
+Checks:
+
+- `no-physical-transport` still fails on any blocked attempt. It accepts a
+  connection to a port other than the run's own only when the connecting
+  process's own launch declared that Hub port. The process serving the run
+  must be paired with exactly the `hub-feed` port in `hub-paired`, and with
+  no port in any other scenario. The log spans the run, so feed reads from an
+  earlier paired launch stay accepted after a reseed to a standalone scenario.
+- `hub-feed` reads Pixoo's `GET /api/integration/v1/sessions`, which first
+  refreshes from the Hub, and then the Hub's feed with the feed token. It
+  passes when Pixoo's feed is current, from `verify-owner`, at the revision
+  the Hub serves. It is `skipped` while this launch has never had a current
+  feed, for example while the Hub does not yet accept the token, so the
+  reseed before the Hub is configured succeeds. It fails once a current feed
+  turns stale. It is skipped in every other scenario.
+
+The orchestrator reads Pixoo's state over loopback. Neither route returns a
+token:
+
+- `GET /api/integration/v1/sessions` returns `ownerId`, `connection`
+  (`current`, `stale` or `unavailable`) and `snapshot.revision`, the revision
+  last applied. The read refreshes from the Hub first.
+- `GET /api/device/simulator` returns
+  `{mode: "simulator", writer: {probe, uploadAnimation, setBrightness, setScreen}}`.
+  Each kind reports `{admitted, succeeded}` counts of the operations that
+  reached the simulator's serialized writer since startup. A controller
+  `brightness.set` adds one `setBrightness`; replaying the same request adds
+  none.
+
+Source tests pair a run with `tests/helpers/stand-in-hub.ts`, the real
+agent-state owner behind a stand-in Hub feed, and act as the Hub's controller
+caller with one representative command, `brightness.set`. Hub #495 owns the
+integrated evidence with the real Hub. Other media and playback commands from
+the Hub, moments and interludes
+([#92](https://github.com/jimmie-potts/divoom-app-upgrade/issues/92)), and
+restarting one consumer while paired are not covered.
 
 ## Shared lifecycle contract conformance
 

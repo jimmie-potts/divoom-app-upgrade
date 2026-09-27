@@ -73,6 +73,8 @@ checks. Browser tests cover desktop/mobile uploads, transforms, editing, player 
 [Simulator verification runs](docs/development.md#simulator-verification-runs)
 start a disposable simulator copy with synthetic media, capture proof and leave
 a leased preview; their feature map lists each step's actions and observations.
+A [hub-paired run](docs/development.md#hub-paired-runs) reads a disposable Hub
+run's session feed and serves that Hub the controller API.
 
 The seven npm workspaces are web and server applications plus core, device,
 media, library and playback packages. Core owns readiness validation. The device package includes a

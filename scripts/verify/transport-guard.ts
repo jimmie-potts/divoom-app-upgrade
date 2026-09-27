@@ -29,8 +29,9 @@ if(!log)throw new Error('Pixoo transport guard: APP_VERIFY_TRANSPORT_LOG is requ
 if(process.env.PIXOO_MODE!=='simulator')throw new Error('Pixoo transport guard: a verification run requires PIXOO_MODE=simulator');
 const path:string=log;
 /**
- * Loopback ports of another disposable run this run may reach, declared
- * explicitly (for a later hub-paired scenario). Empty unless set.
+ * Loopback ports of another disposable run this run may reach: the Hub run's
+ * port, which only a `hub-paired` launch declares. Every launch sets the
+ * variable, empty when the run is not paired. Never an installed port.
  */
 function pairedPorts():ReadonlySet<number> {
  const raw=process.env.APP_VERIFY_PAIRED_PORTS;
@@ -50,8 +51,10 @@ function record(entry:Record<string,unknown>):void {
 function refusal():Error {return new Error('Outbound transport is disabled in a Pixoo verification run');}
 
 // The launch sets exactly these Pixoo settings. Anything else inherited from the
-// user manager (MCP, controller, device IP) would change what the server opens.
-const launchSettings=new Set(['PIXOO_MODE','PIXOO_DATA_DIR','PIXOO_PORT','PIXOO_MONITOR_ENABLED']);
+// user manager (MCP, controller identity, device IP) would change what the
+// server opens. A paired launch also enables the native controller API for its
+// Hub; the controller keeps its default identity.
+const launchSettings=new Set(['PIXOO_MODE','PIXOO_DATA_DIR','PIXOO_PORT','PIXOO_MONITOR_ENABLED',...(paired.size?['PIXOO_CONTROLLER_ENABLED']:[])]);
 const removed=Object.keys(process.env).filter(name=>name.startsWith('PIXOO_')&&!launchSettings.has(name)).sort();
 for(const name of removed)delete process.env[name];
 
@@ -79,9 +82,9 @@ for(const method of ['bind','connect','send'] as const){
 // offers to start a process or replace this one is refused, including a fork of
 // another program and an eval worker.
 const guardUrl=import.meta.url;
-/** The run's settings a guarded child needs; NODE_OPTIONS is emptied so no preload runs before the guard. */
+/** The run's settings a guarded child needs, including exactly this process's pairing; NODE_OPTIONS is emptied so no preload runs before the guard. */
 function guardedEnv(env:NodeJS.ProcessEnv|undefined):NodeJS.ProcessEnv {
- return {...(env??process.env),NODE_OPTIONS:'',PIXOO_MODE:'simulator',APP_VERIFY_TRANSPORT_LOG:path,...(paired.size?{APP_VERIFY_PAIRED_PORTS:[...paired].join(',')}:{})};
+ return {...(env??process.env),NODE_OPTIONS:'',PIXOO_MODE:'simulator',APP_VERIFY_TRANSPORT_LOG:path,APP_VERIFY_PAIRED_PORTS:[...paired].join(',')};
 }
 const withGuard=(execArgv:readonly string[])=>execArgv.includes(guardUrl)?[...execArgv]:['--import',guardUrl,...execArgv];
 const fork=childProcess.fork;
