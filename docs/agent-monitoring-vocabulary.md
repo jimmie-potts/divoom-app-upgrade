@@ -6,21 +6,21 @@ Issue #31 composes its host; browser monitoring panels and device rendering
 remain later work.
 
 The canonical definitions are the
-[delivered Hub lifecycle contract](https://github.com/jimmie-potts/agent-device-hub/blob/855bd3787803dad7245f29e88c758659f6e4eda4/docs/agent-lifecycle-contract.md)
-and its [provider qualification record](https://github.com/jimmie-potts/agent-device-hub/blob/855bd3787803dad7245f29e88c758659f6e4eda4/docs/provider-qualification.md).
+[delivered Hub lifecycle contract](https://github.com/jimmie-potts/agent-device-hub/blob/9d0b78d8f89ab8911339ac982a6dd02357e93843/docs/agent-lifecycle-contract.md)
+and its [provider qualification record](https://github.com/jimmie-potts/agent-device-hub/blob/9d0b78d8f89ab8911339ac982a6dd02357e93843/docs/provider-qualification.md).
 [Consumer behavior](agent-monitoring.md) defines compatibility and hosting.
 [Issue #29](https://github.com/jimmie-potts/divoom-app-upgrade/issues/29) owns this source adoption.
 
 ## Contract pin
 
-Pixoo supports `@jimmie-potts/agent-lifecycle-contracts` artifact `1.0.0`, wire
-API `1.0`, Draft 2020-12 schema `schemas/lifecycle-v1.schema.json` and fixture
+Pixoo supports `@jimmie-potts/agent-lifecycle-contracts` artifact `1.1.0`, wire
+APIs `1.0` and `1.1`, Draft 2020-12 schema `schemas/lifecycle-v1.schema.json` and fixture
 format `1` at `fixtures/lifecycle-v1.json`. Both come from the released package;
 Pixoo maintains no second schema or provider corpus.
 
-The [source receipt](../vendor/agent-lifecycle-contracts-1.0.0-receipt.json)
+The [source receipt](../vendor/agent-lifecycle-contracts-1.1.0-source-receipt.json)
 identifies the reviewed merged revision, release tag and archive SHA-256:
-`669c8e3d8b2bac5255ea613eae96134c324515b4e7a767887e86fa59b87fef85`.
+`3afd731d76c8bac66ce14d7210e606771f249f75e76edd8bc9a9ec76815c5d35`.
 The committed archive, npm integrity and executable manifest/corpus checks
 establish the accepted bytes. A release URL alone is not an immutable pin.
 
@@ -83,11 +83,15 @@ history. Pixoo adds no second reducer.
 
 ## Labels and privacy
 
-Display a neutral identifier unless the user explicitly chooses a label. Labels
-have `origin: "user"`, at most 80 Unicode scalar values and no C0/DEL control
-characters. A project ID also requires explicit assignment.
+Display the shared label, then the shared title, then a neutral session ID.
+Explicit user labels take precedence over provider metadata. Labels have at most
+80 Unicode scalar values. Lifecycle 1.1 permits a title `{value, source}` with
+`source` equal to `provider` or `user`, bounded to 160 scalars, and a project name
+bounded to 80 scalars. Snapshot 1.2 retains these fields; older projections omit
+them. Project names are presentation metadata, distinct from explicitly assigned
+neutral `projectId` grouping keys.
 
-Do not copy prompts, transcripts, automatic session titles, tool content,
+Do not copy prompts, transcripts, tool content,
 credentials or private paths into labels, grouping keys or monitoring data.
 Encoding or hashing excluded content does not make it a neutral identifier.
 These exclusions apply before transmission and to storage, errors, diagnostics

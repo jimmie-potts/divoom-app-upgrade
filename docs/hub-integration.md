@@ -49,9 +49,9 @@ local monitoring.
 
 Shared state separates activity, continuing questions, blocked attention,
 turn-ended notices, acknowledgment and freshness. Turn end proves neither
-success nor readership. Only explicit user-chosen labels or neutral IDs enter
-shared monitoring. Prompts, transcripts, tools, automatically copied titles,
-credentials and private paths remain excluded.
+success nor readership. Shared monitoring accepts explicit labels, bounded provider/user titles and
+project names through the shared allowlist. User labels win. Prompts, transcripts,
+tools, credentials and private paths remain excluded.
 
 Keep one active agent-state owner. The selected source can embed the shared core
 in Pixoo or connect to a remote owner. Switching owners requires an explicit
@@ -88,7 +88,7 @@ the [monitoring consumer capability](../openspec/specs/shared-monitor-contract/s
 
 ## Shared monitor host
 
-The Pixoo source dependency remains agent-state 1.0.0, composed by #31 behind
+The Pixoo source dependency is agent-state 3.3.0, composed by #31 behind
 the selected session-source facade. See [agent monitoring](agent-monitoring.md) for private
 configuration, authentication, API/feeds and explicit owner handoff. The shared
 engine remains in the hub; no source delivery installs hooks or starts a second

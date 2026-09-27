@@ -62,10 +62,12 @@ function Pixels({frames,delayMs=500,label='Exact monitor preview'}:{frames:numbe
 function SessionRow({session,disabled,shared}:{session:MonitorSession;disabled:boolean;shared:(action:Record<string,unknown>)=>void}){
  const [label,setLabel]=useState(session.label??'');useEffect(()=>setLabel(session.label??''),[session.label]);
  const id=session.identity.sessionId;
- return <article className="monitor-session"><h3>{session.label??id}</h3><p>{session.identity.provider} · {session.activity} · {session.freshness} · {session.projectId??'No project'}</p>
+ return <article className="monitor-session"><h3>{session.label??session.title?.value??id}</h3><p>{session.identity.provider} · {session.activity} · {session.freshness}</p>
  <p>{session.attention.length?session.attention.map(a=>a.kind).join(', '):'No attention request'} · Active subagents: {session.children.active}{session.children.uncertain?' · Some child state uncertain':''}</p>
  <p className="muted">Session: {id} · {session.identity.client} · {session.identity.hostId} / {session.identity.sourceId}</p>
  <p className="muted">Observed: {new Date(session.observedAtMs).toISOString()} · Last evidence: {new Date(session.lastEvidenceAtMs).toISOString()} · Observation age: {Math.floor(session.observationAgeMs/1000)} s</p>
+ {session.title&&<p>Title: {session.title.value}</p>}
+ <p>Project: {session.project??session.projectId??'No project'}</p>
  <label>Chosen label<input aria-label={`Label for ${id}`} maxLength={160} value={label} onChange={e=>setLabel(e.target.value)}/></label>
  <button disabled={disabled} aria-label={`Save label for ${id}`} onClick={()=>shared({operation:'label',identity:session.identity,label:label||null})}>Save label</button>
  {session.notices.filter(n=>!n.acknowledgedBy.includes('pixoo')).map(n=><button key={n.id} disabled={disabled} aria-label={`Dismiss notice for ${id}`} onClick={()=>shared({operation:'acknowledge',identity:session.identity,noticeId:n.id})}>Dismiss turn-ended notice</button>)}
@@ -114,7 +116,7 @@ export function MonitorPanel({active}:{active:boolean}){
  <label>Session search<input aria-label="Session search" maxLength={120} value={filter.q??''} onChange={e=>update('q',e.target.value)}/></label>
  <label>Provider<select aria-label="Provider filter" value={filter.provider??''} onChange={e=>update('provider',e.target.value)}><option value="">All providers</option><option value="codex">Codex</option><option value="claude">Claude</option></select></label>
  <label>Project<select aria-label="Project filter" value={filter.projectId??''} onChange={e=>update('projectId',e.target.value)}><option value="">All projects</option>{[...new Set([...projects,...(filter.projectId?[filter.projectId]:[])])].map(p=><option key={p}>{p}</option>)}</select></label>
- <label>Session<select aria-label="Session filter" value={filter.session?JSON.stringify(filter.session):''} onChange={e=>setFilter(current=>{const next={...current};if(e.target.value)next.session=JSON.parse(e.target.value) as SessionIdentity;else delete next.session;return next;})}><option value="">All sessions</option>{sessions.map(s=><option key={JSON.stringify(s.identity)} value={JSON.stringify(s.identity)}>{s.label??s.identity.sessionId} · {s.identity.provider} · {s.identity.hostId}</option>)}</select></label>
+ <label>Session<select aria-label="Session filter" value={filter.session?JSON.stringify(filter.session):''} onChange={e=>setFilter(current=>{const next={...current};if(e.target.value)next.session=JSON.parse(e.target.value) as SessionIdentity;else delete next.session;return next;})}><option value="">All sessions</option>{sessions.map(s=><option key={JSON.stringify(s.identity)} value={JSON.stringify(s.identity)}>{s.label??s.title?.value??s.identity.sessionId} · {s.identity.provider} · {s.identity.hostId}</option>)}</select></label>
  <label>Minimum update interval (ms)<input aria-label="Monitor cadence" type="number" min={1000} max={10000} step={1000} value={cadence} onChange={e=>setCadence(Number(e.target.value))}/></label>
  <button onClick={()=>monitor.change({operation:'view',filter,cadenceMs:cadence})}>Apply monitor view</button></fieldset>
  <p>Filters apply to the preview and display. Labels are assigned only when you save them. Dismissing a notice affects this monitor only.</p>

@@ -11,13 +11,17 @@ test('monitor panel uses explicit mode, shared labels, project filters and exact
  const app=createApp({dataDir,monitorEnabled:true,monitorRenderCadenceMs:1,webRoot:resolve('apps/web/dist')});
  const address=await app.listen({host:'127.0.0.1',port:0});
  try{
-  const event={apiVersion:'1.0',identity:{provider:'codex',client:'cli',hostId:'fixture',sourceId:'fixture',sessionId:'session-one'},projectId:'project-one',turn:{status:'known',id:'turn'},parent:{status:'top-level'},ordering:{status:'known',epoch:'e',sequence:1},observedAtMs:Date.now(),event:{kind:'turn.ended'}};
+  const event={apiVersion:'1.1',title:{value:'Résumé monitor integration',source:'provider'},project:'DIVOOM-APP-UPGRADE',identity:{provider:'codex',client:'cli',hostId:'fixture',sourceId:'fixture',sessionId:'session-one'},projectId:'project-one',turn:{status:'known',id:'turn'},parent:{status:'top-level'},ordering:{status:'known',epoch:'e',sequence:1},observedAtMs:Date.now(),event:{kind:'turn.ended'}};
   const response=await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify(event)});expect(response.ok).toBe(true);
   await page.goto(address);await page.getByRole('button',{name:'Monitor',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Agent monitor',exact:true})).toBeVisible();
   await expect(page.getByText('Selected mode: Media',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Résumé monitor integration',exact:true})).toBeVisible();
+  await expect(page.getByText('Title: Résumé monitor integration',{exact:true})).toBeVisible();
+  await expect(page.getByText('Project: DIVOOM-APP-UPGRADE',{exact:true})).toBeVisible();
   await page.getByRole('textbox',{name:'Label for session-one',exact:true}).fill('Build project');await page.getByRole('button',{name:'Save label for session-one'}).click();
   await expect(page.getByText('Build project',{exact:true})).toBeVisible();
+  await expect(page.getByText('Title: Résumé monitor integration',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Show monitor',exact:true}).click();await expect(page.getByText('Monitor presentation active',{exact:true})).toBeVisible();
   await page.getByLabel('Session search').fill('no matching session');await page.getByRole('button',{name:'Apply monitor view'}).click();
   await expect(page.getByText('No sessions match this view.',{exact:true})).toBeVisible();

@@ -81,16 +81,16 @@ a pinned development dependency for real protocol-client integration tests.
 
 ## Shared lifecycle contract
 
-`@jimmie-potts/agent-lifecycle-contracts` 1.0.0 is a private development
+`@jimmie-potts/agent-lifecycle-contracts` 1.1.0 is a private development
 dependency consumed from its committed released archive. The
-[source receipt](../vendor/agent-lifecycle-contracts-1.0.0-receipt.json) pins
-Hub PR #74 and source revision; its SHA-256 and complete installed manifest
+[source receipt](../vendor/agent-lifecycle-contracts-1.1.0-source-receipt.json) pins
+Hub PR #452 and source revision; its SHA-256 and complete installed manifest
 are checked by the consumer test. Its runtime schema dependency is Ajv 8.20.0
 under the MIT license. No sibling-checkout package or provider adapter is used.
 
-The server consumes `@jimmie-potts/agent-state` 1.0.0 from the verified private
-release archive under `vendor/`. Its source receipt records Hub PR #105 and
-SHA-256 `ae589d311e282c3356579c85507a3aa973ab7990e06e062143aeb08d8d2dcc99`.
+The server consumes `@jimmie-potts/agent-state` 3.3.0 from the verified private
+release archive under `vendor/`. Its source receipt records Hub PR #452 and
+SHA-256 `b539d5296a627dece9da4f9a3713e288c3f2247c84a8e2179ff13cbcec70bd7d`.
 It bundles the lifecycle contract; its exact public dependency is Ajv 8.20.0.
 The archive retains its upstream licenses. Pixoo owns the production storage
 adapter and authenticated host transport; the shared reducer remains upstream.

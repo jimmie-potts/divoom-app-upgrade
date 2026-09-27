@@ -1,9 +1,11 @@
 # Shared agent monitoring
 
 Issue [#31](https://github.com/jimmie-potts/divoom-app-upgrade/issues/31) composes
-`@jimmie-potts/agent-state` 1.0.0 inside the existing backend. The vendored release
-archive has SHA-256 `ae589d311e282c3356579c85507a3aa973ab7990e06e062143aeb08d8d2dcc99`.
-The source receipt identifies Hub PR #105 and its immutable source. Pixoo supplies
+`@jimmie-potts/agent-state` 3.3.0 inside the existing backend. The vendored release
+archive has SHA-256 `b539d5296a627dece9da4f9a3713e288c3f2247c84a8e2179ff13cbcec70bd7d`.
+The [source receipt](../vendor/agent-state-3.3.0-source-receipt.json) identifies
+[Hub PR #452](https://github.com/jimmie-potts/agent-device-hub/pull/452) and source
+revision `9d0b78d8f89ab8911339ac982a6dd02357e93843`. Pixoo supplies
 storage and authenticated transport; the package supplies provider normalization,
 reduction, deduplication, child rollup, freshness, retention and migration validation.
 
@@ -163,7 +165,10 @@ observations. Remote facades include the selected owner's count.
 
 The core limits pending admission to 128 entries/262144 event bytes, sessions to
 128 and registered consumers to 16. The journal keeps the newest 10000 diagnostic
-events within 24 hours. It does not delete current labels or undismissed notices.
+events within 24 hours. Journal pruning does not remove current labels or
+undismissed notices. The shared state package separately retires sessions after
+24 hours without evidence and eligible known-ended sessions according to its
+provider-scoped retirement rules.
 Five minutes without session evidence marks that evidence uncertain independently
 of collector health. Restart restores existing sessions as uncertain. A full
 session/notice limit returns capacity; it does not silently drop durable state.
@@ -232,8 +237,9 @@ deadline. Every outcome exits zero without stdout/stderr. Configuration contains
 `enabled`, `qualified`, `source`, `endpoint` and `token`. Both enable flags must be
 true only after the intended provider path is qualified. The source object uses
 the shared provider/client/hostId/sourceId/hook contract; the endpoint ends in
-`/api/monitor/v1/events`. Do not derive IDs from private paths or copy automatic
-titles. Raw prompts/transcripts/tools never enter the normalized transport.
+`/api/monitor/v1/events`. Do not derive IDs from private paths. The released normalizer allowlists
+bounded shared titles and project names; raw prompts/transcripts/tools and
+credentials never enter the normalized transport.
 Hub #8 owns installation and real-client qualification.
 
 Run `npm run check` and `npm run test:browser` for source acceptance. The monitor
@@ -300,7 +306,7 @@ details. Row details retain full labels, identities, exact observed/evidence
 millisecond timestamps, shared freshness/unavailable evidence, child counts and
 consumer-visible notice IDs. Reading this metadata does not acknowledge notices.
 The endpoint shows the selected monitor projection. Provider, project ID, full
-session identity and label/session search filters apply to both preview and
+session identity and label/title/project/session search filters apply to both preview and
 display. Filtering preserves the complete source snapshot and child rollup.
 
 [Issue #98](https://github.com/jimmie-potts/divoom-app-upgrade/issues/98) replaced
@@ -313,28 +319,31 @@ three sketches and asked that it pulse only when a person is needed.
 | Tile, x=1–20, y=1–20 | Activity colour and a black icon: green ▶ active, blue ‖ idle, red ✕ interrupted, grey ■ runtime ended, purple ? unknown. The word at (33,3) repeats it: `ACTIVE`, `IDLE`, `STOPPED`, `ENDED`, `UNKNOWN` |
 | Provider, (24,2) | Cyan hollow square with a centre dot: Codex. Orange star: Claude |
 | Attention, y=12–20 | Amber chip reading `APPROVAL`, `INPUT` or `QUESTION`. Only then does the picture pulse: a second 500 ms frame dims the tile and chip. `TURN END` without a chip is a retained turn-ended notice, never task success |
-| Label, y=26 and y=35 | Up to 20 characters in the 5×7 font on two lines of ten. The line breaks after a space, `-`, `_`, `/` or `.` when the rest fits, otherwise at ten |
-| Details, y=45 | `+n SUB` active subagents; `+9+` means more than nine; `?` marks incomplete relationship or activity evidence. `UNSURE`, with a dimmed label, marks uncertain, stale or unknown evidence |
+| Label/title, y=26 and y=35 (y=27 and y=36 with a project) | Up to 20 characters in the 5×7 font on two lines of ten. The line breaks after a space, `-`, `_`, `/` or `.` when the rest fits, otherwise at ten |
+| Project, y=45 when present | Shared project name, accent-folded and shortened to 15 characters with a middle ellipsis |
+| Details, y=45 (y=21 with a project) | `+n SUB` active subagents; `+9+` means more than nine; `?` marks incomplete relationship or activity evidence. `UNSURE`, with a dimmed label, marks uncertain, stale or unknown evidence |
 | Summary, y=56 | Matching sessions, `!n` sessions with approval, input or questions across all pages and filters, and page dots, or `p/n` above eight pages |
 | Health, x=52 and x=58 | Source: filled current, ring stale, ✕ unavailable. Collector: filled running, ‖ quiesced, ✕ faulted, hollow square closed, ? unknown |
 
 Every mark differs in shape or words as well as colour. Labels use an original
 5×7 font. Small words use the 3×5 font, which covers ASCII A–Z, digits, space and
-`._+!?/-`. Lowercase ASCII becomes uppercase, and each unsupported Unicode code
+`._+!?/-`. Text is accent-folded and uppercased; each remaining unsupported Unicode code
 point becomes `?`. Identifiers of up to 20 code points are shown whole. Issue #87
 set the rule for longer ones, so sessions from the same period stay distinct:
 
-- A chosen label keeps its first ten and last nine display characters around
+- A label or title keeps its first ten and last nine display characters around
   `…`, so labels that differ only in a trailing number stay distinct.
-- An unlabeled session shows `…` and the last nineteen display characters of its
+- A session without a label or title shows `…` and the last nineteen display characters of its
   session ID. Codex session IDs are time-ordered UUIDs that share their opening
   characters across a period; their final characters are random.
 
 The `…` glyph, three baseline dots in the 5×7 font, is outside the label
 alphabet, so no label or ID character can produce it. Its position shows which
-part was removed. Labels still come only from the owner; titles, prompts and paths
-never become identifiers. The layout's `label` field and the Monitor tab keep the
-full label or ID. A shared neutral alias from
+part was removed. The shared label wins, followed by the shared title, then the
+ID. Prompts and private paths never become identifiers. The layout keeps the full
+chosen identifier plus title/project metadata; the Monitor tab displays the full
+text. With a project, child and uncertainty text occupies rows 21–25, the title
+rows 27–33 and 36–42, and the project rows 45–49. Blank rows separate their ink. A shared neutral alias from
 [Hub #364](https://github.com/jimmie-potts/agent-device-hub/issues/364) could
 replace the ID fallback. An empty view shows `NO SESSIONS` above the summary strip.
 
@@ -386,13 +395,15 @@ readability, installed hooks or timing.
 
 ## Monitor panel and display ownership
 
-The Monitor tab shows full chosen labels, provider/activity/attention/freshness,
+The Monitor tab shows full chosen labels, shared titles and projects, provider/activity/attention/freshness,
 source and collector health, exact timestamps, observation age, children and
-retained notices. Save label is an explicit owner command. No prompt, title,
-tool output or private path is copied. Dismissal acknowledges only Pixoo's
+retained notices. Save label is an explicit owner command. No prompt,
+tool output, credential or private path is copied. Dismissal acknowledges only Pixoo's
 retained notice; it cannot mark a chat read, approve work or change a tracker.
 Projects use the shared optional neutral `projectId`; sessions use all five
-identity fields. Unlabeled sessions retain their neutral ID.
+identity fields. Sessions without a label use the shared title, or their neutral
+ID when no title is available. The project name is displayed separately from
+`projectId`; equal names never merge sessions.
 
 Apply monitor view saves the provider/project/session/search selection and
 cadence. Counts distinguish matching top-level sessions from the total. Empty views
@@ -400,7 +411,7 @@ retain health and summary pixels. The 64×64 canvas uses the renderer's exact RG
 frames, enlarged with nearest-neighbor scaling, and cycles a pulsing picture's
 two frames at 500 ms as the device plays them. The latest preview may lead a
 pending upload. It is desired content, not evidence that a physical display
-shows those pixels. The full label or session ID remains visible beside the
+shows those pixels. The full label, title, project and session ID remain visible beside the
 truncated glyphs.
 
 Show monitor pauses playlist advancement while preserving its captured context,
@@ -606,10 +617,12 @@ approved reduced scope.
 ## Reversible setup package and rehearsal
 
 Pixoo consumes Hub #8's shared setup SDK through the development dependency
-`@jimmie-potts/hub` 0.1.0. [The source receipt](../vendor/hub-0.1.0-source-receipt.json)
-pins the unchanged archive and source revision. `npm ci` installs it for source
+`@jimmie-potts/hub` 0.4.0. [The source receipt](../vendor/hub-0.4.0-source-receipt.json)
+pins the archive and source revision. A loopback compatibility test checks
+snapshot 1.2 titles/projects and explicit label precedence against this released
+owner using an isolated store and no configured controllers. `npm ci` installs it for source
 rehearsal; ordinary Pixoo startup does not import it or install hooks. The
-[upstream setup runbook](https://github.com/jimmie-potts/agent-device-hub/blob/f6bee907e06177c6dc8abde0075d73cc391784e9/apps/hub/SETUP.md)
+[upstream setup runbook](https://github.com/jimmie-potts/agent-device-hub/blob/38b47e3259e3f19f65d0f82234efcce7c48167b9/apps/hub/SETUP.md)
 owns setup, credential adapters and migration. This integration supplies no
 second installer.
 
@@ -773,7 +786,7 @@ Claude completion.
 | Setup/removal, criteria 1–3 | Approved diff and private backup; repeated setup; unrelated hooks/trust intact; fresh removal after unrelated edits; exact credential revoked; ordinary app use continues. Source fixtures do not replace installed observations. |
 | Each required client, criterion 4 | New turn, working, supported continuing-question/blocking-input/approval distinctions, turn-ended notice, new-turn clearing, explicit dismissal, interruption/runtime end and available child rollup. Preserve unknown/unsupported distinctions from the capability matrix. |
 | Isolation and failure, criterion 5 | Two concurrent sessions in one project remain separate; collector outage, failed hook delivery, duplicate/delayed events, five-minute uncertainty and backend restart. Measure agent progress independently of monitor success; a healthy collector cannot refresh stale observations. |
-| Durability and privacy, criterion 6 | Current labels/state/notices survive restart and 24-hour/10,000-event journal cleanup. Synthetic canaries for prompts, transcripts, tool arguments/output, copied titles and secrets are absent from transmitted payloads, state, logs and dashboard. Keep real payloads out of receipts. |
+| Durability and privacy, criterion 6 | Current labels/state/notices survive restart and 24-hour/10,000-event journal cleanup. Synthetic canaries for prompts, transcripts, tool arguments/output, unallowlisted metadata and secrets are absent from transmitted payloads, state, logs and dashboard. Keep real payloads out of receipts. |
 | Physical preflight, criterion 7 | Exact device IP, named test owner, model/firmware, approved sequence and display replacement, prior screen/brightness and restoration limits. Earlier rendering consent does not authorize this test. |
 | Display, criterion 8 | One session per screen with icons, words and a two-line label, the attention-only pulse, attention total on every page, ten-second overflow, uncertainty/notices, native-size readability and exact preview. Record visible loading/timing separately from HTTP acknowledgment. |
 | Mode/writer, criterion 9 | Monitor pauses advancement; hooks cannot select Monitor from Media; return leaves playback paused. Exercise mode changes during uploads, disconnect/reconnect and screen-off/on without stale replay or a second writer. |
@@ -787,3 +800,20 @@ Complete the source rehearsal before proposing personal installation. Complete
 the authorized simulator/client sequence before the physical sequence. A failed
 required case stays open with its owner and next action; do not convert source,
 HTTP or preview results into visible-device passes.
+
+## Shared metadata source contract
+
+The source pins agent-state 3.3.0 and lifecycle 1.1.0 at Hub revision
+`9d0b78d8f89ab8911339ac982a6dd02357e93843`. Their vendored source receipts and
+conformance tests verify archive, manifest and upstream fixture bytes. The
+embedded view selects snapshot 1.2; remote reads request
+`/api/monitor/v1/sessions?snapshotVersion=1.2`. The selected remote owner must
+support this version. An unsupported response leaves monitoring unavailable or
+stale and never starts a local owner. Older authenticated readers retain snapshot
+1.0 by default and can explicitly select 1.1 or 1.2. Legacy projections omit new
+metadata and agent-origin labels.
+
+Source qualification uses isolated stores and loopback services. It does not
+upgrade the installed owner, migrate its state, install hooks or qualify live
+cards. Installed title/project observation remains a separate owner-requested
+check.

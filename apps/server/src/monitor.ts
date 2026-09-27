@@ -48,10 +48,10 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string,service
     if(!['GET','HEAD'].includes(request.method)&&!principal.credential.scopes.includes('control'))throw new ApiError('forbidden',403);
    });
    monitor.get(`${prefix}/sessions`,async request=>{
-    const filter=z.object({q:z.string().max(120).optional(),provider:z.enum(['codex','claude']).optional()}).strict().safeParse(request.query);
+    const filter=z.object({q:z.string().max(120).optional(),provider:z.enum(['codex','claude']).optional(),snapshotVersion:z.enum(['1.0','1.1','1.2']).default('1.0')}).strict().safeParse(request.query);
     if(!filter.success)throw new ApiError('invalid-input');
-    await source.refresh();const view=source.view();view.admissionRejected+=rejectedMonitorRequests(app);
-    const matches=view.snapshot?.sessions.filter(session=>(!filter.data.provider||session.identity.provider===filter.data.provider)&&(!filter.data.q||(session.label??session.identity.sessionId).toLowerCase().includes(filter.data.q.toLowerCase()))).map(session=>session.identity)??[];
+    await source.refresh();const view=source.view(filter.data.snapshotVersion);view.admissionRejected+=rejectedMonitorRequests(app);
+    const matches=view.snapshot?.sessions.filter(session=>(!filter.data.provider||session.identity.provider===filter.data.provider)&&(!filter.data.q||[session.label,session.title?.value,session.project,session.identity.sessionId].some(value=>value?.toLowerCase().includes(filter.data.q!.toLowerCase())))).map(session=>session.identity)??[];
     return {...view,matches};
    });
    monitor.get(`${prefix}/rendition`,async(request,reply)=>{

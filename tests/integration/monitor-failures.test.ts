@@ -20,8 +20,10 @@ it('rejects privacy canaries, deduplicates, retains acknowledgment and separates
   await owner.ingest(event('turn.started',3,'next'));await owner.ingest(event('turn.ended',2));
   expect(owner.snapshot().sessions[0]!.notices.filter(n=>!n.acknowledgedBy.includes('pixoo'))).toEqual([]);
   now+=300000;expect(owner.snapshot()).toMatchObject({collector:'running',sessions:[{freshness:'uncertain'}]});
-  now+=86400000;await owner.maintain();expect(owner.journal()).toEqual([]);
+  now+=23*3600000;await owner.ingest({...event('activity.observed',4,'next'),observedAtMs:now});
+  now+=3600000;await owner.maintain();expect(owner.journal()).toHaveLength(1);
   expect(owner.snapshot().sessions[0]!.notices.length).toBeGreaterThan(0);
+  now+=86400000;await owner.maintain();expect(owner.snapshot().sessions).toEqual([]);
   for(const file of await readdir(directory))expect((await readFile(join(directory,file))).includes(Buffer.from('PRIVATE-CANARY'))).toBe(false);
  }finally{await owner.shutdown();await rm(directory,{recursive:true,force:true});}
 });
@@ -52,10 +54,10 @@ it('preserves unavailable child rollup through durable restart',async()=>{
  try{
   await owner.ingest(event('turn.started',1));
   const child={...event('turn.started',1),identity:{...identity,sessionId:'child'},parent:{status:'known',identity},ordering:{status:'unknown'}};
-  await owner.ingest(child);await owner.ingest({...child,event:{kind:'turn.ended'}});
+  await owner.ingest(child);await owner.ingest({...child,event:{kind:'evidence.unavailable',dimension:'activity',reason:'missing'}});
   expect(owner.snapshot().sessions[0]!.children).toEqual({active:0,uncertain:1});
   await owner.shutdown();owner=await createAgentState({storage:new MonitorStorage(directory),ownerId:'owner',consumers,clock:()=>1000});
   expect(owner.snapshot().sessions[0]!.children).toEqual({active:0,uncertain:1});
-  expect(owner.snapshot().sessions[1]!.activity).toBe('unknown');
+  expect(owner.snapshot().sessions[1]!.unavailable).toEqual(expect.arrayContaining([expect.objectContaining({dimension:'activity',reason:'missing'})]));
  }finally{await owner.shutdown();await rm(directory,{recursive:true,force:true});}
 });
