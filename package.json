@@ -18,6 +18,7 @@
     "test:browser": "npm run build && playwright test",
     "start": "node apps/server/dist/main.js",
     "simulator": "npm run build && npm start",
+    "verify": "node scripts/verify.mjs",
     "check": "npm run lint && npm run typecheck && npm test && npm run check:workflow && npm run test:workflow",
     "device:probe": "node scripts/device-spike.mjs probe",
     "device:smoke": "node scripts/device-spike.mjs",
@@ -42,7 +43,8 @@
     "@types/node": "24.13.3",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@jimmie-potts/agent-lifecycle-contracts": "file:vendor/jimmie-potts-agent-lifecycle-contracts-1.1.0.tgz",
-    "@jimmie-potts/hub": "file:vendor/jimmie-potts-hub-0.4.0.tgz"
+    "@jimmie-potts/hub": "file:vendor/jimmie-potts-hub-0.4.0.tgz",
+    "@jimmie-potts/app-verify": "file:vendor/jimmie-potts-app-verify-1.0.0.tgz"
   },
   "type": "module",
   "workspaces": [

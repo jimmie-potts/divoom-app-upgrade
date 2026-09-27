@@ -145,7 +145,8 @@ owner. The shared core `@jimmie-potts/app-verify` is vendored from the Hub. It
 implements the operations, receipt, supervisor unit, lease, proof directories
 and capture harness of the Hub's
 [app verification contract](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/app-verification.md).
-`scripts/verify/` supplies only the Pixoo plug-in.
+`scripts/verify/` supplies only the Pixoo plug-in. The vendored release and
+its pins are described in [dependencies](dependencies.md#shared-verification-core).
 
 Runs need Linux with a `systemd --user` manager and Node 24.5 or later in the
 24.x line. The wrapper exits with status 3 under any other Node. `capture` also
