@@ -6,13 +6,12 @@ import {lstat,readdir,realpath} from 'node:fs/promises';
 import {userInfo} from 'node:os';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {privatePath} from '../../apps/server/dist/config.js';
+import {installedPorts} from './installed-ports.ts';
 
 export const checkoutRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');
 export const transportGuard=fileURLToPath(new URL('./transport-guard.ts',import.meta.url));
 export const serverEntry=join(checkoutRoot,'apps','server','dist','main.js');
-/** Ports used by installed services on the owner's PC. A run never binds them. */
-export const installedPorts:readonly number[]=[8765,8787,8788,8791,41230,41231];
+export {installedPorts};
 
 /** The guard's record of blocked transport attempts. It lives beside `data/`, so a reseed keeps it. */
 export function transportLog(runtimeDir:string):string {return join(runtimeDir,'pixoo-transport.jsonl');}
@@ -22,8 +21,10 @@ export interface LaunchSpec {argv:string[];env:Record<string,string>;cwd:string}
 /**
  * The server process for one run. Every Pixoo setting the run depends on is
  * explicit, so an inherited PIXOO_MODE, PIXOO_DATA_DIR or PIXOO_PORT never
- * decides it. The transport guard also refuses to start the server unless the
- * process environment it finally receives selects the simulator.
+ * decides it, and the transport guard removes any other inherited PIXOO_*
+ * setting before the server reads its configuration. The guard also refuses to
+ * start the server unless the environment it finally receives selects the
+ * simulator.
  */
 export function launchSpec({runtimeDir,dataDir,port,node}:LaunchInput):LaunchSpec {
  if(!Number.isInteger(port)||port<0||port>65535)throw new Error('Port must be an integer from 0 through 65535');
@@ -65,6 +66,8 @@ async function ownerState(context:OwnerContext):Promise<string[]> {
  * inside the owner's normal Pixoo state. Returns the canonical path.
  */
 export async function assertPrivateDataDir(dataDir:string,context:OwnerContext={}):Promise<string> {
+ // Loaded here, not at module load: the core builds the checkout before it seeds or launches.
+ const {privatePath}=await import('../../apps/server/dist/config.js');
  const path=await privatePath(dataDir,checkoutRoot);
  for(const owned of await ownerState(context)){
   if(within(owned,path)||within(path,owned))throw new Error('Run data must not overlap the owner state directories');

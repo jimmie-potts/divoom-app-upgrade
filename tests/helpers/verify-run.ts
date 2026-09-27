@@ -33,7 +33,8 @@ export async function launch(spec:LaunchSpec,ambient:NodeJS.ProcessEnv,timeoutMs
   const url=await new Promise<string>((resolve,reject)=>{
    const timer=setTimeout(()=>reject(new Error('readiness timeout')),timeoutMs);
    createInterface({input:child.stdout!}).on('line',line=>{stdout.push(line);const ready=readyLine(line);if(ready){clearTimeout(timer);resolve(ready.url);}});
-   child.once('exit',code=>{clearTimeout(timer);setTimeout(()=>reject(new StartError(`exited ${code}: ${stderr.join(' | ')}`,stderr)),50);});
+   // 'close' follows the end of stdout and stderr, so the failure carries all of stderr.
+   child.once('close',code=>{clearTimeout(timer);reject(new StartError(`exited ${code}: ${stderr.join(' | ')}`,stderr));});
   });
   return {child,url,port:Number(new URL(url).port),stdout,stderr,stop};
  }catch(error){await stop();throw error;}

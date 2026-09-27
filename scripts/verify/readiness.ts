@@ -62,29 +62,37 @@ export async function checkSimulatorMode(input:ProbeInput):Promise<CheckOutcome>
  }catch(error){return {outcome:'failed',reason:`device settings unreadable: ${reason(error)}`};}
 }
 
-export interface TransportEntry {at:string;pid:number;event:'armed'|'listening'|'blocked'|'allowed';api?:string;host?:string;port?:number;path?:string;address?:string;target?:'own'|'paired'}
-export interface TransportRecord {armed:TransportEntry[];listening:TransportEntry[];blocked:TransportEntry[];allowed:TransportEntry[]}
+export interface TransportEntry {
+ at:string;pid:number;event:'armed'|'listening'|'blocked'|'allowed'|'fork';api?:string;
+ host?:string;port?:number;socketPath?:string;program?:string;module?:string;address?:string;target?:'own'|'paired';removed?:string[];
+}
+export interface TransportRecord {armed:TransportEntry[];listening:TransportEntry[];blocked:TransportEntry[];allowed:TransportEntry[];forks:TransportEntry[]}
 /** The guard's log for the whole run; a missing log reads as empty, so it never passes the listening check. */
 export async function readTransportLog(path:string):Promise<TransportRecord> {
  let text='';
  try{text=await readFile(path,'utf8');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  const entries=text.split('\n').filter(Boolean).map(line=>JSON.parse(line) as TransportEntry);
  const only=(event:TransportEntry['event'])=>entries.filter(e=>e.event===event);
- return {armed:only('armed'),listening:only('listening'),blocked:only('blocked'),allowed:only('allowed')};
+ return {armed:only('armed'),listening:only('listening'),blocked:only('blocked'),allowed:only('allowed'),forks:only('fork')};
 }
-const describe=(e:TransportEntry)=>e.path??`${e.host}:${e.port}`;
+/** Where an attempt went: host and port, a Unix socket or a program name. URL paths and query strings are never recorded. */
+function describe(e:TransportEntry):string {
+ const where=e.socketPath??e.program??(e.host!==undefined?`${e.host}:${e.port}`:undefined);
+ return where===undefined?`${e.api}`:`${e.api} ${where}`;
+}
 
 /**
  * Nothing outside the run was attempted or reached: no blocked attempt (a
- * device, another host, an installed loopback service, a Unix or UDP socket),
+ * device, another host, an installed loopback service, a Unix or UDP socket,
+ * a spawned process),
  * no connection to a local port other than the one this run serves, and the
  * guard is loaded in the process serving this port.
  */
 export async function checkNoPhysicalTransport(input:ProbeInput):Promise<CheckOutcome> {
  const record=await readTransportLog(transportLog(input.runtimeDir));
- if(record.blocked.length)return {outcome:'failed',reason:`${record.blocked.length} transport attempts blocked: ${record.blocked.map(e=>`${e.api} ${describe(e)}`).join(', ')}`};
+ if(record.blocked.length)return {outcome:'failed',reason:`${record.blocked.length} transport attempts blocked: ${record.blocked.map(describe).join(', ')}`};
  const other=record.allowed.filter(e=>e.port!==input.port);
- if(other.length)return {outcome:'failed',reason:`${other.length} connection${other.length===1?'':'s'} to another local port: ${other.map(describe).join(', ')}`};
+ if(other.length)return {outcome:'failed',reason:`${other.length} connection${other.length===1?'':'s'} to another local port: ${other.map(e=>`${e.host}:${e.port}`).join(', ')}`};
  const serving=record.listening.at(-1);
  if(!serving||serving.port!==input.port)return {outcome:'failed',reason:`the transport guard is not recorded in the process serving port ${input.port}`};
  return {outcome:'passed'};

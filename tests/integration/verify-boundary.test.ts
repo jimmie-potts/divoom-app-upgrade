@@ -1,12 +1,13 @@
 import {afterEach,expect,it} from 'vitest';
 import {execFile} from 'node:child_process';
-import {mkdtemp,readdir,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
+import dgram from 'node:dgram';
 import {createServer} from 'node:net';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {promisify} from 'node:util';
-import {readFile} from 'node:fs/promises';
+import sharp from 'sharp';
 import {checkNoPhysicalTransport,checkSimulatorMode,failureCause,probeHealth,readTransportLog} from '../../scripts/verify/readiness.ts';
 import {launchSpec,transportGuard,transportLog} from '../../scripts/verify/run-environment.ts';
 import {seedScenario} from '../../scripts/verify/scenarios.ts';
@@ -25,17 +26,19 @@ async function command(url:string,body:Record<string,unknown>){
  expect(response.status).toBe(200);
 }
 /**
- * The owner's shell selects device mode, a real data directory and the
- * installed port, and the run's own data holds a saved device target, as
- * after Save configuration in Settings. A leak of any of these would reach
- * the owner's state or the device.
+ * The owner's shell selects device mode, a real data directory, the installed
+ * port, MCP and the native controller, and the run's own data holds a saved
+ * device target, as after Save configuration in Settings. A leak of any of
+ * these would reach the owner's state or the device, or open routes the run
+ * never configured.
  */
 async function hostileRun(){
  const ownerHome=await temporary('verify-owner-home-'),ownerData=await temporary('verify-owner-data-');
  const run=await makeRun();cleanup.push(run.remove);
  await seedScenario({...run,scenario:'library-playlist'},{home:ownerHome,ambient:{PIXOO_DATA_DIR:ownerData}});
  await writeFile(join(run.dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.255.254',profile:'pixoo64-smoke-2026-09-06'}}));
- const ambient={...process.env,HOME:ownerHome,TMPDIR:join(run.runtimeDir,'tmp'),PIXOO_MODE:'device',PIXOO_DATA_DIR:ownerData,PIXOO_PORT:'8787',NODE_OPTIONS:''};
+ const ambient={...process.env,HOME:ownerHome,TMPDIR:join(run.runtimeDir,'tmp'),PIXOO_MODE:'device',PIXOO_DATA_DIR:ownerData,PIXOO_PORT:'8787',NODE_OPTIONS:'',
+  PIXOO_MCP_ENABLED:'1',PIXOO_CONTROLLER_ENABLED:'1',PIXOO_CONTROLLER_DEVICE_ID:'owner-pixoo',PIXOO_DEVICE_IP:'192.168.255.254'};
  return {...run,ownerHome,ownerData,ambient,spec:launchSpec({...run,port:0,node:process.execPath})};
 }
 const context=(run:{runId:string;root:string;runtimeDir:string;dataDir:string},url:string)=>({...run,scenario:'library-playlist',url,port:Number(new URL(url).port),signal:AbortSignal.timeout(5000)});
@@ -51,14 +54,25 @@ it('keeps a run in simulator mode under ambient device settings and records no p
  await command(server.url,{command:'next'});
  const probe=await fetch(new URL('/api/device/probe',server.url),{method:'POST',headers:header,body:'{}'});
  expect(await probe.json()).toMatchObject({mode:'simulator',connected:false});
+ // An upload renders in the media worker, which the server forks; the guard follows it.
+ const form=new FormData();form.append('file',new Blob([new Uint8Array(await sharp({create:{width:4,height:4,channels:3,background:'red'}}).png().toBuffer())],{type:'image/png'}),'boundary.png');
+ const upload=await fetch(new URL('/api/assets',server.url),{method:'POST',headers:{'x-pixoo-request':'1'},body:form});
+ expect(upload.status).toBe(201);
  expect(await checkNoPhysicalTransport(ctx)).toEqual({outcome:'passed'});
- expect(await readTransportLog(transportLog(run.runtimeDir))).toMatchObject({blocked:[],listening:[{pid:server.child.pid,port:server.port}]});
+ const record=await readTransportLog(transportLog(run.runtimeDir));
+ expect(record).toMatchObject({blocked:[],allowed:[],listening:[{pid:server.child.pid,port:server.port}],forks:[expect.objectContaining({pid:server.child.pid,module:'worker.js'})]});
+ const worker=record.armed.find(entry=>entry.pid!==server.child.pid);
+ expect(worker,'the forked media worker ran under the guard').toBeDefined();
+ // Inherited Pixoo settings the launch did not set were removed before the server read its configuration.
+ expect(record.armed.find(entry=>entry.pid===server.child.pid)?.removed).toEqual(['PIXOO_CONTROLLER_DEVICE_ID','PIXOO_CONTROLLER_ENABLED','PIXOO_DEVICE_IP','PIXOO_MCP_ENABLED']);
+ expect((await fetch(new URL('/mcp',server.url),{method:'POST',headers:header,body:'{}'})).status).toBe(404);
+ expect((await fetch(new URL('/controller/v1/snapshot',server.url))).status).toBe(404);
  expect(await readdir(run.ownerData)).toEqual([]);
  expect(await readdir(run.ownerHome)).toEqual([]);
  // The core gives the app a private HOME; the server and guard need nothing else from it.
  const environ=(await readFile(`/proc/${server.child.pid}/environ`,'utf8')).split('\0');
  expect(environ).toContain(`HOME=${join(run.runtimeDir,'home')}`);
- expect(environ.filter(entry=>entry.startsWith('PIXOO_')).sort()).toEqual(['PIXOO_DATA_DIR='+run.dataDir,'PIXOO_MODE=simulator','PIXOO_MONITOR_ENABLED=1','PIXOO_PORT=0']);
+ expect(environ).toEqual(expect.arrayContaining(['PIXOO_DATA_DIR='+run.dataDir,'PIXOO_MODE=simulator','PIXOO_MONITOR_ENABLED=1','PIXOO_PORT=0']));
 },SPAWNS);
 async function startFailure(spec:Parameters<typeof launch>[0],ambient:NodeJS.ProcessEnv):Promise<StartError> {
  const error=await launch(spec,ambient).then(()=>undefined,(caught:unknown)=>caught);
@@ -140,7 +154,7 @@ it('refuses and logs loopback connections to installed services, other local por
   expect.objectContaining({api:'net.connect',host:'localhost',port:41230}),
   expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:otherPort}),
   expect.objectContaining({api:'net.connect',host:'::1',port:otherPort}),
-  expect.objectContaining({api:'net.connect',path:join(runtimeDir,'absent.sock')}),
+  expect.objectContaining({api:'net.connect',socketPath:join(runtimeDir,'absent.sock')}),
   expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:8787}),
  ]);
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,otherPort))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/6 transport attempts blocked: net\.connect 127\.0\.0\.1:8788/)});
@@ -163,6 +177,83 @@ it('allows only the process\'s own listening port, and records a declared paired
  record=await readTransportLog(transportLog(runtimeDir));
  expect(record.allowed.at(-1)).toMatchObject({port:pairedPort,target:'paired'});
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,own[0]))).toMatchObject({outcome:'failed',reason:expect.stringMatching(new RegExp(`1 connection to another local port: 127\\.0\\.0\\.1:${pairedPort}`))});
+},SPAWNS);
+
+/** A listener this test owns, counting every connection or datagram it receives. */
+async function owned(kind:'tcp'|'udp'){
+ let received=0;
+ if(kind==='tcp'){
+  const server=createServer(socket=>{received++;socket.destroy();});
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise(resolve=>server.close(resolve)));
+  return {port:(server.address() as {port:number}).port,received:()=>received};
+ }
+ const socket=dgram.createSocket('udp4');socket.on('message',()=>received++);
+ await new Promise<void>(resolve=>socket.bind(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise<void>(resolve=>socket.close(()=>resolve())));
+ return {port:socket.address().port,received:()=>received};
+}
+
+it('runs a fork under the guard even with replaced execArgv and env, and refuses every other spawn',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp');
+ const child=join(runtimeDir,'child.mjs');
+ await writeFile(child,`import net from 'node:net';
+  const socket=net.connect({port:${listener.port},host:'127.0.0.1'});
+  socket.once('connect',()=>{socket.destroy();process.send('connected');});socket.once('error',()=>process.send('refused'));`);
+ const connect=`require('node:net').connect(${listener.port},'127.0.0.1')`;
+ const result=await guarded(runtimeDir,`
+  import {fork,spawn,spawnSync,exec,execSync,execFile,execFileSync} from 'node:child_process';
+  // Exactly the media worker's options: they replace execArgv and env.
+  const forked=await new Promise(resolve=>{
+   const c=fork(${JSON.stringify(child)},{stdio:['ignore','ignore','ignore','ipc'],execArgv:['--max-old-space-size=256'],env:{PATH:process.env.PATH},serialization:'advanced'});
+   c.once('message',resolve);c.once('exit',code=>resolve('exited '+code));
+  });
+  const node=process.execPath,code=${JSON.stringify(connect)};
+  const spawns={};
+  for(const [name,call] of Object.entries({
+   spawn:()=>spawn(node,['-e',code]),spawnSync:()=>spawnSync(node,['-e',code]),
+   exec:()=>exec(node+' -e "'+code+'"'),execSync:()=>execSync(node+' -e "'+code+'"'),
+   execFile:()=>execFile(node,['-e',code]),execFileSync:()=>execFileSync(node,['-e',code]),
+  })){try{call();spawns[name]='started';}catch{spawns[name]='refused';}}
+  console.log(JSON.stringify({forked,spawns}));`) as {forked:string;spawns:Record<string,string>};
+ expect(result).toEqual({forked:'refused',spawns:{spawn:'refused',spawnSync:'refused',exec:'refused',execSync:'refused',execFile:'refused',execFileSync:'refused'}});
+ await new Promise(resolve=>setTimeout(resolve,300));
+ expect(listener.received(),'nothing reached the test-owned listener').toBe(0);
+ const record=await readTransportLog(transportLog(runtimeDir));
+ const parent=record.forks[0]?.pid;
+ expect(record.forks).toEqual([expect.objectContaining({module:'child.mjs'})]);
+ expect(record.armed.map(entry=>entry.pid)).toEqual(expect.arrayContaining([parent,expect.any(Number)]));
+ expect(record.blocked).toEqual(expect.arrayContaining([
+  expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port}),
+  ...['spawn','spawnSync','exec','execSync','execFile','execFileSync'].map(name=>expect.objectContaining({api:`child_process.${name}`,program:'node'})),
+ ]));
+ expect(record.blocked.find(entry=>entry.api==='net.connect')?.pid).not.toBe(parent);
+ expect(await checkNoPhysicalTransport(guardContext(runtimeDir,1))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/7 transport attempts blocked: /)});
+},SPAWNS);
+
+it('refuses UDP from new dgram.Socket and records HTTP attempts by host and port only',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),udp=await owned('udp'),tcp=await owned('tcp');
+ const result=await guarded(runtimeDir,`
+  import dgram from 'node:dgram';import http from 'node:http';
+  const outcomes=[];
+  const attempt=async(call)=>{try{await call();outcomes.push('sent');}catch{outcomes.push('refused');}};
+  await attempt(()=>{const s=new dgram.Socket('udp4');s.send(Buffer.from('x'),${udp.port},'127.0.0.1');});
+  await attempt(()=>new dgram.Socket('udp4').bind(0));
+  await attempt(()=>new dgram.Socket('udp4').connect(${udp.port},'127.0.0.1'));
+  await attempt(()=>http.request('http://192.168.255.254/post?token=sk-FAKE-1'));
+  await attempt(()=>new Promise((resolve,reject)=>{const r=new http.ClientRequest('http://127.0.0.1:${tcp.port}/private/path?token=sk-FAKE-2');r.once('response',resolve);r.once('error',reject);r.end();}));
+  console.log(JSON.stringify(outcomes));`);
+ expect(result).toEqual(['refused','refused','refused','refused','refused']);
+ await new Promise(resolve=>setTimeout(resolve,300));
+ expect([udp.received(),tcp.received()]).toEqual([0,0]);
+ const {blocked}=await readTransportLog(transportLog(runtimeDir));
+ expect(blocked).toEqual([
+  expect.objectContaining({api:'dgram.send'}),expect.objectContaining({api:'dgram.bind'}),expect.objectContaining({api:'dgram.connect'}),
+  expect.objectContaining({api:'http.request',host:'192.168.255.254',port:80}),
+  expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:tcp.port}),
+ ]);
+ const text=await readFile(transportLog(runtimeDir),'utf8');
+ expect(text).not.toMatch(/sk-FAKE|\/post|\/private|null/);
+ const check=await checkNoPhysicalTransport(guardContext(runtimeDir,1));
+ expect(check).toEqual({outcome:'failed',reason:`5 transport attempts blocked: dgram.send, dgram.bind, dgram.connect, http.request 192.168.255.254:80, net.connect 127.0.0.1:${tcp.port}`});
 },SPAWNS);
 
 it('refuses to start with an invalid or installed paired port',async()=>{
