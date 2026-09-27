@@ -137,6 +137,70 @@ Do not claim physical behavior from the readiness API or simulator page.
 diagnostics commands. Run application checks and browser checks sequentially in
 one worktree because both rebuild the production web assets.
 
+## Simulator verification runs
+
+`npm run verify -- <operation>` starts a disposable copy of this application for
+an agent or the owner, drives it, keeps proof and leaves a preview under a
+lease. The shared core `@jimmie-potts/app-verify` implements the Hub's
+[app verification contract](https://github.com/jimmie-potts/agent-device-hub/blob/main/docs/app-verification.md):
+operations, receipt, supervisor unit, lease, proof directories and capture
+harness. `scripts/verify/` supplies only the Pixoo plug-in. Runs need Linux
+with a `systemd --user` manager and Node 24.5 or later; `capture` also needs
+Chromium from `npx playwright install chromium`.
+
+Each run:
+
+- builds with `npm run build`, then serves this checkout's build. Rebuilding
+  the checkout changes what a running preview serves.
+- launches `apps/server/dist/main.js` on `127.0.0.1:0` with
+  `PIXOO_MODE=simulator`, monitoring enabled and a private `PIXOO_DATA_DIR`
+  under `~/.local/state/app-verify/<run-id>/data`. Inherited Pixoo settings
+  never decide the mode, data directory or port.
+- preloads `scripts/verify/transport-guard.ts`. It refuses to start the server
+  unless the simulator is selected, and it blocks and records every outbound
+  HTTP request and non-loopback connection. The start checks `simulator-mode`
+  and `no-physical-transport`, and every capture step ends by asserting that
+  the run has recorded no attempt.
+- rejects a data directory inside a Git checkout, one reached through a
+  symlink alias, or one that overlaps the owner's normal data and lock
+  directories or an inherited `PIXOO_DATA_DIR`. It seeds only an empty
+  directory.
+
+Simulator pixels are the desired 64×64 content. They never establish what a
+physical display shows, and saved results are labelled as simulator rendering.
+
+### Feature map
+
+The default scenario `library-playlist` seeds `verify-quadrants.png`,
+`verify-blink.gif` (two frames, 500 ms each) and `verify-stripes.png`, the
+playlist "Verification loop" in that order, and one synthetic agent session,
+"Synthetic verification task" in project VERIFY-PIXOO. The `empty` scenario
+seeds no media, playlists or sessions.
+
+| Feature | Entry | Capture step | Deterministic action | Expected observation |
+| --- | --- | --- | --- | --- |
+| Library | Library tab | `library-selection` | Select each synthetic medium | Its heading, `64 × 64 · N frames` and preview pixels equal to the fixture; saves `library-quadrants` |
+| Playlist | Playlists, then Player | `playlist-progression` | Open the playlist, then Play playlist, Next, Next, Previous | A new session shows items 1, 2, 3 and 2 with their exact first frames, and the server is on item 2; saves `player-item-2` |
+| Playback | Player | `playback-controls` | Play playlist, Pause, Resume, Stop, reload | Intent paused, active, then stopped on item 1; the stopped session survives the reload |
+| 64×64 rendering | Library and Player previews, Monitor canvas | `library-selection`, `playlist-progression`, `monitor-media` | Read the 64×64 pixels the page draws | Fixture pixels, or the server's exact monitor picture; a PNG, an 8× copy and a simulator label |
+| Monitor/Media | Monitor tab | `monitor-media` | Play playlist, Show monitor, Select Media, then Resume in Player | Monitor active with playback paused and the canvas equal to the server picture; Media leaves playback paused; Resume continues item 1 in Media; saves `monitor` |
+| Recovery | Player | `lost-response-recovery` | Drop the Next response after the server applied it, then Retry command | Uncertain notice; the retry reuses the request identity; item 2 once with the generation unchanged |
+| Device boundary | Settings | `device-boundary` | Probe simulator | Simulator labels; health and device settings report the simulator; no transport attempt |
+
+Each negative control runs a step with a known-wrong behavior injected between
+the page and the server, and must report failed:
+
+| Control | Wrong behavior | Detected by |
+| --- | --- | --- |
+| `control-wrong-frame` | Every rendition frame is served as the stripes fixture | `library-selection` preview pixels |
+| `control-duplicate-next` | Every Next is applied twice under a fresh identity | `playlist-progression` item 2 |
+| `control-select-media-resumes` | Select Media also resumes playback | `monitor-media` paused check |
+| `control-retry-new-identity` | A retried Next is resent under a fresh identity | `lost-response-recovery` single effect |
+
+`npm run test:browser` runs every step and control against the actual server.
+`npm test` covers the launch environment, data directory guard, transport
+guard, concurrent runs and reseeding.
+
 ## Shared lifecycle contract conformance
 
 `npm test` and `npm run check` run the released lifecycle package consumer test
