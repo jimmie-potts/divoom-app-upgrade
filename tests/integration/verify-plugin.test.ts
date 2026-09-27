@@ -12,6 +12,8 @@ import {launch,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.
 
 const cleanup:(()=>Promise<unknown>)[]=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
+/** These tests start real server processes; CI hosts need more than the 5 s default. */
+const SPAWNS=30000;
 const header={'x-pixoo-request':'1','content-type':'application/json'};
 const names=async(url:string)=>(await (await fetch(new URL('/api/playlists',url))).json() as {name:string}[]).map(p=>p.name).sort();
 async function started(scenario:string,port=0){
@@ -42,7 +44,7 @@ it('loads every plug-in module under plain Node type stripping and registers its
   fresh:['playlist-progression','playback-controls','monitor-media','lost-response-recovery','control-wrong-frame','control-duplicate-next','control-select-media-resumes','control-retry-new-identity'],
   unscoped:['device-boundary'],cause:'function',
   components:['pixoo-server:actual','web-ui:actual','device-transport:simulated','media:simulated','agent-sessions:simulated'],artifact:{route:'/'},version:'0.0.0'});
-});
+},SPAWNS);
 
 it('keeps two concurrent runs apart and reseeds one on its recorded port without touching the other',async()=>{
  const first=await started('library-playlist'),second=await started('library-playlist');
@@ -57,7 +59,7 @@ it('keeps two concurrent runs apart and reseeds one on its recorded port without
  const ctx=(run:typeof first,server:LaunchedRun)=>({...run,url:server.url,port:server.port});
  expect(await checkNoPhysicalTransport(ctx(first,reseeded))).toEqual({outcome:'passed'});
  expect(await checkNoPhysicalTransport(ctx(second,second.server))).toEqual({outcome:'passed'});
-});
+},SPAWNS);
 
 it('fails a relaunch on an occupied recorded port and names the cause',async()=>{
  const blocker=createServer();await new Promise<void>(resolve=>blocker.listen(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise(resolve=>blocker.close(resolve)));
@@ -66,4 +68,4 @@ it('fails a relaunch on an occupied recorded port and names the cause',async()=>
  expect(failed).toBeInstanceOf(StartError);
  expect((failed as StartError).message).toMatch(new RegExp(`exited 1: .*EADDRINUSE.*${port}`));
  expect(failureCause((failed as StartError).stderr.join('\n'))).toBe('pixoo-start-failed: port in use');
-});
+},SPAWNS);

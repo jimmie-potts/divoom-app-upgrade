@@ -14,6 +14,8 @@ import {launch,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.
 
 const cleanup:(()=>Promise<unknown>)[]=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
+/** These tests start real server processes; CI hosts need more than the 5 s default. */
+const SPAWNS=30000;
 async function temporary(prefix:string){const path=await mkdtemp(join(tmpdir(),prefix));cleanup.push(()=>rm(path,{recursive:true,force:true}));return path;}
 function started(run:LaunchedRun){cleanup.push(()=>run.stop());return run;}
 const header={'x-pixoo-request':'1','content-type':'application/json'};
@@ -57,7 +59,7 @@ it('keeps a run in simulator mode under ambient device settings and records no p
  const environ=(await readFile(`/proc/${server.child.pid}/environ`,'utf8')).split('\0');
  expect(environ).toContain(`HOME=${join(run.runtimeDir,'home')}`);
  expect(environ.filter(entry=>entry.startsWith('PIXOO_')).sort()).toEqual(['PIXOO_DATA_DIR='+run.dataDir,'PIXOO_MODE=simulator','PIXOO_MONITOR_ENABLED=1','PIXOO_PORT=0']);
-});
+},SPAWNS);
 async function startFailure(spec:Parameters<typeof launch>[0],ambient:NodeJS.ProcessEnv):Promise<StartError> {
  const error=await launch(spec,ambient).then(()=>undefined,(caught:unknown)=>caught);
  if(!(error instanceof StartError))throw new Error(`expected a failed start, got ${String(error)}`);
@@ -71,7 +73,7 @@ it('negative control: a launch that loses its simulator setting never starts, ev
  expect(failed.message).toMatch(/exited 1: .*PIXOO_MODE=simulator/);
  expect(failureCause(failed.stderr.join('\n'))).toBe('pixoo-transport-guard: simulator mode required');
  expect(await readTransportLog(transportLog(run.runtimeDir))).toMatchObject({blocked:[],listening:[]});
-});
+},SPAWNS);
 
 /**
  * A test-only backstop loaded before the guard, beneath it: if the guard ever
@@ -121,7 +123,7 @@ it('negative control: the guard observes and blocks the physical transport path 
  const record=await readTransportLog(transportLog(runtimeDir));
  expect(record.blocked).toEqual([expect.objectContaining({api:'http.request',host:'192.168.255.254',port:80}),expect.objectContaining({api:'net.connect',host:'10.255.255.254',port:8080})]);
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,1))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/2 transport attempts blocked/)});
-});
+},SPAWNS);
 
 it('refuses and logs loopback connections to installed services, other local ports and Unix sockets',async()=>{
  const runtimeDir=await temporary('verify-guard-');
@@ -142,7 +144,7 @@ it('refuses and logs loopback connections to installed services, other local por
   expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:8787}),
  ]);
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,otherPort))).toMatchObject({outcome:'failed',reason:expect.stringMatching(/6 transport attempts blocked: net\.connect 127\.0\.0\.1:8788/)});
-});
+},SPAWNS);
 
 it('allows only the process\'s own listening port, and records a declared paired port as another target',async()=>{
  const runtimeDir=await temporary('verify-guard-');
@@ -161,13 +163,13 @@ it('allows only the process\'s own listening port, and records a declared paired
  record=await readTransportLog(transportLog(runtimeDir));
  expect(record.allowed.at(-1)).toMatchObject({port:pairedPort,target:'paired'});
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,own[0]))).toMatchObject({outcome:'failed',reason:expect.stringMatching(new RegExp(`1 connection to another local port: 127\\.0\\.0\\.1:${pairedPort}`))});
-});
+},SPAWNS);
 
 it('refuses to start with an invalid or installed paired port',async()=>{
  const runtimeDir=await temporary('verify-guard-');
  for(const value of ['8788','abc','0','70000','1234,'])
   await expect(guarded(runtimeDir,'console.log(1)',{APP_VERIFY_PAIRED_PORTS:value}),value).rejects.toMatchObject({stderr:expect.stringContaining('APP_VERIFY_PAIRED_PORTS')});
-});
+},SPAWNS);
 
 it('refuses to start the server when the transport guard has no log',async()=>{
  const run=await hostileRun();
@@ -175,4 +177,4 @@ it('refuses to start the server when the transport guard has no log',async()=>{
  const failed=await startFailure(spec,run.ambient);
  expect(failed.message).toMatch(/exited 1: .*APP_VERIFY_TRANSPORT_LOG/);
  expect(failureCause(failed.stderr.join('\n'))).toBe('pixoo-transport-guard: transport log required');
-});
+},SPAWNS);
