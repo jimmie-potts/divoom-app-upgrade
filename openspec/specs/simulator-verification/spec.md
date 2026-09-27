@@ -1,4 +1,9 @@
-## ADDED Requirements
+# simulator-verification Specification
+
+## Purpose
+Run the actual Pixoo server as a disposable simulator-only verification run through the shared app-verify core, with private synthetic data, an observed transport boundary that refuses devices and installed services, assertive capture steps with negative controls and a feature map that matches them.
+
+## Requirements
 
 ### Requirement: Adapter command
 `npm run verify -- <operation>` SHALL pass the Pixoo plug-in to the vendored shared verification core, which owns the run lifecycle, receipt and proof. The wrapper SHALL refuse a Node version outside 24.5 through 24.x before loading the plug-in. `start` and `restart` SHALL build the checkout before seeding. Steps that change state, and every control, SHALL be marked for a fresh reseed.
@@ -12,7 +17,7 @@
 - **THEN** `doctor` reports the served artifact digest as changed rather than matching
 
 ### Requirement: Simulator-only runs
-A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator. It SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. A later paired scenario MAY allow explicitly declared loopback ports of another disposable run, never an installed port. A run SHALL NOT bind an installed port.
+A verification run SHALL launch the built server with explicit simulator mode, the run's own data directory and port, and a transport guard. The guard SHALL refuse to start the server unless the final process environment selects the simulator. A run SHALL NOT bind an installed port.
 
 #### Scenario: Ambient device settings
 - **WHEN** a run starts while the caller selects device mode, the owner's data directory and the installed port, and the run's data holds a saved device target
@@ -21,6 +26,9 @@ A verification run SHALL launch the built server with explicit simulator mode, t
 #### Scenario: Lost simulator setting
 - **WHEN** the launch environment no longer selects the simulator
 - **THEN** the server does not start and no transport attempt is recorded
+
+### Requirement: Observed transport boundary
+The transport guard SHALL block and record, before it leaves the process, every outbound HTTP request, UDP socket, Unix socket connection and TCP connection except to the process's own listening port, so installed loopback services are refused like a device. A later paired scenario MAY allow explicitly declared loopback ports of another disposable run, never an installed port.
 
 #### Scenario: Physical transport attempt
 - **WHEN** code in a guarded process calls the device transport or fetches a non-loopback address
@@ -53,7 +61,7 @@ A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a he
 - **THEN** no cause line is reported
 
 ### Requirement: Assertive capture steps
-Capture steps SHALL drive the actual page and record named assertions for library selection, playlist progression, playback controls, Monitor/Media transitions, recovery from a lost command response and the device boundary. Pixel assertions SHALL compare drawn pixels with fixture definitions or with the server's exact monitor picture. Each step SHALL end by asserting that the run has recorded no transport attempt. Saved 64×64 results SHALL include an exact PNG, an enlarged copy and a label that marks them as simulator rendering, not physical display evidence.
+Capture steps SHALL drive the actual page and record named assertions for library selection, playlist progression, playback controls, Monitor/Media transitions, recovery from a lost command response and the device boundary. Pixel assertions SHALL compare drawn pixels with fixture definitions or with the server's exact monitor picture. Each step SHALL end by asserting that the run has recorded no transport attempt.
 
 #### Scenario: Reference run
 - **WHEN** every step runs against a seeded reference run
@@ -62,6 +70,13 @@ Capture steps SHALL drive the actual page and record named assertions for librar
 #### Scenario: Lost response
 - **WHEN** a Next response is lost after the server applied it and the user retries
 - **THEN** the retry reuses the request identity and playback advances exactly once
+
+### Requirement: Labelled simulator results
+Saved 64×64 results SHALL include an exact PNG, an enlarged copy and a label that marks them as simulator rendering, not physical display evidence.
+
+#### Scenario: Saved progression result
+- **WHEN** playlist progression ends on item 2
+- **THEN** the capture holds the exact 64×64 PNG of that item's first frame, an 8× copy and a label naming the run, scenario and simulator rendering
 
 ### Requirement: Negative controls
 Each `control-*` step SHALL run a reference step with a known-wrong behavior injected between the page and the server, and SHALL report failed at the assertion that names that behavior.
