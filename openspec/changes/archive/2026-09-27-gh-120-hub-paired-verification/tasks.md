@@ -14,5 +14,5 @@
 ## 3. Shared core and delivery evidence
 
 - [x] 3.1 Vendor the released `@jimmie-potts/app-verify` 1.1.0 archive with its checksum and source receipt, and pin it in the consumer test.
-- [ ] 3.2 Local real-unit run from a clean candidate: standalone reference steps, then `hub-paired` against a stand-in Hub feed and controller caller, doctor, handoff, controls after handoff and stop.
-- [ ] 3.3 `npm run check`, `npm run test:browser` and both workflow checks pass without credentials or devices; synchronize and archive the change.
+- [x] 3.2 Local real-unit run from a clean candidate: standalone reference steps, then `hub-paired` against a stand-in Hub feed and controller caller, doctor, handoff, controls after handoff and stop.
+- [x] 3.3 `npm run check`, `npm run test:browser` and both workflow checks pass without credentials or devices; synchronize and archive the change.
