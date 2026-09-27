@@ -11,7 +11,7 @@ import sharp from 'sharp';
 import {checkNoPhysicalTransport,checkSimulatorMode,failureCause,probeHealth,readTransportLog} from '../../scripts/verify/readiness.ts';
 import {launchSpec,transportGuard,transportLog} from '../../scripts/verify/run-environment.ts';
 import {seedScenario} from '../../scripts/verify/scenarios.ts';
-import {launch,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.js';
+import {launch,listenLoopback,makeRun,StartError,type LaunchedRun} from '../helpers/verify-run.js';
 
 const cleanup:(()=>Promise<unknown>)[]=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
@@ -180,10 +180,10 @@ it('allows only the process\'s own listening port',async()=>{
  expect(await checkNoPhysicalTransport(guardContext(runtimeDir,own[0]))).toEqual({outcome:'passed'});
 },SPAWNS);
 
-/** A listener this test owns, standing in for the paired Hub run's port. */
+/** A listener this test owns, standing in for the paired Hub run's port, which is never an installed port. */
 async function listener(){
- const server=createServer(socket=>socket.destroy());await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise(resolve=>server.close(resolve)));
- return (server.address() as {port:number}).port;
+ const server=createServer(socket=>socket.destroy());const port=await listenLoopback(server);cleanup.push(()=>new Promise(resolve=>server.close(resolve)));
+ return port;
 }
 /** A guarded process that serves `port` (0 for any) and connects to itself and to each of `targets`. */
 const serving=(port:number,targets:number[])=>`${attempts}

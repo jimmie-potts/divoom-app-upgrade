@@ -7,7 +7,7 @@ import {checkHubFeed,checkNoPhysicalTransport,readTransportLog,type ProbeInput} 
 import {launchSpec,transportLog} from '../../scripts/verify/run-environment.ts';
 import {PLAYLIST,seedScenario} from '../../scripts/verify/scenarios.ts';
 import {HUB_SESSION,pairingToken,standInHub,writePairingTokens,type StandInHub} from '../helpers/stand-in-hub.js';
-import {launch,makeRun,type LaunchedRun} from '../helpers/verify-run.js';
+import {launch,listenLoopback,makeRun,type LaunchedRun} from '../helpers/verify-run.js';
 
 // The hub-paired scenario against a stand-in for the paired Hub run: the real
 // agent-state owner behind the Hub's session feed, and this test as the Hub's
@@ -155,8 +155,7 @@ it('pairs with a Hub run: tolerates a rejected and a dropped feed, shows its ses
 it('names routes by their full URL in reasons, which the core\'s redaction keeps',async()=>{
  const {createServer}=await import('node:http');
  const failing=createServer((_request,response)=>{response.writeHead(500,{'content-type':'application/json'});response.end('{}');});
- await new Promise<void>(resolve=>failing.listen(0,'127.0.0.1',resolve));cleanup.push(()=>new Promise(resolve=>failing.close(resolve)));
- const origin=`http://127.0.0.1:${(failing.address() as {port:number}).port}`;
+ const origin=`http://127.0.0.1:${await listenLoopback(failing)}`;cleanup.push(()=>new Promise(resolve=>failing.close(resolve)));
  const {probeHealth}=await import('../../scripts/verify/readiness.ts');
  const run=await pairedRun(),context={...run,url:`${origin}/`,port:1,scenario:HUB_PAIRED,inputs:{'hub-feed':`${origin}/`}};
  expect(await probeHealth(context)).toEqual({ok:false,reason:`health unreadable: ${origin}/api/health answered 500`});

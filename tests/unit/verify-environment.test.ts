@@ -70,3 +70,18 @@ describe('seedable data directory',()=>{
   await expect(assertSeedable(planted,{home,ambient:{}})).rejects.toThrow(/occupied/);
  });
 });
+
+describe('test listeners for a paired Hub',()=>{
+ it('never keep an installed port the kernel hands out, such as 41231',async()=>{
+  const {EventEmitter}=await import('node:events');
+  const {listenLoopback}=await import('../helpers/verify-run.js');
+  const handed=[41231,41230,45123],closed:number[]=[];let current=0;
+  const server=Object.assign(new EventEmitter(),{
+   listen(_port:number,_host:string,ready:()=>void){current=handed.shift()!;ready();return server;},
+   address:()=>({port:current,address:'127.0.0.1',family:'IPv4'}),
+   close(done:()=>void){closed.push(current);done();return server;},
+  });
+  expect(await listenLoopback(server as never)).toBe(45123);
+  expect(closed).toEqual([41231,41230]);
+ });
+});

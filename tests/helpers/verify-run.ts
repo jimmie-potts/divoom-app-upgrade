@@ -3,6 +3,8 @@ import {mkdir,mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
 import {createInterface} from 'node:readline';
+import type {AddressInfo,Server} from 'node:net';
+import {installedPorts} from '../../scripts/verify/installed-ports.ts';
 import {readyLine} from '../../scripts/verify/readiness.ts';
 import type {LaunchSpec} from '../../scripts/verify/run-environment.ts';
 
@@ -38,4 +40,19 @@ export async function launch(spec:LaunchSpec,ambient:NodeJS.ProcessEnv,timeoutMs
   });
   return {child,url,port:Number(new URL(url).port),stdout,stderr,stop};
  }catch(error){await stop();throw error;}
+}
+
+/**
+ * Listen on an ephemeral 127.0.0.1 port outside the installed services' ports.
+ * The kernel's ephemeral range includes 41230 and 41231, and a paired Hub
+ * port or `hub-feed` origin is refused on those, so a stand-in must avoid them.
+ */
+export async function listenLoopback(server:Server):Promise<number> {
+ for(let attempt=0;attempt<20;attempt++){
+  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',()=>{server.off('error',reject);resolve();});});
+  const port=(server.address() as AddressInfo).port;
+  if(!installedPorts.includes(port))return port;
+  await new Promise<void>(resolve=>server.close(()=>resolve()));
+ }
+ throw new Error('no ephemeral loopback port outside the installed ports');
 }

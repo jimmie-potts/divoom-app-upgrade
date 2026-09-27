@@ -4,6 +4,7 @@ import {randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {MemoryStorage,createAgentState} from '@jimmie-potts/agent-state';
 import {HUB_OWNER_ID,pairingTokens} from '../../scripts/verify/pairing.ts';
+import {listenLoopback} from './verify-run.js';
 
 /** The synthetic lifecycle source the #495 orchestrator posts to the Hub run. */
 export const HUB_SOURCE={provider:'codex',client:'cli',hostId:'verify-host',sourceId:'verify-source'} as const;
@@ -46,8 +47,7 @@ export async function standInHub(feedToken:string){
   send(200,{apiVersion:'1.0',ownerId:fault.owner??HUB_OWNER_ID,connection:'current',snapshot:owner.snapshot(version as '1.2'),admissionRejected:0,
    nextRequestId:fault.malformed?42:`hub-request-${sequence}`,matches:[]});
  });
- await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
- const port=(server.address() as {port:number}).port;
+ const port=await listenLoopback(server);
  return {
   origin:`http://127.0.0.1:${port}/`,port,reads,paths,event,
   setFeed(value:typeof feed){feed=value;},
