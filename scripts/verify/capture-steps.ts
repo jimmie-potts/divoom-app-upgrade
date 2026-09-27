@@ -14,7 +14,12 @@ import {PLAYLIST,SESSION,syntheticMedia,type MediaKey} from './scenarios.ts';
 /** The part of the shared core's capture context these steps use, with Playwright's page type. */
 export interface StepContext {
  page:Page;url:string;port:number;runId:string;scenario:string;runtimeDir:string;signal:AbortSignal;
- expect(name:string,check:()=>unknown):Promise<void>;
+ /**
+  * Every check throws or rejects on a mismatch and returns nothing. The type
+  * refuses predicate-style checks, such as `() => locator.isVisible()`, whose
+  * `false` result would otherwise read as a pass.
+  */
+ expect(name:string,check:()=>Promise<void>):Promise<void>;
  note(message:string):void;
  screenshot(name:string):Promise<void>;
  /**
@@ -237,7 +242,7 @@ export const captureSteps:Record<string,Step>={
    const before=await player(t);
    await click(t,'Retry command');
    await t.expect('the retry resolves the uncertainty',async()=>{await t.page.getByText(/Command outcome uncertain/).waitFor({state:'detached',timeout:WAIT});});
-   await t.expect('the retry reused the original request identity',()=>{
+   await t.expect('the retry reused the original request identity',async()=>{
     if(bodies.length!==2)throw new Error(`${bodies.length} command requests were sent`);
     if(JSON.stringify(bodies[0])!==JSON.stringify(bodies[1]))throw new Error('the retry changed the request');
    });
