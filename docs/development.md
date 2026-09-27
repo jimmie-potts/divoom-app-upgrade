@@ -185,7 +185,7 @@ Each run:
   unless the simulator is selected. Through the public Node.js APIs it blocks
   and records every outbound HTTP request, UDP socket and Unix socket
   connection, every TCP connection except to the run's own port (and, in
-  `hub-paired`, the declared Hub port), and every
+  `hub-paired`, the declared Hub port on `127.0.0.1`), and every
   other process start (`spawn`, `exec`, `execFile` and their Sync forms,
   `ChildProcess#spawn` and `process.execve`). Installed services such as the
   Hub on 8788 are refused like a device. A fork of Node, such as the media
@@ -228,7 +228,7 @@ none of its own; see [Hub-paired runs](#hub-paired-runs).
 | Monitor/Media | Monitor tab | `monitor-media` | Play playlist, Show monitor, Select Media, then Resume in Player | Monitor active with playback paused and the canvas equal to the server picture; Media leaves playback paused; Resume continues item 1 in Media; saves `monitor` |
 | Recovery | Player | `lost-response-recovery` | Drop the Next response after the server applied it, then Retry command | Uncertain notice; the retry reuses the request identity; item 2 once with the generation unchanged |
 | Device boundary | Settings | `device-boundary` | Probe simulator | Simulator labels; health and device settings report the simulator; no transport attempt |
-| Hub pairing | Monitor tab, controller API | `hub-sessions` | In `hub-paired`, compare the feeds, open Monitor and read the controller snapshots with the Hub's token | A current feed from `verify-owner` at the Hub's revision; every Hub session and project listed; the canvas equal to the server picture; the default controller identity, and 401 without the token; only the run's port and the Hub port reached; saves `hub-monitor` |
+| Hub pairing | Monitor tab, controller API | `hub-sessions` | In `hub-paired`, compare the feeds, open Monitor, read the controller snapshots with the Hub's token, send one `brightness.set` and replay it, then try the feed token and a random one | A current feed from `verify-owner` at the Hub's revision; every Hub session and project listed; the canvas equal to the server picture; the default controller identity, and 401 without the token; the command reaches the writer once and its replay returns the same receipt; other tokens get 401 and reach no writer; only the run's port and the Hub port reached; saves `hub-monitor` |
 
 Each negative control runs a step with a known-wrong behavior injected between
 the page and the server, and must report failed:
@@ -278,6 +278,11 @@ controller API. The Hub orchestrator drives this sequence:
    `<controller>controller/v1`, where `<controller>` is the endpoint that
    Pixoo's reseed returned.
 
+A later reseed of the Hub, such as a `fresh` Hub step or `handoff --reset`,
+restarts its owner's revisions below those Pixoo has applied. Pixoo refuses a
+revision regression and stays stale, so reseed Pixoo `hub-paired` again after
+any Hub reseed; the token files can stay.
+
 `hub-feed` is the only input, optional for the plug-in and required by
 `hub-paired`. It must be exactly `http://127.0.0.1:<port>/`, on a port that
 is neither an installed service's nor the run's own. Tokens are never inputs.
@@ -316,18 +321,27 @@ they answer 404.
 Checks:
 
 - `no-physical-transport` still fails on any blocked attempt. It accepts a
-  connection to a port other than the run's own only when the connecting
-  process's own launch declared that Hub port. The process serving the run
+  connection to a port other than the run's own only when it went to
+  `127.0.0.1` and the connecting process's own launch declared that Hub port;
+  the guard refuses the Hub port on any other loopback name or address. The process serving the run
   must be paired with exactly the `hub-feed` port in `hub-paired`, and with
   no port in any other scenario. The log spans the run, so feed reads from an
   earlier paired launch stay accepted after a reseed to a standalone scenario.
 - `hub-feed` reads Pixoo's `GET /api/integration/v1/sessions`, which first
   refreshes from the Hub, and then the Hub's feed with the feed token. It
   passes when Pixoo's feed is current, from `verify-owner`, at the revision
-  the Hub serves. It is `skipped` while this launch has never had a current
-  feed, for example while the Hub does not yet accept the token, so the
-  reseed before the Hub is configured succeeds. It fails once a current feed
-  turns stale. It is skipped in every other scenario.
+  the Hub serves. Every other result names what it saw:
+  - `skipped` while this launch has had no current feed and the Hub refuses
+    the token (401 or 403) or cannot be reached (connection refused or
+    reset), for up to 60 seconds after the launch. The reseed before the Hub
+    is configured therefore succeeds. After that grace period the same
+    result fails.
+  - `failed` when the Hub serves a feed that Pixoo does not apply: another
+    owner, a feed Pixoo refuses, or an error status.
+  - `failed` when a current feed turns stale, naming a Hub whose revisions
+    restarted below Pixoo's, and when Pixoo and the Hub do not settle on one
+    revision within a few reads.
+  - `skipped` in every other scenario.
 
 The orchestrator reads Pixoo's state over loopback. Neither route returns a
 token:
