@@ -97,12 +97,14 @@ adapter and authenticated host transport; the shared reducer remains upstream.
 
 ## Shared verification core
 
-`@jimmie-potts/app-verify` 1.0.0 is a private development dependency consumed
+`@jimmie-potts/app-verify` 1.1.0 is a private development dependency consumed
 from the committed archive of the
-[app-verify-v1.0.0 release](https://github.com/jimmie-potts/agent-device-hub/releases/tag/app-verify-v1.0.0).
-Its SHA-256 is `f2106ea7ddd00169e325ea23fc2af022b7b2c4da5577ca9e06e72c908843433f`.
-The [source receipt](../vendor/app-verify-1.0.0-source-receipt.json) pins Hub
-PR #552 and source revision `4e7d095ea369db2b564c8debb130a7fddf997235`. The
+[app-verify-v1.1.0 release](https://github.com/jimmie-potts/agent-device-hub/releases/tag/app-verify-v1.1.0).
+Its SHA-256 is `1a0447ec6324f815bc89c3f671207ef452cde120c329b5318fd68711e06a3281`.
+The [source receipt](../vendor/app-verify-1.1.0-source-receipt.json) pins Hub
+PR #554 and source revision `917d06f75bfe91dd161024a51c0582b5b7ceccde`. Version
+1.1 adds run inputs, extra ready-line endpoints and redacted reasons, which the
+`hub-paired` scenario uses. The
 package has no runtime dependencies; Playwright is its optional peer, supplied
 by this repository's pinned `@playwright/test`. The consumer test verifies the
 archive, the receipt and every installed manifest hash.
