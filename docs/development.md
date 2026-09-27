@@ -218,7 +218,11 @@ the page and the server, and must report failed:
 | `control-retry-new-identity` | A retried Next is resent under a fresh identity | `lost-response-recovery` single effect |
 
 Steps that change state, and every control, are marked `fresh`: the core
-reseeds and relaunches the run on its port before driving them.
+reseeds and relaunches the run on its port before driving them. For proof a
+delivery cites, capture only the reference steps before `handoff`; the Hub's
+delivery preflight rejects a verified set holding a capture that did not
+pass. Run the controls after `handoff`, where they land in `after-handoff/`
+and still report failed.
 
 `npm run test:browser` runs every step and control through the core's
 unsupervised `runCaptureStep` against the actual server. `npm test` covers the
