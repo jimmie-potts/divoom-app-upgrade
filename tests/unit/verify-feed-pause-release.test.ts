@@ -30,9 +30,7 @@ it('a completed seed cannot consume a newer pause published during control clean
    writeFileSync(temporary,JSON.stringify(newer),{mode:0o600});renameSync(temporary,path);
   }
  };
- await seedScenario({...run,scenario:'hub-paired',inputs:{'hub-feed':'http://127.0.0.1:41999/'}}).catch((error:unknown)=>{
-  expect((error as Error).message).toMatch(/feed pause changed during seed/);
- });
+ await expect(seedScenario({...run,scenario:'hub-paired',inputs:{'hub-feed':'http://127.0.0.1:41999/'}})).rejects.toThrow('feed pause changed during seed');
  expect(replaced).toBe(true);
  expect(JSON.parse(readFileSync(path,'utf8'))).toEqual(newer);
 });
