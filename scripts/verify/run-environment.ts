@@ -41,6 +41,7 @@ export function launchSpec({runtimeDir,dataDir,port,node,scenario,inputs}:Launch
  return {
   argv:[node,'--import',pathToFileURL(transportGuard).href,serverEntry],
   env:{NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:dataDir,PIXOO_PORT:String(port),PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog(runtimeDir),
+   APP_VERIFY_FEED_PAUSE_DIR:hub?runtimeDir:'',APP_VERIFY_FEED_PAUSE_RUN_ID:hub?basename(runtimeDir):'',
    APP_VERIFY_PAIRED_PORTS:hub?String(hub.port):'',...(hub?{PIXOO_CONTROLLER_ENABLED:'1'}:{})},
   cwd:checkoutRoot,
  };

@@ -3,6 +3,8 @@
 // compare what the page shows against an oracle that does not come from the
 // server under test. Nothing reads the owner's media or data.
 import {mkdir,writeFile} from 'node:fs/promises';
+import {linkSync,mkdtempSync,renameSync,rmdirSync,unlinkSync} from 'node:fs';
+import {readFeedPauseControl,validateFeedPauseContext,type FeedPauseControl} from '../../apps/server/src/verification-feed-pause.ts';
 import {join} from 'node:path';
 import sharp from 'sharp';
 import {HUB_CONTROLLER_PRINCIPAL,HUB_OWNER_ID,HUB_PAIRED,hubFeed,pairingTokens,readPairingToken} from './pairing.ts';
@@ -55,9 +57,21 @@ export const defaultScenario:ScenarioName='library-playlist';
 
 export interface SeedInput {runId:string;dataDir:string;scenario:string;runtimeDir?:string;inputs?:Readonly<Record<string,string>>}
 /** Write one scenario into the run's empty data directory, before the server starts. */
-export async function seedScenario({dataDir,scenario,runtimeDir,inputs}:SeedInput,owner:OwnerContext={}):Promise<void> {
+export async function seedScenario({runId,dataDir,scenario,runtimeDir,inputs}:SeedInput,owner:OwnerContext={}):Promise<void> {
  if(!Object.hasOwn(scenarioDefinitions,scenario))throw new Error(`Unknown scenario ${scenario}`);
  const definition:ScenarioDefinition=scenarioDefinitions[scenario as ScenarioName];
+ const request=runtimeDir?readFeedPauseControl(runtimeDir,'request'):{kind:'absent'} as const;
+ const release=runtimeDir?readFeedPauseControl(runtimeDir,'release'):{kind:'absent'} as const;
+ let released:FeedPauseControl|undefined;
+ if(request.kind==='invalid')throw new Error('feed-pause.request is invalid; stop or repair the paired run before reseeding');
+ if(request.kind==='valid'){
+  if(request.value.runId!==runId)throw new Error('feed-pause.request names another run');
+  validateFeedPauseContext(runtimeDir!,runId,dataDir);
+  if(!definition.hub)throw new Error('an outstanding feed pause requires a hub-paired reseed');
+  if(release.kind!=='valid'||release.value.runId!==runId||release.value.nonce!==request.value.nonce)
+   throw new Error('a matching feed-pause.release is required before reseeding');
+  released=request.value;
+ }else if(release.kind!=='absent')throw new Error('feed-pause.release has no matching request');
  // A paired seed checks its input and both token files before it writes anything.
  const paired=definition.hub?await pairing(runtimeDir,inputs):undefined;
  const data=await assertSeedable(dataDir,owner);
@@ -89,6 +103,39 @@ export async function seedScenario({dataDir,scenario,runtimeDir,inputs}:SeedInpu
  finally{await revokeCredential(monitor,'verify-seed');}
  // The Hub presents its controller token to the controller API; the backend's store keeps only its digest.
  if(paired)await registerCredential(data,HUB_CONTROLLER_PRINCIPAL,paired.controllerToken,['read','control']);
+ if(released&&runtimeDir){
+  consumeRelease(runtimeDir,released);
+ }
+}
+
+/** Core stopped the old unit and seed wrote fresh state. Delete only atomically claimed controls. */
+function consumeRelease(runtimeDir:string,expected:FeedPauseControl):void {
+ const claimed=mkdtempSync(join(runtimeDir,'.feed-pause-consume-')),paths=new Map<string,string>();
+ const changed=()=>new Error('feed pause changed during seed; the run must remain stopped');
+ try{
+  for(const kind of ['request','release','ack'] as const){
+   const path=join(claimed,`feed-pause.${kind}`);
+   try{renameSync(join(runtimeDir,`feed-pause.${kind}`),path);}
+   catch(error){if(kind==='ack'&&(error as NodeJS.ErrnoException).code==='ENOENT')continue;throw error;}
+   paths.set(kind,path);
+   if(kind!=='ack'){
+    const value=readFeedPauseControl(claimed,kind);
+    if(value.kind!=='valid'||value.value.runId!==expected.runId||value.value.nonce!==expected.nonce)throw changed();
+   }
+  }
+  const assertNoReplacement=()=>{
+   if(readFeedPauseControl(runtimeDir,'request').kind!=='absent'||readFeedPauseControl(runtimeDir,'release').kind!=='absent')throw changed();
+  };
+  assertNoReplacement();
+  for(const path of paths.values())unlinkSync(path);
+  assertNoReplacement();
+ }catch{
+  // Restore without replacing a newer public file. Occupied paths retain private claims until failed-run cleanup.
+  for(const [kind,path] of paths){
+   try{linkSync(path,join(runtimeDir,`feed-pause.${kind}`));unlinkSync(path);}catch{/* No overwrite, including after a partial cleanup. */}
+  }
+  throw changed();
+ }finally{try{rmdirSync(claimed);}catch{/* Failed-run cleanup owns any retained claims. */}}
 }
 
 /** The Hub run from the `hub-feed` input and the two tokens the orchestrator wrote into the run directory. */

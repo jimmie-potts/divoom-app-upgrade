@@ -13,7 +13,7 @@ describe('launch command',()=>{
  it('launches the built server through the transport guard with explicit simulator settings only',()=>{
   const spec=launchSpec({runtimeDir:'/state/pixoo-run',dataDir:'/state/pixoo-run/data',port:0,node:'/opt/node/bin/node'});
   expect(spec.argv).toEqual(['/opt/node/bin/node','--import',expect.stringMatching(/^file:.*\/scripts\/verify\/transport-guard\.ts$/),resolve('apps/server/dist/main.js')]);
-  expect(spec.env).toEqual({NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:'/state/pixoo-run/data',PIXOO_PORT:'0',PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog('/state/pixoo-run'),APP_VERIFY_PAIRED_PORTS:''});
+  expect(spec.env).toEqual({NODE_OPTIONS:'',PIXOO_MODE:'simulator',PIXOO_DATA_DIR:'/state/pixoo-run/data',PIXOO_PORT:'0',PIXOO_MONITOR_ENABLED:'1',APP_VERIFY_TRANSPORT_LOG:transportLog('/state/pixoo-run'),APP_VERIFY_PAIRED_PORTS:'',APP_VERIFY_FEED_PAUSE_DIR:'',APP_VERIFY_FEED_PAUSE_RUN_ID:''});
   expect(spec.cwd).toBe(resolve('.'));
   expect(launchSpec({runtimeDir:'/state/r',dataDir:'/state/r/data',port:41705,node:'node'}).env.PIXOO_PORT).toBe('41705');
  });
@@ -23,10 +23,12 @@ describe('launch command',()=>{
  it('pairs only a hub-paired launch with the Hub port from hub-feed and enables the controller API there alone',()=>{
   const run={runtimeDir:'/state/r',dataDir:'/state/r/data',port:41705,node:'node'},inputs={'hub-feed':'http://127.0.0.1:41999/'};
   const paired=launchSpec({...run,scenario:'hub-paired',inputs});
-  expect(paired.env).toMatchObject({APP_VERIFY_PAIRED_PORTS:'41999',PIXOO_CONTROLLER_ENABLED:'1',PIXOO_MODE:'simulator',PIXOO_PORT:'41705'});
+  expect(paired.env).toMatchObject({APP_VERIFY_PAIRED_PORTS:'41999',APP_VERIFY_FEED_PAUSE_DIR:'/state/r',APP_VERIFY_FEED_PAUSE_RUN_ID:'r',PIXOO_CONTROLLER_ENABLED:'1',PIXOO_MODE:'simulator',PIXOO_PORT:'41705'});
   for(const scenario of ['library-playlist','empty',undefined]){
    const standalone=launchSpec({...run,...(scenario?{scenario}:{}),inputs});
    expect(standalone.env.APP_VERIFY_PAIRED_PORTS,String(scenario)).toBe('');
+   expect(standalone.env.APP_VERIFY_FEED_PAUSE_DIR,String(scenario)).toBe('');
+   expect(standalone.env.APP_VERIFY_FEED_PAUSE_RUN_ID,String(scenario)).toBe('');
    expect(standalone.env,String(scenario)).not.toHaveProperty('PIXOO_CONTROLLER_ENABLED');
   }
  });

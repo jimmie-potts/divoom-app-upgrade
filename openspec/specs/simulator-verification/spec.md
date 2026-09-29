@@ -83,6 +83,8 @@ Seeding SHALL write only into an empty real directory outside every Git checkout
 ### Requirement: Readiness and boundary checks
 A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a health read reporting simulator mode without connectivity. Start checks SHALL confirm simulator mode through health and device settings, and a guard record for the serving port with no transport attempt. A connection to another port SHALL pass only when it went to `127.0.0.1` and the connecting process's own launch declared it paired. The serving process SHALL be paired with exactly the `hub-feed` port in `hub-paired` and with no port otherwise. The `hub-feed` check SHALL pass in `hub-paired` when Pixoo's feed is current, from `verify-owner`, at the Hub's revision. While the launch has had no current feed, it SHALL be skipped only when the Hub refuses the feed token or cannot be reached, and only within a grace period after the launch. It SHALL otherwise fail, naming what the Hub answered or served. It SHALL fail when a current feed turns stale or the revisions do not settle, and SHALL be skipped in other scenarios. A failed start SHALL be named by a fixed cause line for known server and guard failures, without copying server output.
 
+While a valid verification feed pause is active, the paired-feed diagnostic SHALL report `skipped` with a pause reason without probing the Hub. Invalid request or release input, including release for another nonce or without a request, SHALL report `failed` without probing the Hub. A paused diagnostic SHALL NOT establish composition readiness; the ordinary current-feed check SHALL pass after authorized reseed release.
+
 #### Scenario: Occupied recorded port
 - **WHEN** a relaunch after reseeding finds its recorded port occupied
 - **THEN** the server exits and the failure is named `pixoo-start-failed: port in use`
@@ -110,6 +112,10 @@ A run SHALL be ready only after its simulator ready line on `127.0.0.1` and a he
 #### Scenario: Hub reseeded after pairing
 - **WHEN** the Hub's revisions restart below the revision Pixoo applied
 - **THEN** the `hub-feed` check fails naming both revisions and the reseed of Pixoo `hub-paired` that recovers it
+
+#### Scenario: Diagnostic during a feed pause
+- **WHEN** a paired-feed diagnostic runs while valid or invalid pause control state is present
+- **THEN** it reports skipped or failed respectively without making a Hub request and does not claim readiness
 
 ### Requirement: Assertive capture steps
 Capture steps SHALL drive the actual page and record named assertions for library selection, playlist progression, playback controls, Monitor/Media transitions, recovery from a lost command response, the device boundary and Hub pairing. Pixel assertions SHALL compare drawn pixels with fixture definitions or with the server's exact monitor picture. Each step SHALL end by asserting that the run has recorded no transport attempt.
@@ -169,3 +175,35 @@ The plug-in SHALL declare the optional input `hub-feed`, which the `hub-paired` 
 #### Scenario: Reseed to a standalone scenario
 - **WHEN** a paired run is reseeded to `library-playlist`
 - **THEN** it embeds its own owner, its controller routes answer 404, the `controller` endpoint is still announced, and the earlier Hub reads still pass the transport check
+
+### Requirement: Disposable paired feed pause
+
+An explicitly launched `hub-paired` verification process SHALL honor a private versioned pause request for its run and nonce. It SHALL stop admitting outbound Pixoo-to-Hub feed requests and commands, drain requests already in flight, then atomically acknowledge the matching run and nonce with its own process identity. While paused, local pages, health and inbound controller work SHALL remain responsive, retained feed state SHALL preserve truthful freshness, and no rejected command SHALL be queued for replay. Invalid, linked, oversized, nonprivate or wrong-run controls SHALL block admission without a successful acknowledgment, withdrawing any acknowledgment for a request that becomes invalid. Ordinary launches SHALL NOT enable this mechanism through inherited environment alone.
+
+#### Scenario: A request already in flight
+- **WHEN** a pause arrives while a Hub response is unfinished
+- **THEN** no acknowledgment appears until that request drains, then a matching process acknowledgment appears and subsequent timer and read activity makes no new Hub request
+
+#### Scenario: Responsive paused preview
+- **WHEN** an owner reads pages or controller state and attempts an outbound shared-owner command after pause acknowledgment
+- **THEN** local reads answer, the feed does not claim fresh observation without evidence, the outbound command is refused and never replayed, and no new Hub request starts
+
+#### Scenario: Resume a live consumer
+- **WHEN** the pause request is removed without reseeding
+- **THEN** the still-running consumer resumes normal polling without replaying a refused command
+
+#### Scenario: Invalid controls or ordinary startup
+- **WHEN** a control file is malformed, linked, nonprivate or for another run, or pause settings are inherited by an ordinary launch
+- **THEN** the paired process does not acknowledge unsafe controls, and ordinary startup retains its existing behavior without enabling the pause mechanism
+
+### Requirement: Authorized paired reseed release
+
+A seed encountering a pause SHALL refuse to proceed unless it is `hub-paired` and has a matching one-shot release authorization. The seed callback SHALL refuse failed or unrelated seeding without consuming its authorization. After an already stopped run fails reseeding, the existing core may remove its runtime controls during normal failed-run cleanup; it SHALL NOT relaunch that failed run. A successful authorized seed SHALL consume the same pause and release only after the old process has stopped and fresh state has been written, before launching the new process. Successful reseeding SHALL preserve pairing token files and recorded ports. Frozen proof SHALL remain unchanged on success and failure. The new process SHALL accept the reseeded owner's current feed without retaining the prior owner's higher revision.
+
+#### Scenario: Owner resets before consumer
+- **WHEN** the coordinator authorizes the paused consumer's reseed after resetting the Hub owner
+- **THEN** the old consumer stops, fresh paired state is seeded, the matching controls are consumed, and the new consumer reaches current-feed readiness at the owner's new revision on its recorded ports
+
+#### Scenario: Missing, stale or failed release
+- **WHEN** a seed lacks matching release authorization, targets another scenario, sees a newer pause request, or fails before completion
+- **THEN** it does not resume the paused feed or consume a newer request using old authorization; outstanding controls remain until normal cleanup of the stopped failed run, which remains stoppable without changing frozen proof

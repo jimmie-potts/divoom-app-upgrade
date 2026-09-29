@@ -11,6 +11,7 @@ import {nowPlayingRequest,nowPlayingSetting,presentationConfiguration,sharedMoni
 import {readMonitorJson,writeMonitorJson} from './monitor-source.js';
 import type {ControlService} from './control-service.js';
 import {parse} from './validation.js';
+import {verificationFeedPause} from './verification-feed-pause.js';
 const prefix='/api/monitor/v1';
 export async function registerMonitor(app:FastifyInstance,dataDir:string,service:ControlService,cadenceMs=1000):Promise<()=>Promise<void>>{
  const directory=join(dataDir,'agent-monitor');
@@ -29,9 +30,10 @@ export async function registerMonitor(app:FastifyInstance,dataDir:string,service
  const playback=playbackConfig?new PlaybackReader(playbackConfig):undefined;
  const readPlayback=async()=>{if(!playback)return;await playback.refresh();dashboard.submitPlayback(playback.status());};
  const nowPlayingState=():NowPlayingState=>({configured:playback!==undefined,...dashboard.nowPlayingStatus()});
- const source:SessionSource=await createSessionSource(directory,config).catch(async error=>{playback?.close();await dashboard.close();throw error;});
+ const pause=config.mode==='remote'?verificationFeedPause():undefined;
+ const source:SessionSource=await createSessionSource(directory,config,undefined,pause).catch(async error=>{pause?.close();playback?.close();await dashboard.close();throw error;});
  let timer:ReturnType<typeof setInterval>|undefined,renderTimer:ReturnType<typeof setInterval>|undefined,playbackTimer:ReturnType<typeof setInterval>|undefined,events:Events|undefined,presentationEvents:Events|undefined,closed=false;
- const close=async()=>{if(closed)return;closed=true;clearInterval(timer);clearInterval(renderTimer);clearInterval(playbackTimer);playback?.close();await dashboard.close();events?.close();presentationEvents?.close();await source.close();};
+ const close=async()=>{if(closed)return;closed=true;clearInterval(timer);clearInterval(renderTimer);clearInterval(playbackTimer);playback?.close();await dashboard.close();events?.close();presentationEvents?.close();await source.close();pause?.close();};
  try{
   await source.refresh();dashboard.submit(source.view());
   events=new Events(()=>{const view=source.view();return {apiVersion:view.apiVersion,ownerId:view.ownerId,connection:view.connection,admissionRejected:view.admissionRejected+rejectedMonitorRequests(app),revision:view.snapshot?.revision??null,lossCount:view.snapshot?.lossCount??null,collector:view.snapshot?.collector??null,uncertain:view.snapshot?.sessions.filter(session=>session.freshness==='uncertain').length??null};});

@@ -1,5 +1,7 @@
 // Readiness and simulated-boundary checks for a Pixoo verification run.
 import {readFile} from 'node:fs/promises';
+import {basename} from 'node:path';
+import {readFeedPauseControl} from '../../apps/server/src/verification-feed-pause.ts';
 import {HUB_OWNER_ID,HUB_PAIRED,hubFeed,pixooFeed,readHubFeed,type HubRead} from './pairing.ts';
 import {transportLog} from './run-environment.ts';
 
@@ -162,12 +164,25 @@ async function uptimeMs(url:string,signal?:AbortSignal):Promise<number> {
  */
 export async function checkHubFeed(input:ProbeInput,graceMs=PAIRING_GRACE_MS):Promise<CheckOutcome> {
  if(input.scenario!==HUB_PAIRED)return {outcome:'skipped',reason:`the run is not paired with a Hub (scenario ${input.scenario??'unknown'})`};
+ const pauseState=():CheckOutcome|undefined=>{
+  const state=readFeedPauseControl(input.runtimeDir,'request');
+  if(state.kind==='invalid'||(state.kind==='valid'&&state.value.runId!==basename(input.runtimeDir)))
+   return {outcome:'failed',reason:'feed-pause.request is invalid for this run'};
+  const release=readFeedPauseControl(input.runtimeDir,'release');
+  if(release.kind==='invalid'||(release.kind==='valid'&&(state.kind!=='valid'||release.value.runId!==state.value.runId||release.value.nonce!==state.value.nonce)))
+   return {outcome:'failed',reason:'feed-pause.release is invalid for this run'};
+  if(state.kind==='absent')return undefined;
+  return {outcome:'skipped',reason:'the Hub feed is paused for aggregate reset'};
+ };
+ const initial=pauseState();if(initial)return initial;
  let problem='';
  try{
   const hub=hubFeed(input.inputs);
   for(let attempt=0;attempt<5;attempt++){
    if(attempt)await pause(250);
+   const pending=pauseState();if(pending)return pending;
    const pixoo=await pixooFeed(input.url,input.signal);
+   const beforeHub=pauseState();if(beforeHub)return beforeHub;
    const read=await readHubFeed(input.runtimeDir,hub,input.signal);
    if(pixoo.connection==='unavailable'){
     if(read.kind==='refused'||read.kind==='unreachable'){

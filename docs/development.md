@@ -364,6 +364,18 @@ the Hub, moments and interludes
 ([#92](https://github.com/jimmie-potts/divoom-app-upgrade/issues/92)), and
 restarting one consumer while paired are not covered.
 
+### Aggregate reset pause
+
+An explicitly launched disposable `hub-paired` simulator can pause requests to its Hub owner while the owner resets. The verification preload supplies this control to the remote session source; ordinary startup ignores inherited pause variables. The existing private runtime directory holds `feed-pause.request` and `feed-pause.release`, each containing exactly `{version:1,runId,nonce}`. The nonce is 32 lowercase hexadecimal characters. Controls must be owned, private regular files of at most 4 KiB, with no links.
+
+The source stops admitting both feed reads and forwarded commands, then waits for active response bodies to drain before atomically writing mode-0600 `feed-pause.ack` with the request fields and its positive integer `pid`. Timer, browser and command requests use that same admission check. Pages, health and inbound controller work remain available. The pause gates outbound Pixoo-to-Hub requests. Retained monitor state becomes stale when refresh is paused. Invalid requests block admission and withdraw an existing acknowledgment. Removing the request resumes the same process without replaying commands; a release file alone does not resume it.
+
+After the Hub owner is ready, the coordinator writes a matching release and reseeds `hub-paired`. The core stops the old process before seed. Seed refuses an outstanding pause without matching authorization, or a change to another scenario. After fresh state succeeds, seed atomically claims and validates the matching controls, then deletes only the claimed files. A concurrent newer request stays in place; a changed claim is restored without overwriting another control. The replacement can accept the owner's lower new revision. Successful reseeding preserves token files and recorded ports. Seed refuses missing or changed authorization without resuming polling. The core cleans the runtime of an already stopped failed run, including retained private claims; the run remains stoppable and frozen proof stays unchanged.
+
+The `hub-feed` diagnostic skips a valid pause and fails an invalid request or release before probing the Hub. A release must match the current request. Avoid concurrent individual `doctor`, capture or scenario commands during aggregate pause: the coordinator serializes aggregate mutations, and an already active independent diagnostic is outside the serving process's drain acknowledgment. Require a passed current-feed check after release. The paired seed does not configure playback polling. Installed Pixoo and physical devices are outside this protocol.
+
+`npm run check` covers held reads, malformed controls, release refusal, lower revision recovery and ordinary-launch isolation with plain child processes. On the Linux owner host, run `APP_VERIFY_REQUIRE_SYSTEMD=1 fnm exec --using=.nvmrc -- npx vitest run tests/integration/verify-host-lifecycle.test.ts`. This opt-in test uses unique app, state and proof roots, captures real browser proof, checks the old unit is stopped inside the seed callback, and verifies unchanged frozen bytes after reset and failed release. It stops its run and removes its private test roots. Normal CI skips this host test; a skipped result is not systemd qualification.
+
 ## Shared lifecycle contract conformance
 
 `npm test` and `npm run check` run the released lifecycle package consumer test
