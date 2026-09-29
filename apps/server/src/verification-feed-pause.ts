@@ -52,14 +52,14 @@ export function verificationFeedPause():FeedPauseGate|undefined {
   return state.kind==='valid'&&state.value.runId!==runId?{kind:'invalid'} as const:state;
  };
  const acknowledge=()=>{
-  if(closed||active)return;
+  if(closed)return;
   const state=request();
-  if(state.kind==='absent'){
+  if(state.kind!=='valid'){
    lastNonce=undefined;
-   try{unlinkSync(join(directory,'feed-pause.ack'));}catch{/* No request admits normal traffic. */}
+   try{unlinkSync(join(directory,'feed-pause.ack'));}catch{/* Invalid requests stay blocked without a success acknowledgment. */}
    return;
   }
-  if(state.kind!=='valid'||state.value.nonce===lastNonce)return;
+  if(active||state.value.nonce===lastNonce)return;
   const temporary=join(directory,`.feed-pause-${randomUUID()}`);
   try{
    const fd=openSync(temporary,'wx',0o600);

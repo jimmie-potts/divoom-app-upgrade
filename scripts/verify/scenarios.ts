@@ -3,7 +3,7 @@
 // compare what the page shows against an oracle that does not come from the
 // server under test. Nothing reads the owner's media or data.
 import {mkdir,writeFile} from 'node:fs/promises';
-import {unlinkSync} from 'node:fs';
+import {linkSync,mkdtempSync,renameSync,rmdirSync,unlinkSync} from 'node:fs';
 import {readFeedPauseControl,validateFeedPauseContext,type FeedPauseControl} from '../../apps/server/src/verification-feed-pause.ts';
 import {join} from 'node:path';
 import sharp from 'sharp';
@@ -104,16 +104,38 @@ export async function seedScenario({runId,dataDir,scenario,runtimeDir,inputs}:Se
  // The Hub presents its controller token to the controller API; the backend's store keeps only its digest.
  if(paired)await registerCredential(data,HUB_CONTROLLER_PRINCIPAL,paired.controllerToken,['read','control']);
  if(released&&runtimeDir){
-  const current=readFeedPauseControl(runtimeDir,'request'),authorization=readFeedPauseControl(runtimeDir,'release');
-  if(current.kind!=='valid'||authorization.kind!=='valid'||current.value.runId!==released.runId||
-   current.value.nonce!==released.nonce||authorization.value.runId!==released.runId||authorization.value.nonce!==released.nonce)
-   throw new Error('feed pause changed during seed; controls were retained');
-  // Core stopped the old unit before seed. Keep admission closed until consumption finishes.
-  unlinkSync(join(runtimeDir,'feed-pause.release'));
-  try{unlinkSync(join(runtimeDir,'feed-pause.ack'));}
-  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
-  unlinkSync(join(runtimeDir,'feed-pause.request'));
+  consumeRelease(runtimeDir,released);
  }
+}
+
+/** Core stopped the old unit and seed wrote fresh state. Delete only atomically claimed controls. */
+function consumeRelease(runtimeDir:string,expected:FeedPauseControl):void {
+ const claimed=mkdtempSync(join(runtimeDir,'.feed-pause-consume-')),paths=new Map<string,string>();
+ const changed=()=>new Error('feed pause changed during seed; the run must remain stopped');
+ try{
+  for(const kind of ['request','release','ack'] as const){
+   const path=join(claimed,`feed-pause.${kind}`);
+   try{renameSync(join(runtimeDir,`feed-pause.${kind}`),path);}
+   catch(error){if(kind==='ack'&&(error as NodeJS.ErrnoException).code==='ENOENT')continue;throw error;}
+   paths.set(kind,path);
+   if(kind!=='ack'){
+    const value=readFeedPauseControl(claimed,kind);
+    if(value.kind!=='valid'||value.value.runId!==expected.runId||value.value.nonce!==expected.nonce)throw changed();
+   }
+  }
+  const assertNoReplacement=()=>{
+   if(readFeedPauseControl(runtimeDir,'request').kind!=='absent'||readFeedPauseControl(runtimeDir,'release').kind!=='absent')throw changed();
+  };
+  assertNoReplacement();
+  for(const path of paths.values())unlinkSync(path);
+  assertNoReplacement();
+ }catch{
+  // Restore without replacing a newer public file. Occupied paths retain private claims until failed-run cleanup.
+  for(const [kind,path] of paths){
+   try{linkSync(path,join(runtimeDir,`feed-pause.${kind}`));unlinkSync(path);}catch{/* No overwrite, including after a partial cleanup. */}
+  }
+  throw changed();
+ }finally{try{rmdirSync(claimed);}catch{/* Failed-run cleanup owns any retained claims. */}}
 }
 
 /** The Hub run from the `hub-feed` input and the two tokens the orchestrator wrote into the run directory. */

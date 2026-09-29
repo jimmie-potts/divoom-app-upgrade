@@ -166,10 +166,13 @@ export async function checkHubFeed(input:ProbeInput,graceMs=PAIRING_GRACE_MS):Pr
  if(input.scenario!==HUB_PAIRED)return {outcome:'skipped',reason:`the run is not paired with a Hub (scenario ${input.scenario??'unknown'})`};
  const pauseState=():CheckOutcome|undefined=>{
   const state=readFeedPauseControl(input.runtimeDir,'request');
+  if(state.kind==='invalid'||(state.kind==='valid'&&state.value.runId!==basename(input.runtimeDir)))
+   return {outcome:'failed',reason:'feed-pause.request is invalid for this run'};
+  const release=readFeedPauseControl(input.runtimeDir,'release');
+  if(release.kind==='invalid'||(release.kind==='valid'&&(state.kind!=='valid'||release.value.runId!==state.value.runId||release.value.nonce!==state.value.nonce)))
+   return {outcome:'failed',reason:'feed-pause.release is invalid for this run'};
   if(state.kind==='absent')return undefined;
-  return state.kind==='invalid'||state.value.runId!==basename(input.runtimeDir)
-   ?{outcome:'failed',reason:'feed-pause.request is invalid for this run'}
-   :{outcome:'skipped',reason:'the Hub feed is paused for aggregate reset'};
+  return {outcome:'skipped',reason:'the Hub feed is paused for aggregate reset'};
  };
  const initial=pauseState();if(initial)return initial;
  let problem='';

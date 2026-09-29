@@ -1,13 +1,14 @@
 import {afterEach,expect,it} from 'vitest';
 import {createHash} from 'node:crypto';
-import {chmod,mkdir,readFile,readdir,rm,stat,symlink,writeFile} from 'node:fs/promises';
+import {chmod,mkdir,readFile,readdir,rename,rm,stat,symlink,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {HUB_PAIRED,pairingTokens} from '../../scripts/verify/pairing.ts';
 import {checkHubFeed,checkNoPhysicalTransport,readTransportLog,type ProbeInput} from '../../scripts/verify/readiness.ts';
 import {launchSpec,transportLog} from '../../scripts/verify/run-environment.ts';
 import {PLAYLIST,seedScenario} from '../../scripts/verify/scenarios.ts';
-import {HUB_SESSION,pairingToken,standInHub,writePairingTokens,type StandInHub} from '../helpers/stand-in-hub.js';
+import {HUB_SESSION,HUB_SOURCE,pairingToken,standInHub,writePairingTokens,type StandInHub} from '../helpers/stand-in-hub.js';
 import {launch,listenLoopback,makeRun,type LaunchedRun} from '../helpers/verify-run.js';
+import {createSessionSource} from '../../apps/server/src/monitor-source.js';
 
 // The hub-paired scenario against a stand-in for the paired Hub run: the real
 // agent-state owner behind the Hub's session feed, and this test as the Hub's
@@ -129,6 +130,10 @@ it('does not probe the Hub while paused and reports malformed controls as failed
  await privateControl(run.runtimeDir,'request',pauseControl(run.runId));
  expect(await checkHubFeed(input)).toEqual({outcome:'skipped',reason:'the Hub feed is paused for aggregate reset'});
  expect(hub.reads.accepted+hub.reads.rejected+hub.reads.dropped).toBe(0);
+ const release=controlFile(run.runtimeDir,'release');
+ await writeFile(release,'{',{mode:0o600});
+ expect(await checkHubFeed(input)).toEqual({outcome:'failed',reason:'feed-pause.release is invalid for this run'});
+ await rm(release);
  await writeFile(controlFile(run.runtimeDir,'request'),'bad json',{mode:0o600});
  expect(await checkHubFeed(input)).toEqual({outcome:'failed',reason:'feed-pause.request is invalid for this run'});
  expect(hub.reads.accepted+hub.reads.rejected+hub.reads.dropped).toBe(0);
@@ -163,6 +168,13 @@ it('drains a held Hub feed before acknowledging and keeps local routes responsiv
  expect(ack).toEqual({...request,pid:server.child.pid});
  expect((await stat(ackPath)).mode&0o777).toBe(0o600);
  const accepted=hub.reads.accepted;
+ const actions=()=>hub.paths.filter(path=>path==='POST /api/monitor/v1/commands').length;
+ const command={operation:'label',requestId:'hub-request-1',identity:{...HUB_SOURCE,sessionId:HUB_SESSION.sessionId},label:'Paused command'};
+ const action=()=>fetch(new URL('/api/integration/v1/shared-actions',server.url),{method:'POST',
+  headers:{'content-type':'application/json','x-pixoo-request':'1'},body:JSON.stringify(command)});
+ const refused=await action();
+ expect(refused.status).toBe(503);
+ expect(actions()).toBe(0);
  for(let i=0;i<3;i++){
   expect((await fetch(new URL('/',server.url))).status).toBe(200);
   expect((await controller(server,'/controller/v1/snapshot',run.tokens.controller)).status).toBe(200);
@@ -172,7 +184,30 @@ it('drains a held Hub feed before acknowledging and keeps local routes responsiv
  expect(hub.reads.accepted).toBe(accepted);
  await rm(requestPath);
  expect(await eventually(()=>Promise.resolve(hub.reads.accepted),count=>count>accepted)).toBeGreaterThan(accepted);
+ await pause(150);
+ expect(actions(),'the refused action is not replayed after resume').toBe(0);
+ // Explicitly retrying can reach the stand-in, which has no commands route: proves a valid forwarding path.
+ expect((await action()).status).toBe(503);
+ expect(actions()).toBe(1);
 },SPAWNS);
+
+it('a paused remote source refuses a command even while its cached feed is current and never replays it',async()=>{
+ const run=await pairedRun(),hub=await standInHub(run.tokens.feed);cleanup.push(()=>hub.close());
+ await hub.event('session.started');hub.setFeed('accept');
+ let paused=false;
+ const source=await createSessionSource(run.dataDir,{version:1,mode:'remote',ownerId:'verify-owner',endpoint:hub.origin+'api/monitor/v1',token:run.tokens.feed},
+  undefined,{enter:()=>paused?undefined:()=>{},close(){}});cleanup.push(()=>source.close());
+ await source.refresh();expect(source.view().connection).toBe('current');
+ const command={operation:'label' as const,requestId:source.view().nextRequestId!,identity:{...HUB_SOURCE,sessionId:HUB_SESSION.sessionId},label:'Paused command'};
+ const actions=()=>hub.paths.filter(path=>path==='POST /api/monitor/v1/commands').length;
+ paused=true;
+ await expect(source.command(command)).rejects.toMatchObject({code:'monitor-unavailable',status:503});
+ expect(actions()).toBe(0);
+ paused=false;await source.refresh();expect(actions()).toBe(0);
+ // An explicit retry reaches the stand-in's missing command route, proving the forwarding path.
+ await expect(source.command(command)).rejects.toMatchObject({status:503});
+ expect(actions()).toBe(1);
+});
 
 it('invalid live controls block admission, release alone stays paused and a new nonce is acknowledged',async()=>{
  const run=await pairedRun(),hub=await standInHub(run.tokens.feed);cleanup.push(()=>hub.close());
@@ -185,17 +220,20 @@ it('invalid live controls block admission, release alone stays paused and a new 
  expect((await eventually(ack,value=>value.nonce===request.nonce)).pid).toBe(server.child.pid);
  const calls=hub.reads.accepted;
  for(const kind of ['malformed','oversized','nonprivate','linked','wrong-run']){
-  await rm(path);await rm(ackPath,{force:true});
-  if(kind==='linked')await symlink(controlFile(run.runtimeDir,'release'),path);
-  else if(kind==='malformed')await writeFile(path,'{',{mode:0o600});
-  else if(kind==='oversized')await writeFile(path,JSON.stringify(request)+' '.repeat(4096),{mode:0o600});
-  else await privateControl(run.runtimeDir,'request',kind==='wrong-run'?pauseControl('another-run'):request);
-  if(kind==='nonprivate')await chmod(path,0o640);
+  const replacement=join(run.runtimeDir,'feed-pause.replacement');
+  if(kind==='linked')await symlink(controlFile(run.runtimeDir,'release'),replacement);
+  else if(kind==='malformed')await writeFile(replacement,'{',{mode:0o600});
+  else if(kind==='oversized')await writeFile(replacement,JSON.stringify(request)+' '.repeat(4096),{mode:0o600});
+  else await writeFile(replacement,JSON.stringify(kind==='wrong-run'?pauseControl('another-run'):request),{mode:0o600});
+  if(kind==='nonprivate')await chmod(replacement,0o640);
+  await rename(replacement,path);
   expect((await fetch(server.url)).status).toBe(200);
   expect((await pixooView(server)).connection).toBe('stale');
   await pause(50);
   expect(hub.reads.accepted).toBe(calls);
   await expect(stat(ackPath)).rejects.toMatchObject({code:'ENOENT'});
+  await writeFile(replacement,JSON.stringify(request),{mode:0o600});await rename(replacement,path);
+  expect((await eventually(ack,value=>value.nonce===request.nonce)).pid).toBe(server.child.pid);
  }
  await rm(path);const next=pauseControl(run.runId,'b'.repeat(32));
  await privateControl(run.runtimeDir,'request',next);await privateControl(run.runtimeDir,'release',next);
