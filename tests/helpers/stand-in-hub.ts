@@ -26,6 +26,14 @@ export async function standInHub(feedToken:string){
  /** Another owner in the envelope, a `nextRequestId` Pixoo refuses, an error status, or a new revision on every read. */
  let fault:{owner?:string;malformed?:boolean;status?:number;advance?:boolean}={};
  const reads={accepted:0,rejected:0,dropped:0},paths:string[]=[];
+ let held:undefined|{enter:()=>void;wait:Promise<void>};
+ function holdNextRead(){
+  let enter!:()=>void,release!:()=>void;
+  const entered=new Promise<void>(resolve=>{enter=resolve;});
+  const wait=new Promise<void>(resolve=>{release=resolve;});
+  held={enter,wait};
+  return {entered,release};
+ }
  /** One synthetic lifecycle event from the orchestrator's source; each gets its own turn unless `extra` names one. */
  async function event(kind:'session.started'|'turn.ended',extra:Record<string,unknown>={}){
   const outcome=await owner.ingest({apiVersion:'1.1',title:{value:HUB_SESSION.title,source:'provider'},project:HUB_SESSION.project,projectId:HUB_SESSION.projectId,
@@ -41,6 +49,7 @@ export async function standInHub(feedToken:string){
   if(request.method!=='GET'||url.pathname!=='/api/monitor/v1/sessions')return send(404,{error:{code:'not-found'}});
   if(feed==='reject'||request.headers.authorization!==`Bearer ${feedToken}`){reads.rejected++;return send(401,{error:{code:'unauthorized'}});}
   reads.accepted++;
+  if(held){const current=held;held=undefined;current.enter();await current.wait;}
   if(fault.status)return send(fault.status,{error:{code:'internal-error'}});
   if(fault.advance)await event('turn.ended');
   const version=url.searchParams.get('snapshotVersion')??'1.0';
@@ -49,7 +58,7 @@ export async function standInHub(feedToken:string){
  });
  const port=await listenLoopback(server);
  return {
-  origin:`http://127.0.0.1:${port}/`,port,reads,paths,event,
+  origin:`http://127.0.0.1:${port}/`,port,reads,paths,event,holdNextRead,
   setFeed(value:typeof feed){feed=value;},
   serve(value:typeof fault){fault=value;},
   revision:()=>owner.snapshot('1.2').revision,

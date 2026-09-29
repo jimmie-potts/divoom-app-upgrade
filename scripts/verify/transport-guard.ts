@@ -20,7 +20,8 @@ import http from 'node:http';
 import https from 'node:https';
 import {syncBuiltinESMExports} from 'node:module';
 import net from 'node:net';
-import {basename} from 'node:path';
+import {basename,dirname} from 'node:path';
+import {validateFeedPauseContext} from '../../apps/server/src/verification-feed-pause.ts';
 import workerThreads from 'node:worker_threads';
 import {installedPorts} from './installed-ports.ts';
 
@@ -42,6 +43,14 @@ function pairedPorts():ReadonlySet<number> {
  return new Set(ports.map(Number));
 }
 const paired=pairedPorts();
+const pauseDirectory=process.env.APP_VERIFY_FEED_PAUSE_DIR??'',pauseRunId=process.env.APP_VERIFY_FEED_PAUSE_RUN_ID??'';
+if(pauseDirectory||pauseRunId){
+ try{
+  if(paired.size!==1||pauseDirectory!==dirname(path))throw new Error();
+  validateFeedPauseContext(pauseDirectory,pauseRunId,process.env.PIXOO_DATA_DIR??'');
+ }catch{throw new Error('Pixoo transport guard: invalid feed pause run context');}
+ Object.defineProperty(globalThis,Symbol.for('pixoo.verificationFeedPause'),{value:Object.freeze({directory:pauseDirectory,runId:pauseRunId})});
+}
 /** Ports this process listens on; a connection back to one stays inside the run. Never an installed port. */
 const own=new Set<number>();
 
@@ -84,7 +93,7 @@ for(const method of ['bind','connect','send'] as const){
 const guardUrl=import.meta.url;
 /** The run's settings a guarded child needs, including exactly this process's pairing; NODE_OPTIONS is emptied so no preload runs before the guard. */
 function guardedEnv(env:NodeJS.ProcessEnv|undefined):NodeJS.ProcessEnv {
- return {...(env??process.env),NODE_OPTIONS:'',PIXOO_MODE:'simulator',APP_VERIFY_TRANSPORT_LOG:path,APP_VERIFY_PAIRED_PORTS:[...paired].join(',')};
+ return {...(env??process.env),NODE_OPTIONS:'',PIXOO_MODE:'simulator',APP_VERIFY_TRANSPORT_LOG:path,APP_VERIFY_PAIRED_PORTS:[...paired].join(','),APP_VERIFY_FEED_PAUSE_DIR:pauseDirectory,APP_VERIFY_FEED_PAUSE_RUN_ID:pauseRunId};
 }
 const withGuard=(execArgv:readonly string[])=>execArgv.includes(guardUrl)?[...execArgv]:['--import',guardUrl,...execArgv];
 const fork=childProcess.fork;

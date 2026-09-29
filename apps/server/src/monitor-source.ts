@@ -7,6 +7,7 @@ import {createAgentState,validateSnapshot,type Snapshot,type Outcome,type Identi
 import {MonitorStorage} from './monitor-storage.js';
 import {Commands} from './commands.js';
 import {ApiError} from './security.js';
+import type {FeedPauseGate} from './verification-feed-pause.js';
 const id=z.string().regex(/^[A-Za-z0-9_.-]{1,128}$/);
 const consumers=z.array(z.object({id,clearOnNewTurn:z.boolean()}).strict()).min(1).max(16).refine(value=>new Set(value.map(c=>c.id)).size===value.length);
 const base={version:z.literal(1),ownerId:id};
@@ -54,8 +55,8 @@ export interface SessionSource {
  command(command:MonitorCommand):Promise<Outcome|DurableState>;
  close():Promise<void>;
 }
-export async function createSessionSource(directory:string,config:MonitorConfig,clock?:()=>number):Promise<SessionSource>{
- if(config.mode==='remote')return remoteSource(config);
+export async function createSessionSource(directory:string,config:MonitorConfig,clock?:()=>number,pause?:FeedPauseGate):Promise<SessionSource>{
+ if(config.mode==='remote')return remoteSource(config,pause);
  try{await access(join(directory,'quiesced.json'));throw new Error('monitor-owner-quiesced');}
  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  let imported:unknown;
@@ -75,12 +76,14 @@ export async function createSessionSource(directory:string,config:MonitorConfig,
   close:()=>owner.shutdown()
  };
 }
-function remoteSource(config:Extract<MonitorConfig,{mode:'remote'}>):SessionSource {
+function remoteSource(config:Extract<MonitorConfig,{mode:'remote'}>,pause?:FeedPauseGate):SessionSource {
  let current:MonitorView={apiVersion:'1.0',ownerId:config.ownerId,connection:'unavailable',admissionRejected:0,snapshot:null,nextRequestId:null};
  let refreshing:Promise<void>|undefined,closed=false;
  const controllers=new Set<AbortController>();
  async function request(path:string,body?:unknown):Promise<unknown>{
   if(closed)throw new ApiError('monitor-unavailable',503);
+  const leave=pause?.enter();
+  if(pause&&!leave){current={...current,connection:current.snapshot?'stale':'unavailable',nextRequestId:null};throw new ApiError('monitor-unavailable',503);}
   const controller=new AbortController();controllers.add(controller);const timer=setTimeout(()=>controller.abort(),2500);
   try{
    const response=await fetch(`${config.endpoint}${path}`,{method:body===undefined?'GET':'POST',redirect:'error',signal:controller.signal,
@@ -97,7 +100,7 @@ function remoteSource(config:Extract<MonitorConfig,{mode:'remote'}>):SessionSour
    }
    return value;
   }catch(error){if(error instanceof ApiError&&error.status<500)throw error;current={...current,connection:current.snapshot?'stale':'unavailable',nextRequestId:null};throw new ApiError('monitor-unavailable',503);}
-  finally{clearTimeout(timer);controllers.delete(controller);}
+  finally{clearTimeout(timer);controllers.delete(controller);leave?.();}
  }
  return {
   view:(version='1.2')=>{
