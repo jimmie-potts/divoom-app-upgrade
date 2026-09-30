@@ -86,10 +86,10 @@ for(const method of ['bind','connect','send'] as const){
  Object.defineProperty(dgram.Socket.prototype,method,{configurable:true,writable:true,value(){record({event:'blocked',api:`dgram.${method}`});throw refusal();}});
 }
 
-// Child processes and threads. A fork of Node or a file-based worker thread
-// runs under this guard with the run's settings; every other way the public API
-// offers to start a process or replace this one is refused, including a fork of
-// another program and an eval worker.
+// Child processes and threads. A fork of Node and a worker thread from a file or
+// data: URL run under this guard with the run's settings; every other way the
+// public API offers to start a process or replace this one is refused, including
+// a fork of another program and an eval worker.
 const guardUrl=import.meta.url;
 /** The run's settings a guarded child needs, including exactly this process's pairing; NODE_OPTIONS is emptied so no preload runs before the guard. */
 function guardedEnv(env:NodeJS.ProcessEnv|undefined):NodeJS.ProcessEnv {

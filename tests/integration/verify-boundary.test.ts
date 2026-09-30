@@ -354,7 +354,7 @@ it('runs worker threads under the guard even when execArgv or env is replaced',a
  expect(result).toEqual(['refused','refused','refused']);
  expect(listener.received()).toBe(0);
  const record=await readTransportLog(transportLog(runtimeDir));
- expect(record.workers).toHaveLength(3);
+ expect(record.workers).toEqual(Array.from({length:3},()=>expect.objectContaining({module:'worker.mjs'})));
  expect(record.blocked).toEqual(Array.from({length:3},()=>expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port})));
 },SPAWNS);
 
