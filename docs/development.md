@@ -189,9 +189,13 @@ Each run:
   other process start (`spawn`, `exec`, `execFile` and their Sync forms,
   `ChildProcess#spawn` and `process.execve`). Installed services such as the
   Hub on 8788 are refused like a device. A fork of Node, such as the media
-  worker, and every file-based worker thread run under the same guard, even
-  when their caller replaces `execArgv` or `env`; a fork of another program
-  and an eval worker are refused. The guard observes and refuses public API
+  worker, and every worker thread from a file or `data:` URL run under the same
+  guard, even when their caller replaces `execArgv` or `env`; a fork of another
+  program and an eval worker are refused. A fork's program is read as Node
+  reads it (an empty `execPath` means `process.execPath`) and must resolve to
+  the Node binary that loaded the guard, so overwriting `process.execPath`
+  cannot start another program. The log names a `data:` worker only as
+  `<data-url>`, never by its source. The guard observes and refuses public API
   use by the app and its dependencies. It is not a sandbox against
   deliberately hostile code already running in the server process, such as
   values with a side-effecting `toString`, internal bindings

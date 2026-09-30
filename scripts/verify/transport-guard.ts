@@ -86,10 +86,10 @@ for(const method of ['bind','connect','send'] as const){
  Object.defineProperty(dgram.Socket.prototype,method,{configurable:true,writable:true,value(){record({event:'blocked',api:`dgram.${method}`});throw refusal();}});
 }
 
-// Child processes and threads. A fork of Node or a file-based worker thread
-// runs under this guard with the run's settings; every other way the public API
-// offers to start a process or replace this one is refused, including a fork of
-// another program and an eval worker.
+// Child processes and threads. A fork of Node and a worker thread from a file or
+// data: URL run under this guard with the run's settings; every other way the
+// public API offers to start a process or replace this one is refused, including
+// a fork of another program and an eval worker.
 const guardUrl=import.meta.url;
 /** The run's settings a guarded child needs, including exactly this process's pairing; NODE_OPTIONS is emptied so no preload runs before the guard. */
 function guardedEnv(env:NodeJS.ProcessEnv|undefined):NodeJS.ProcessEnv {
@@ -100,6 +100,8 @@ const fork=childProcess.fork;
 const programOf=(file:unknown)=>basename(String(file).trim().split(/\s+/)[0]??'');
 /** The resolved path of a program, or the path itself when it cannot be resolved. */
 function realPath(path:string):string {try{return realpathSync(path);}catch{return path;}}
+/** The Node binary that loaded the guard; later code can overwrite process.execPath. */
+const node=realPath(process.execPath);
 /** Set only while guardedFork calls Node's fork, which spawns through ChildProcess#spawn. */
 let forking=false;
 function guardedFork(this:unknown,modulePath:string|URL,...rest:unknown[]){
@@ -108,11 +110,11 @@ function guardedFork(this:unknown,modulePath:string|URL,...rest:unknown[]){
  if(rest[0]==null)options=rest[1] as childProcess.ForkOptions|undefined;
  else if(typeof rest[0]==='object'&&!Array.isArray(rest[0]))options=rest[0] as childProcess.ForkOptions;
  else{args=rest[0] as string[];options=rest[1] as childProcess.ForkOptions|undefined;}
- // A fork runs Node with the guard; another program given as execPath would run unguarded.
- if(options?.execPath!==undefined&&realPath(String(options.execPath))!==realPath(process.execPath)){
-  record({event:'blocked',api:'child_process.fork',program:programOf(options.execPath)});throw refusal();
- }
- const guarded:childProcess.ForkOptions={...options,execArgv:withGuard(options?.execArgv??process.execArgv),env:guardedEnv(options?.env)};
+ // A fork runs Node with the guard; another program would run unguarded. Node reads a falsy execPath as process.execPath.
+ const execPath=String(options?.execPath||process.execPath);
+ if(realPath(execPath)!==node){record({event:'blocked',api:'child_process.fork',program:programOf(execPath)});throw refusal();}
+ // Pass the checked path, so Node never reads process.execPath again.
+ const guarded:childProcess.ForkOptions={...options,execPath,execArgv:withGuard(options?.execArgv??process.execArgv),env:guardedEnv(options?.env)};
  record({event:'fork',module:basename(String(modulePath))});
  forking=true;
  try{return fork.call(this,modulePath,args,guarded);}finally{forking=false;}
@@ -133,6 +135,11 @@ if(typeof process.execve==='function')Object.defineProperty(process,'execve',{co
  record({event:'blocked',api:'process.execve',program:programOf(file)});throw refusal();
 }});
 const Worker=workerThreads.Worker;
+/** A file worker's base name. A data: URL holds the worker's source, so any URL but file: is recorded by scheme only. */
+function workerModule(filename:string|URL):string {
+ const href=String(filename),scheme=/^([a-z][a-z\d+.-]*):/i.exec(href)?.[1]?.toLowerCase();
+ return !scheme||scheme==='file'?basename(href):`<${scheme}-url>`;
+}
 /** A worker thread always preloads the guard, even when its caller replaces execArgv or env. */
 class GuardedWorker extends Worker {
  constructor(filename:string|URL,options:import('node:worker_threads').WorkerOptions={}){
@@ -140,7 +147,7 @@ class GuardedWorker extends Worker {
   if(options.eval){record({event:'blocked',api:'Worker(eval)',module:'<eval>'});throw refusal();}
   super(filename,{...options,execArgv:withGuard(options.execArgv??process.execArgv),
    ...(options.env&&typeof options.env==='object'?{env:guardedEnv(options.env as NodeJS.ProcessEnv)}:{})});
-  record({event:'worker',module:basename(String(filename))});
+  record({event:'worker',module:workerModule(filename)});
  }
 }
 Object.assign(workerThreads,{Worker:GuardedWorker});
