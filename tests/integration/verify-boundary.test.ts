@@ -387,6 +387,45 @@ it('refuses eval workers without logging their source, and forks of any program 
  expect(await readFile(transportLog(runtimeDir),'utf8')).not.toContain('EVAL-SOURCE-CANARY');
 },SPAWNS);
 
+it('forks only the Node that loaded the guard, reads an empty execPath as Node does and never logs a data: worker source',async()=>{
+ const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp'),marker=join(runtimeDir,'other-program-ran');
+ const otherProgram=join(runtimeDir,'fake-node.sh');
+ await writeFile(otherProgram,`#!/bin/sh\ntouch ${JSON.stringify(marker)}\n`,{mode:0o755});
+ const child=join(runtimeDir,'child.mjs');
+ await writeFile(child,`import net from 'node:net';const s=net.connect({port:${listener.port},host:'127.0.0.1'});s.once('connect',()=>{s.destroy();process.send('connected');});s.once('error',()=>process.send('refused'));`);
+ const workerSource=`/* DATA-SOURCE-CANARY */ import net from 'node:net';import {parentPort} from 'node:worker_threads';
+  const s=net.connect({port:${listener.port},host:'127.0.0.1'});s.once('connect',()=>{s.destroy();parentPort.postMessage('connected');});s.once('error',()=>parentPort.postMessage('refused'));`;
+ const result=await guarded(runtimeDir,`
+  import {Worker} from 'node:worker_threads';import {fork} from 'node:child_process';
+  const forked=options=>new Promise(resolve=>{const c=fork(${JSON.stringify(child)},[],options);c.once('message',resolve);c.once('exit',code=>resolve('exited '+code));});
+  const outcomes={};
+  // Node reads a falsy execPath as process.execPath: both are guarded forks of Node.
+  outcomes.emptyExecPath=await forked({execPath:''});
+  outcomes.nullExecPath=await forked({execPath:null});
+  outcomes.dataWorker=await new Promise(resolve=>{const w=new Worker(new URL('data:text/javascript,'+encodeURIComponent(${JSON.stringify(workerSource)})));w.once('message',value=>{resolve(value);w.terminate();});w.once('error',error=>resolve('error '+error.message));});
+  // Code that overwrites process.execPath cannot make a fork start another program.
+  const node=process.execPath;process.execPath=${JSON.stringify(otherProgram)};
+  try{fork(${JSON.stringify(child)},[],{stdio:'ignore'});outcomes.overwrittenExecPath='started';}catch{outcomes.overwrittenExecPath='refused';}
+  try{fork(${JSON.stringify(child)},[],{execPath:'',stdio:'ignore'});outcomes.overwrittenEmptyExecPath='started';}catch{outcomes.overwrittenEmptyExecPath='refused';}
+  process.execPath=node;
+  console.log(JSON.stringify(outcomes));`);
+ expect(result).toEqual({emptyExecPath:'refused',nullExecPath:'refused',dataWorker:'refused',overwrittenExecPath:'refused',overwrittenEmptyExecPath:'refused'});
+ await new Promise(resolve=>setTimeout(resolve,300));
+ expect(listener.received(),'nothing reached the test-owned listener').toBe(0);
+ await expect(readFile(marker),'the other program ran').rejects.toMatchObject({code:'ENOENT'});
+ const record=await readTransportLog(transportLog(runtimeDir));
+ const parent=record.forks[0]?.pid;
+ expect(record.forks).toEqual([expect.objectContaining({module:'child.mjs'}),expect.objectContaining({module:'child.mjs'})]);
+ expect(record.workers).toEqual([expect.objectContaining({module:'<data-url>'})]);
+ expect(record.blocked).toEqual([
+  ...Array.from({length:3},()=>expect.objectContaining({api:'net.connect',host:'127.0.0.1',port:listener.port})),
+  ...Array.from({length:2},()=>expect.objectContaining({api:'child_process.fork',program:'fake-node.sh'})),
+ ]);
+ // The children connected from their own guarded processes; the data: worker from its guarded thread.
+ expect(record.blocked.slice(0,2).map(entry=>entry.pid)).not.toContain(parent);
+ expect(await readFile(transportLog(runtimeDir),'utf8')).not.toContain('DATA-SOURCE-CANARY');
+},SPAWNS);
+
 it('refuses ChildProcess#spawn and process.execve and records each',async()=>{
  const runtimeDir=await temporary('verify-guard-'),listener=await owned('tcp');
  const child=join(runtimeDir,'connect.mjs');
