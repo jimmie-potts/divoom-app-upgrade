@@ -65,6 +65,6 @@ test('settings distinguish playback qualification from GIF imports',async({page}
  await page.route('**/api/device',async route=>{const response=await route.fetch();const value=await response.json();await route.fulfill({json:{...value,mode:'device',activeConfiguration:null,activeProfile:value.profiles.find((profile:{name:string})=>profile.name==='pixoo64-smoke-2026-09-06')}});});
  await page.goto('/');await page.getByRole('button',{name:'Settings',exact:true}).click();
  await expect(page.getByText('Active playback profile:',{exact:false})).toBeVisible();
- await expect(page.getByText('Physical playback limits:',{exact:false})).toContainText('Larger GIFs can still be imported and previewed');
+ await expect(page.getByText('Physical playback limits:',{exact:false})).toContainText('GIFs with more frames or mixed delays can still be imported and previewed');
  await page.screenshot({path:info.outputPath('gif-settings.png'),fullPage:true});
 });
