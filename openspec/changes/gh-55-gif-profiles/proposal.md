@@ -6,7 +6,7 @@
 
 - Admit complete library imports under existing application resource budgets in either runtime mode.
 - Show playback compatibility alongside effective previews and retain physical admission checks.
-- Add a fixed, bounded, offline-default qualification tool for frame count and timing. Retain the historical device profile pending physical evidence.
+- Add a fixed, bounded, offline-default qualification tool for frame count and timing. Retain the historical device profile and add a separately selected GIF profile from the completed physical observations.
 
 ## Capabilities
 
@@ -17,8 +17,10 @@
 ### Modified Capabilities
 
 - `media-rendering`: separate library rendering from active playback limits.
-- `controller-ui`: display playback compatibility without limiting previews.
+- `controller-ui`: display playback compatibility without limiting previews, simplify optional device notes, and show the active profile limits.
+- `application-foundation`: accept either dated observed profile at explicit device startup.
+- `local-operations`: document selection and physical acceptance for the selected profile.
 
 ## Impact
 
-Server catalog composition, browser media library, device qualification tooling and tests. No dependency, database migration, default hardware activation or production playback-profile change. Issue criteria AC1–AC2 and AC6 cover source work; AC3–AC5 require physical evidence and acceptance.
+Server catalog composition, browser media library, device qualification tooling and tests. No dependency, database migration or default hardware activation change. Add an explicit 20-frame, variable 100–800 ms production playback profile; preserve the historical profile and require normal-player acceptance. Issue criteria AC1–AC2 and AC6 cover source work; AC3–AC5 require physical evidence and acceptance.
