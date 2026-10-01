@@ -4,12 +4,12 @@ import {randomUUID} from 'node:crypto';
 import type {FastifyInstance} from 'fastify';
 import type {FakeDeviceAdapter,OperationResult} from '@pixoo/device';
 import type {Player} from '@pixoo/playback';
-import {SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE} from '@pixoo/media';
+import {SIMULATOR_PROFILE,DEVICE_PROFILES} from '@pixoo/media';
 import {deviceConfiguration,emptyRequest} from '@pixoo/core';
 import {parse} from './validation.js';
 import {ControlService,requireDisplaySuccess} from './control-service.js';
 import {ApiError} from './security.js';
-import type {RuntimeSelection} from './device-settings.js';
+import {playbackProfile,type RuntimeSelection} from './device-settings.js';
 function result<T>(value:OperationResult<T>|undefined):T {
  if(!value)throw new ApiError('cancelled',409);
  if(!value.ok)throw new ApiError(value.code,value.code==='invalid-input'?400:503,{priorEffects:value.priorEffects});return value.value;
@@ -20,7 +20,7 @@ export async function deviceRoutes(app:FastifyInstance,directory:string,player:P
  const status=()=>{const availability=player.getState().availability;return {configuration,activeConfiguration:runtime.activeConfiguration,
   restartRequired:runtime.mode==='device'&&JSON.stringify(configuration)!==JSON.stringify(runtime.activeConfiguration),mode:runtime.mode,
   connected:runtime.mode==='simulator'?false:availability==='unknown'?null:availability==='available',availability,
-  activeProfile:runtime.mode==='device'?PIXOO64_SMOKE_PROFILE:SIMULATOR_PROFILE,profiles:[SIMULATOR_PROFILE,PIXOO64_SMOKE_PROFILE]};};
+  activeProfile:playbackProfile(runtime),profiles:[SIMULATOR_PROFILE,...DEVICE_PROFILES]};};
  app.get('/api/device',status);
  // What reached the simulator's writer since startup, for scripted checks; absent in device mode.
  app.get('/api/device/simulator',()=>{if(!simulator)throw new ApiError('not-found',404);return {mode:'simulator',writer:simulator.counts};});

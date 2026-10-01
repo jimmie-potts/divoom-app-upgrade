@@ -75,3 +75,16 @@ Physical playback still validates every rendition against the active device
 profile before submitting device work. The historical smoke bounds, immutable
 renditions, ownership lock and uncertainty-pause behavior remain in force. Broader
 physical admission requires the separate observations and disposition in #55.
+
+
+## Explicit GIF profile amendment — September 30, 2026
+
+The owner observed complete 20-frame animations at 100/500 ms and a reversed
+200/800 ms timing pair. An additional named profile, `pixoo64-gif-2026-09-30`,
+admits up to 20 frames and variable 100–800 ms delays as a bounded policy inferred
+from those observations. See the [hardware record](../hardware-validation.md#gif-frame-count-and-timing-qualification--september-30-2026)
+for measurement limits and 1–3-second transition loading. Selecting it is
+explicit; saved settings still apply only on restart. The smoke profile,
+existing media identities, five-second player deadline, estimated readiness,
+serialized writer and uncertainty pause remain unchanged. Normal-player
+acceptance is separate from the qualification runner.

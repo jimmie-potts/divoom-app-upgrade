@@ -25,7 +25,7 @@ npm start
 ```
 
 In Settings, enter the explicitly supplied private IPv4 address and select
-`pixoo64-smoke-2026-09-06`. Leave model or firmware observations blank when unknown.
+`pixoo64-smoke-2026-09-06` or `pixoo64-gif-2026-09-30`. Leave model or firmware notes blank when unknown. Existing installations keep their selected profile until explicitly changed and restarted.
 Save configuration writes a version-1 file beneath `PIXOO_DATA_DIR`; saving does
 not enable hardware. Its shape is:
 
@@ -78,10 +78,16 @@ may continue looping. Cancellation cannot undo a request the display received.
 ## Use the recorded media limits
 
 Device mode imports and renders under the same bounded 500-frame application
-budget as the simulator. Physical playback still uses
-`pixoo64-smoke-2026-09-06`: one or two complete 64×64 frames and exactly 500 ms
-per animation frame. The recorded smoke test had unknown
-firmware and early loading screens. These bounds establish no wider capability.
+budget as the simulator. Physical playback uses the explicitly selected profile:
+
+- `pixoo64-smoke-2026-09-06`: one or two complete 64×64 frames, exactly 500 ms per animation frame.
+- `pixoo64-gif-2026-09-30`: up to 20 complete 64×64 frames, variable delays from 100–800 ms.
+
+The GIF profile is a bounded admission envelope inferred from the observed
+20-frame 100/500 ms tests and reversed two-frame 200/800 ms tests. It is not a
+hardware maximum or exhaustive timing qualification. Firmware remains unknown;
+the owner observed 1–3-second loading screens between animations. See the
+[dated hardware evidence](hardware-validation.md#gif-frame-count-and-timing-qualification--september-30-2026).
 
 An admitted GIF remains fully previewable even when physical playback is
 unqualified. Playback of an incompatible GIF fails with `profile-limit` before

@@ -163,3 +163,11 @@ originals or reread every other frame for each frame request. A missing/corrupt
 requested frame fails closed; successful frame reads do not certify unrequested
 frames. The client must load every manifest frame before presenting a complete
 animation. These source guarantees do not broaden physical playback support.
+
+
+The explicitly selected `pixoo64-gif-2026-09-30` playback profile additionally
+admits up to 20 frames at 100–800 ms, including variable delays. The envelope is
+inferred from the [dated physical observations](hardware-validation.md#gif-frame-count-and-timing-qualification--september-30-2026);
+it does not establish a hardware maximum or every timing combination. Both
+observed profiles are immutable, and existing rendition identities remain valid.
+Application imports continue to use `simulator-v1` in either runtime mode.

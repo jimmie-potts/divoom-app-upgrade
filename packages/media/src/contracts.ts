@@ -12,6 +12,8 @@ export interface MediaProfile {
 }
 export const SIMULATOR_PROFILE: Readonly<MediaProfile> = Object.freeze({ name: 'simulator-v1', evidence: 'provisional-simulator', reference: 'Application safeguards; no device claim', maxFrames: 500, minDelayMs: 10, maxDelayMs: 655350, uniformTiming: false });
 export const PIXOO64_SMOKE_PROFILE: Readonly<MediaProfile> = Object.freeze({ name: 'pixoo64-smoke-2026-09-06', evidence: 'observed-device', reference: 'https://github.com/jimmie-potts/divoom-app-upgrade/issues/4#issuecomment-5562714620; firmware unknown; loading screens observed', maxFrames: 2, minDelayMs: 500, maxDelayMs: 500, uniformTiming: true });
+export const PIXOO64_GIF_PROFILE: Readonly<MediaProfile> = Object.freeze({ name: 'pixoo64-gif-2026-09-30', evidence: 'observed-device', reference: 'https://github.com/jimmie-potts/divoom-app-upgrade/issues/55; 20 frames at 100/500 ms and 2 at 200/800 ms observed; 100-800 ms admission envelope inferred; firmware unknown; 1-3 s transition loading', maxFrames: 20, minDelayMs: 100, maxDelayMs: 800, uniformTiming: false });
+export const DEVICE_PROFILES: readonly Readonly<MediaProfile>[] = Object.freeze([PIXOO64_SMOKE_PROFILE,PIXOO64_GIF_PROFILE]);
 export interface MediaLimits { maxUploadBytes: number; maxSourcePixels: number; concurrency: number; maxQueued: number; timeoutMs: number }
 export const DEFAULT_LIMITS: Readonly<MediaLimits> = Object.freeze({ maxUploadBytes: 10 * 1024 * 1024, maxSourcePixels: 50_000_000, concurrency: 1, maxQueued: 4, timeoutMs: 30_000 });
 export interface MediaSource { format: 'png' | 'jpeg' | 'gif'; width: number; height: number; frameCount: number; delaysMs: (number | null)[]; durationMs: number | null }
@@ -34,7 +36,7 @@ export function canonicalProfile(p: MediaProfile): MediaProfile {
     p.maxDelayMs < p.minDelayMs || typeof p.uniformTiming !== 'boolean') throw new MediaError('invalid-input');
   const result = { name: p.name, evidence: p.evidence, reference: p.reference, maxFrames: p.maxFrames, minDelayMs: p.minDelayMs, maxDelayMs: p.maxDelayMs, uniformTiming: p.uniformTiming };
   // Observed profiles must identify the exact evidence and bounds shipped by this renderer.
-  if (p.evidence === 'observed-device' && JSON.stringify(result) !== JSON.stringify(PIXOO64_SMOKE_PROFILE)) throw new MediaError('invalid-input');
+  if (p.evidence === 'observed-device' && !DEVICE_PROFILES.some(profile=>JSON.stringify(result)===JSON.stringify(profile))) throw new MediaError('invalid-input');
   return result;
 }
 export function canonicalLimits(l: Partial<MediaLimits> = {}): MediaLimits {

@@ -445,3 +445,43 @@ remain outside Git.
 HTTP receipts are transport evidence. No firmware, router, firewall, brightness
 or screen-power changes were made.
 
+
+
+## GIF frame-count and timing qualification — September 30, 2026
+
+Issue #55 used the fixed A–E runner at
+`71a85fc87708f9e40fb015d200a00fc8247b1a56` on the owner's configured Pixoo64;
+firmware remains unknown. The owner ran the private handoff, which stops the
+installed controller and acquires the target lock. The run completed in
+78.103 seconds with all 53 requests successful: two reads, five distinct
+animation ID queries and 46 sequential frames. Receipt hashes, offsets, counts
+and requested delays match the synthetic source. No reset, brightness, screen,
+retry or restoration command was sent. Raw receipts and the target stay private.
+
+The owner reported: “It looked good. There were just a few loading screens in
+between transitions.” They then explicitly confirmed all 20 numbered frames
+appeared in both the 500 ms and 100 ms sequences, and the longer-held frame
+switched from 02 to 01 between the 200/800 and 800/200 ms sequences. Loading
+screens appeared only between stages and lasted approximately 1–3 seconds;
+none were reported during looping. These are qualitative human observations,
+not video-derived per-frame measurements or an instrumented loop count.
+
+The two 20-frame uploads took 3,471.8 and 3,338.1 ms; the two-frame uploads took
+374.1–405.3 ms. Those are host transport durations, not measured visible loading
+or post-acknowledgment readiness. The earlier inconclusive September 8 timing
+observations above remain part of the record.
+
+The new explicit `pixoo64-gif-2026-09-30` application profile admits up to 20
+complete frames, delays from 100 through 800 ms, and nonuniform timing. This is
+a bounded admission policy inferred from the observed endpoints and reversed
+asymmetric pair. Intermediate delays and other frame-count/timing combinations
+were not exhaustively measured; 20 is not a hardware maximum. The historical
+smoke profile remains unchanged. Keep the normal player's five-second operation
+deadline and zero estimated ready delay pending normal-player acceptance: these
+uploads fit that deadline, and the observations do not measure a separate ready
+delay. Loading transitions are a known limitation, not evidence of #52's rapid
+extra flashing or a correction for it.
+
+Normal-player play-count/duration transitions, cancellation and paused recovery
+still require the next bounded acceptance session. No production installation
+or saved-profile change is established by this runner result.

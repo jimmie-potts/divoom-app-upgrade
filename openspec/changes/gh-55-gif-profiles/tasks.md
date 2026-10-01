@@ -7,6 +7,6 @@
 
 ## 2. Physical evidence and delivery
 
-- [ ] 2.1 Run approved sequence under exclusive ownership and record frame/loop/timing observations separately from request traces.
+- [x] 2.1 Run approved sequence under exclusive ownership and record frame/loop/timing observations separately from request traces.
 - [ ] 2.2 Define only the evidence-supported playback profile and upload deadline; verify normal player transitions/cancellation and obtain owner disposition of limitations.
 - [ ] 2.3 Obtain current-candidate UI approval, independent reviews, head/main CI and reconcile issue criteria before sync/archive and closure.

@@ -1,7 +1,7 @@
 import {lstat,open} from 'node:fs/promises';
 import {join} from 'node:path';
 import {deviceConfiguration,type DeviceConfiguration} from '@pixoo/core';
-import {PIXOO64_SMOKE_PROFILE} from '@pixoo/media';
+import {DEVICE_PROFILES,SIMULATOR_PROFILE} from '@pixoo/media';
 import {ApiError} from './security.js';
 export type RuntimeMode='simulator'|'device';
 export interface RuntimeSelection {
@@ -28,8 +28,14 @@ export async function readDeviceSettings(directory:string):Promise<Readonly<Devi
 export function selectRuntime(mode:RuntimeMode,savedConfiguration:Readonly<DeviceConfiguration>|null):Readonly<RuntimeSelection>{
  if(mode!=='simulator'&&mode!=='device')throw new Error('PIXOO_MODE must be simulator or device');
  const saved=savedConfiguration===null?null:Object.freeze(deviceConfiguration.parse(savedConfiguration));
- if(mode==='device'&&(!saved||saved.profile!==PIXOO64_SMOKE_PROFILE.name))throw new Error('Device mode requires private device.json with the dated smoke profile');
+ if(mode==='device'&&(!saved||!DEVICE_PROFILES.some(profile=>profile.name===saved.profile)))throw new Error('Device mode requires private device.json with a supported observed profile');
  return Object.freeze({mode,savedConfiguration:saved,activeConfiguration:mode==='device'?saved:null});
+}
+export function playbackProfile(runtime:RuntimeSelection){
+ if(runtime.mode==='simulator')return SIMULATOR_PROFILE;
+ const profile=DEVICE_PROFILES.find(profile=>profile.name===runtime.activeConfiguration?.profile);
+ if(!profile)throw new Error('Device mode requires a supported observed profile');
+ return profile;
 }
 export async function loadRuntimeSelection(directory:string,mode:RuntimeMode):Promise<Readonly<RuntimeSelection>>{
  return selectRuntime(mode,await readDeviceSettings(directory));

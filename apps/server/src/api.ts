@@ -2,7 +2,6 @@ import type {FastifyInstance} from 'fastify';
 import {Library} from '@pixoo/library';
 import {Player,LibraryPlaybackStore} from '@pixoo/playback';
 import {FakeDeviceAdapter,HttpDeviceAdapter,type DeviceTransport} from '@pixoo/device';
-import {PIXOO64_SMOKE_PROFILE,SIMULATOR_PROFILE} from '@pixoo/media';
 import {deviceRoutes} from './device-routes.js';
 import {Events} from './events.js';
 import {Commands} from './commands.js';
@@ -13,7 +12,7 @@ import {join} from 'node:path';
 import {catalogRoutes} from './catalog-routes.js';
 import {assertRuntimeDirectory} from './operations.js';
 import {diagnosticsSchema} from '@pixoo/core';
-import {loadRuntimeSelection,selectRuntime,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
+import {loadRuntimeSelection,selectRuntime,playbackProfile,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
 import {acquireDeviceOwner} from './device-owner.js';
 import {registerController,type ControllerIdentity} from './controller.js';
 export interface ApiRuntimeOptions {
@@ -31,7 +30,7 @@ export interface RuntimeStatus {mode:RuntimeMode;connected:boolean|null}
 export async function registerApi(app:FastifyInstance,dataDir:string,options:ApiRuntimeOptions={}):Promise<()=>RuntimeStatus> {
  await assertRuntimeDirectory(dataDir);
  const runtime=options.runtime?selectRuntime(options.runtime.mode,options.runtime.savedConfiguration):await loadRuntimeSelection(dataDir,options.mode??'simulator');
- const profile=runtime.mode==='device'?PIXOO64_SMOKE_PROFILE:SIMULATOR_PROFILE;
+ const profile=playbackProfile(runtime);
  let closeMonitor:(()=>Promise<void>)|undefined;
  let releaseOwner:(()=>void)|undefined,library:Library|undefined,physical:HttpDeviceAdapter|undefined,player:Player|undefined;
  const close=async()=>{try{await closeMonitor?.();await player?.close();}finally{try{await physical?.close();}finally{try{await library?.close();}finally{releaseOwner?.();}}}};
@@ -40,7 +39,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   library=await Library.open({directory:join(dataDir,'library')});
   let simulator:FakeDeviceAdapter|undefined;
   const device=runtime.activeConfiguration?(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration.ip,
-   profile:{...PIXOO64_SMOKE_PROFILE,evidence:'observed',readyDelayMs:0}},options.transportForTests)):(simulator=new FakeDeviceAdapter({recordHistory:false}));
+   profile:{...profile,evidence:'observed',readyDelayMs:0}},options.transportForTests)):(simulator=new FakeDeviceAdapter({recordHistory:false}));
   await assertRuntimeDirectory(dataDir);
   player=await Player.open({store:new LibraryPlaybackStore(library,{profile,stillDelayMs:runtime.mode==='device'?500:100}),device,pauseOnUncertain:runtime.mode==='device'});
   const active=player;

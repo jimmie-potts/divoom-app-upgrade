@@ -21,3 +21,17 @@ The qualification runner uses five fixed synthetic animations, existing transpor
 ## Migration Plan
 
 No persistent migration. Existing files, profiles, playlist references and original bytes remain unchanged. Rollback retains all media; old device playback still rejects incompatible media. Physical profile expansion remains a separate evidence-dependent completion task within #55.
+
+
+## Observed profile selection
+
+The September 30 physical run and subsequent owner observations support a new
+explicit `pixoo64-gif-2026-09-30` profile: 20 frames, 100–800 ms, nonuniform timing.
+This interval is a bounded admission inference from observed 20-frame endpoint
+cases and reversed two-frame asymmetric timing, not exhaustive measurement.
+Preserve the smoke profile and original rendition identities. Resolve the saved
+profile once at startup for adapter admission, player admission and compatibility.
+Save remains restart-only. Retain the normal five-second operation deadline and
+zero estimated ready delay: measured uploads fit, while 1–3-second visible loading
+between stages does not measure an additional post-ack delay. Test the normal
+player before final acceptance.
