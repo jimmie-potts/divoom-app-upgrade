@@ -14,7 +14,7 @@ export const expectedRevision=z.object({revision:apiRevision}).strict();
 export const assetQuery=z.object({offset:z.coerce.number().int().min(0).max(1000000).default(0),limit:z.coerce.number().int().min(1).max(100).default(25),q:z.string().max(120).default('')}).strict();
 export const transformRequest=z.object({fit:z.enum(['fit','crop']),scaling:z.enum(['nearest','smooth']),background:z.tuple([z.number().int().min(0).max(255),z.number().int().min(0).max(255),z.number().int().min(0).max(255)])}).strict();
 export const renditionRequest=z.object({transform:transformRequest.optional()}).strict();
-export const deviceConfiguration=z.object({ip:z.ipv4().refine(ip=>{const [a,b]=ip.split('.').map(Number);return a===10||a===172&&b!>=16&&b!<=31||a===192&&b===168;}),model:apiName.optional(),firmware:apiName.optional(),profile:z.enum(['simulator-v1','pixoo64-smoke-2026-09-06','pixoo64-gif-2026-09-30'])}).strict();
+export const deviceConfiguration=z.object({ip:z.ipv4().refine(ip=>{const [a,b]=ip.split('.').map(Number);return a===10||a===172&&b!>=16&&b!<=31||a===192&&b===168;}),model:apiName.optional(),firmware:apiName.optional(),profile:z.enum(['simulator-v1','pixoo64-smoke-2026-09-06','pixoo64-gif-2026-10-01'])}).strict();
 export type DeviceConfiguration=z.infer<typeof deviceConfiguration>;
 export const requestIdentity=z.string().regex(/^[a-f0-9-]{36}:[1-9][0-9]{0,15}$/);
 export const catalogQuery=z.object({q:z.string().max(120).default(''),offset:z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),limit:z.number().int().min(1).max(100).default(25)}).strict();

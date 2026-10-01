@@ -36,3 +36,8 @@ The browser SHALL persist explicit private device IP, profile and optional model
 - **THEN** it labels device mode, the selected active profile limits and estimated timing separately from visual evidence
 - **AND** an uncertain operation displays its error and explains that explicit resume restarts the item
 - **AND** saving settings or reconnecting the browser does not activate hardware, retarget the running backend or replay lost commands
+
+#### Scenario: Explain uniform frame timing
+- **WHEN** Settings shows the selected uniform physical profile limits
+- **THEN** it explains that every frame uses the same delay and pauses use repeated frames that count toward the frame limit
+- **AND** complete mixed-delay imports and previews remain available even though physical playback is unavailable

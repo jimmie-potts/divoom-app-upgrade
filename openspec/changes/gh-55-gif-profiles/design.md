@@ -25,13 +25,24 @@ No persistent migration. Existing files, profiles, playlist references and origi
 
 ## Observed profile selection
 
-The September 30 physical run and subsequent owner observations support a new
-explicit `pixoo64-gif-2026-09-30` profile: 20 frames, 100–800 ms, nonuniform timing.
-This interval is a bounded admission inference from observed 20-frame endpoint
-cases and reversed two-frame asymmetric timing, not exhaustive measurement.
-Preserve the smoke profile and original rendition identities. Resolve the saved
-profile once at startup for adapter admission, player admission and compatibility.
-Save remains restart-only. Retain the normal five-second operation deadline and
-zero estimated ready delay: measured uploads fit, while 1–3-second visible loading
-between stages does not measure an additional post-ack delay. Test the normal
-player before final acceptance.
+October 1 camera recordings supersede the initial qualitative interpretation of
+mixed-delay support. The 20-frame loops measured about 10.05 seconds at uniform
+500 ms, 16.05 seconds for mixed delays ending at 800 ms, and 2.05 seconds for
+mixed delays ending at 100 ms. The last requested delay acted uniformly in these
+cases. The owner selected native uniform timing and repeated frames for pauses.
+
+Use the new explicit `pixoo64-gif-2026-10-01` profile: at most 20 frames and one
+fixed delay of 100–800 ms per animation. This interval is an admission envelope,
+not exhaustive hardware measurement. Retire the unreleased September 30
+candidate rather than changing the meaning of its dated identifier. Preserve
+the historical smoke profile and original rendition identities. Repeated frames
+remain separate frames and count toward the 20-frame limit; do not deduplicate
+or automatically convert mixed-delay imports. Their full previews retain the
+original effective delays, but physical playback rejects them before any write.
+
+Resolve the saved profile once at startup for adapter admission, player
+admission and compatibility. Save remains restart-only. Retain the normal
+five-second operation deadline and zero estimated ready delay. GIF-to-still BLUE
+flashing remains unresolved; the timing-only recordings do not test handoff.
+Normal-player transition acceptance remains open under #55, with #52 retaining
+its flashing investigation and no shared cause assumed.

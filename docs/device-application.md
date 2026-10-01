@@ -25,7 +25,7 @@ npm start
 ```
 
 In Settings, enter the explicitly supplied private IPv4 address and select
-`pixoo64-smoke-2026-09-06` or `pixoo64-gif-2026-09-30`. Leave model or firmware notes blank when unknown. Existing installations keep their selected profile until explicitly changed and restarted.
+`pixoo64-smoke-2026-09-06` or `pixoo64-gif-2026-10-01`. Leave model or firmware notes blank when unknown. Existing installations keep their selected profile until explicitly changed and restarted.
 Save configuration writes a version-1 file beneath `PIXOO_DATA_DIR`; saving does
 not enable hardware. Its shape is:
 
@@ -81,13 +81,17 @@ Device mode imports and renders under the same bounded 500-frame application
 budget as the simulator. Physical playback uses the explicitly selected profile:
 
 - `pixoo64-smoke-2026-09-06`: one or two complete 64×64 frames, exactly 500 ms per animation frame.
-- `pixoo64-gif-2026-09-30`: up to 20 complete 64×64 frames, variable delays from 100–800 ms.
+- `pixoo64-gif-2026-10-01`: up to 20 complete 64×64 frames with one fixed delay of 100–800 ms per animation.
 
-The GIF profile is a bounded admission envelope inferred from the observed
-20-frame 100/500 ms tests and reversed two-frame 200/800 ms tests. It is not a
-hardware maximum or exhaustive timing qualification. Firmware remains unknown;
-the owner observed 1–3-second loading screens between animations. See the
-[dated hardware evidence](hardware-validation.md#gif-frame-count-and-timing-qualification--september-30-2026).
+Every frame in an animation must have the same delay. To hold a pose, repeat its
+frame; repeats count toward the frame limit. Five identical frames at 100 ms,
+for example, request a 500 ms hold. Imports are not automatically converted.
+
+The GIF profile is a bounded admission envelope based on the October 1 recorded
+timing tests and owner decision. It is not a hardware maximum or exhaustive
+timing qualification. Firmware remains unknown. The owner observed 1–3-second
+loading screens between animations, and later GIF-to-still flashing remains
+unresolved. See the [recorded hardware evidence](hardware-validation.md#recorded-gif-timing--october-1-2026).
 
 An admitted GIF remains fully previewable even when physical playback is
 unqualified. Playback of an incompatible GIF fails with `profile-limit` before

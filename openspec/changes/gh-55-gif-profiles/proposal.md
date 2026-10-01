@@ -23,4 +23,4 @@
 
 ## Impact
 
-Server catalog composition, browser media library, device qualification tooling and tests. No dependency, database migration or default hardware activation change. Add an explicit 20-frame, variable 100–800 ms production playback profile; preserve the historical profile and require normal-player acceptance. Issue criteria AC1–AC2 and AC6 cover source work; AC3–AC5 require physical evidence and acceptance.
+Server catalog composition, browser media library, device qualification tooling and tests. No dependency, database migration or default hardware activation change. Add an explicit 20-frame production playback profile with one fixed 100–800 ms delay per animation; preserve the historical profile and require normal-player acceptance. Issue criteria AC1–AC2 and AC6 cover source work; AC3–AC5 require physical evidence and acceptance.

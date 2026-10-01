@@ -10,3 +10,9 @@
 - [x] 2.1 Run approved sequence under exclusive ownership and record frame/loop/timing observations separately from request traces.
 - [ ] 2.2 Define only the evidence-supported playback profile and upload deadline; verify normal player transitions/cancellation and obtain owner disposition of limitations.
 - [ ] 2.3 Obtain current-candidate UI approval, independent reviews, head/main CI and reconcile issue criteria before sync/archive and closure.
+
+## 3. Recorded timing correction
+
+- [x] 3.1 Replace the unreleased mixed-delay candidate with the dated uniform-only profile; prove mixed-delay rejection before writes and preservation of repeated pause frames.
+- [x] 3.2 Reconcile guidance, Settings and the historical evidence with the October 1 camera results and owner decision; retain full imports/previews.
+- [ ] 3.3 Run source/browser/workflow checks, renew independent reviews and obtain approval of the updated Settings text before final delivery.

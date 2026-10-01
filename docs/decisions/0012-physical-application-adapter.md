@@ -77,14 +77,21 @@ renditions, ownership lock and uncertainty-pause behavior remain in force. Broad
 physical admission requires the separate observations and disposition in #55.
 
 
-## Explicit GIF profile amendment — September 30, 2026
+## Explicit GIF profile amendment — October 1, 2026
 
-The owner observed complete 20-frame animations at 100/500 ms and a reversed
-200/800 ms timing pair. An additional named profile, `pixoo64-gif-2026-09-30`,
-admits up to 20 frames and variable 100–800 ms delays as a bounded policy inferred
-from those observations. See the [hardware record](../hardware-validation.md#gif-frame-count-and-timing-qualification--september-30-2026)
-for measurement limits and 1–3-second transition loading. Selecting it is
-explicit; saved settings still apply only on restart. The smoke profile,
-existing media identities, five-second player deadline, estimated readiness,
-serialized writer and uncertainty pause remain unchanged. Normal-player
-acceptance is separate from the qualification runner.
+The October 1 camera evidence supersedes the earlier qualitative interpretation
+of mixed-delay support. The owner selected uniform timing: every frame in an
+animation has the same delay, and repeated frames provide pauses. The explicit
+`pixoo64-gif-2026-10-01` profile admits at most 20 frames with one fixed delay of
+100–800 ms per animation. Repeats count toward the limit and are not removed.
+Mixed-delay imports and full previews remain available, but physical playback
+rejects them before device work. Automatic timing conversion is deferred until
+an owner request and previewed conversion design.
+
+This replaces the unreleased September 30 candidate. See the
+[recorded evidence](../hardware-validation.md#recorded-gif-timing--october-1-2026)
+for measurement limits and the unresolved transition symptom. Selection remains
+explicit and restart-only. The smoke profile, existing media identities,
+five-second player deadline, estimated readiness, serialized writer and
+uncertainty pause remain unchanged. Normal-player transition acceptance is
+separate from the timing recordings.

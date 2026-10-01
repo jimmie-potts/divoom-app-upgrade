@@ -471,9 +471,9 @@ The two 20-frame uploads took 3,471.8 and 3,338.1 ms; the two-frame uploads took
 or post-acknowledgment readiness. The earlier inconclusive September 8 timing
 observations above remain part of the record.
 
-The new explicit `pixoo64-gif-2026-09-30` application profile admits up to 20
+The initial, unreleased `pixoo64-gif-2026-09-30` candidate admitted up to 20
 complete frames, delays from 100 through 800 ms, and nonuniform timing. This is
-a bounded admission policy inferred from the observed endpoints and reversed
+an initial admission policy inferred from the observed endpoints and reversed
 asymmetric pair. Intermediate delays and other frame-count/timing combinations
 were not exhaustively measured; 20 is not a hardware maximum. The historical
 smoke profile remains unchanged. Keep the normal player's five-second operation
@@ -485,3 +485,41 @@ extra flashing or a correction for it.
 Normal-player play-count/duration transitions, cancellation and paused recovery
 still require the next bounded acceptance session. No production installation
 or saved-profile change is established by this runner result.
+
+## Recorded GIF timing — October 1, 2026
+
+The owner ran three camera-assisted, timing-only cases through the normal
+application at `47c6551535f642b4dde7f3fd066e8278fb033b83`. Each case uploaded one
+20-frame animation and then sent no more display frames. Each trace contains
+23 successful requests with the expected frame bytes, offsets and delays.
+Three approximately 65-second recordings captured the Pixoo64 at about 30 fps;
+firmware remains unknown. Original recordings, receipts and target stay private.
+
+| Case | Requested frame delays | Loop if individual delays were preserved | Observed mean loop |
+| --- | --- | ---: | ---: |
+| A | All 500 ms | 10 s | 10.048 s across four cycles |
+| B | 100/200/500/800 ms, repeated five times | 8 s | 16.048 s across two cycles |
+| C | 800/500/200/100 ms, repeated five times | 8 s | 2.049 s across 26 cycles |
+
+Independent moving-diamond and progress-bar analyses used original video
+timestamps. Digit contact sheets verify all 20 frames in order for a full cycle
+from each recording. Allow about 0.1 second uncertainty at individual visual
+boundaries due to camera sampling and panel scanning. In these cases, the final
+requested frame delay acted as the delay for the entire animation. The results
+supersede the September 30 qualitative interpretation of variable-delay support;
+that historical observation remains above. They do not establish firmware
+internals, a universal frame limit or exact timing for every input.
+
+The owner chose one fixed delay per animation, using repeated frames for pauses.
+The replacement `pixoo64-gif-2026-10-01` profile admits up to 20 frames at one
+uniform delay from 100 through 800 ms. This is a bounded admission envelope;
+intermediate values and all combinations were not exhaustively measured.
+Repeated frames count toward the limit. Complete mixed-delay imports and
+previews are retained, with no automatic conversion; native physical playback
+rejects their unequal effective delays.
+
+Earlier normal-player tests showed BLUE briefly, then prior content, before
+settling on BLUE. These timing-only recordings contain no GIF-to-still handoff
+and do not resolve that symptom or establish a shared cause with #52. Transition
+acceptance remains incomplete. No production installation or saved-profile
+change is established by these tests.

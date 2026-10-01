@@ -165,9 +165,16 @@ frames. The client must load every manifest frame before presenting a complete
 animation. These source guarantees do not broaden physical playback support.
 
 
-The explicitly selected `pixoo64-gif-2026-09-30` playback profile additionally
-admits up to 20 frames at 100–800 ms, including variable delays. The envelope is
-inferred from the [dated physical observations](hardware-validation.md#gif-frame-count-and-timing-qualification--september-30-2026);
-it does not establish a hardware maximum or every timing combination. Both
-observed profiles are immutable, and existing rendition identities remain valid.
-Application imports continue to use `simulator-v1` in either runtime mode.
+The explicitly selected `pixoo64-gif-2026-10-01` playback profile admits up to
+20 frames with one fixed delay of 100–800 ms per animation. Every frame must
+use that delay. To hold a pose, repeat its frame; repeats remain separate and
+count toward the 20-frame limit. For example, five identical frames at 100 ms
+request a 500 ms hold. There is no automatic conversion of mixed-delay GIFs.
+
+The envelope follows the [October 1 camera evidence](hardware-validation.md#recorded-gif-timing--october-1-2026)
+and owner disposition; it is not a hardware maximum or a measurement of every
+combination. It replaces the unreleased September 30 candidate, whose
+nonuniform-timing assumption the recordings disproved. The historical smoke
+profile is unchanged. Imports still use `simulator-v1` in either runtime mode,
+so existing rendition identities and complete mixed-delay previews remain valid.
+Physical admission independently rejects unequal effective frame delays.

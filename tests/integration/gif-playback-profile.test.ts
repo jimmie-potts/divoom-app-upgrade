@@ -5,24 +5,25 @@ import {join} from 'node:path';
 import {createApp} from '../../apps/server/src/app.js';
 import {gifFixture} from '../helpers/media-fixtures.js';
 import {multipart} from '../helpers/http-api.js';
+import {deviceConfiguration} from '../../packages/core/src/api.js';
 import {canonicalProfile,PIXOO64_GIF_PROFILE,PIXOO64_SMOKE_PROFILE} from '../../packages/media/src/contracts.js';
 const cleanup:(()=>Promise<unknown>)[]=[];
 afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
 const headers={'x-pixoo-request':'1'};
-it('explicitly selects the observed GIF profile and preserves all admitted frames while rejecting outside bounds before replacement',async()=>{
+it.each([100,200,500,800])('preserves uniform %i ms pause frames and rejects mixed delays or exceeded bounds before replacement',async delayMs=>{
  const dataDir=await mkdtemp(join(tmpdir(),'gif-profile-'));cleanup.push(()=>rm(dataDir,{recursive:true,force:true}));
  const deviceLockDirectoryForTests=await mkdtemp(join(tmpdir(),'gif-lock-'));cleanup.push(()=>rm(deviceLockDirectoryForTests,{recursive:true,force:true}));
- await writeFile(join(dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.50.20',profile:'pixoo64-gif-2026-09-30'}}));
+ await writeFile(join(dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.50.20',profile:PIXOO64_GIF_PROFILE.name}}));
  const requests:Record<string,unknown>[]=[];
  const app=createApp({dataDir,mode:'device',deviceLockDirectoryForTests,transportForTests:async body=>{requests.push(body);return {error_code:0,PicId:1};}});cleanup.push(()=>app.close());
  const device=await app.inject('/api/device');expect(device.statusCode).toBe(200);
- expect(device.json().activeProfile).toMatchObject({name:'pixoo64-gif-2026-09-30',maxFrames:20,minDelayMs:100,maxDelayMs:800,uniformTiming:false});
+ expect(device.json().activeProfile).toMatchObject({name:PIXOO64_GIF_PROFILE.name,maxFrames:20,minDelayMs:100,maxDelayMs:800,uniformTiming:true});
  expect(requests).toEqual([]);
  const imported=async(delays:number[])=>{
-  const response=await app.inject({method:'POST',url:'/api/assets',...multipart(gifFixture(1,1,delays.map((delay,i)=>({width:1,height:1,pixels:[i%4],delay:delay/10}))))});
+  const response=await app.inject({method:'POST',url:'/api/assets',...multipart(gifFixture(1,1,delays.map((delay,i)=>({width:1,height:1,pixels:[Math.floor(i/5)%4],delay:delay/10}))))});
   expect(response.statusCode).toBe(201);expect(response.json().rendition.profile.name).toBe('simulator-v1');return response.json().rendition;
  };
- const delays=Array.from({length:20},(_,i)=>[100,200,500,800][i%4]!);
+ const delays=Array<number>(20).fill(delayMs);
  const rendition=await imported(delays);expect(requests).toEqual([]);
  const playlist=(await app.inject({method:'POST',url:'/api/playlists',headers,payload:{name:'Qualified GIF'}})).json();
  await app.inject({method:'PUT',url:`/api/playlists/${playlist.id}/items`,headers,payload:{revision:1,items:[{renditionId:rendition.id}]}});
@@ -31,9 +32,12 @@ it('explicitly selects the observed GIF profile and preserves all admitted frame
  await vi.waitFor(async()=>expect((await app.inject('/api/player')).json().player.state).toBe('playing'));
  const frames=requests.filter(r=>r.Command==='Draw/SendHttpGif');expect(frames).toHaveLength(20);
  expect(frames.map(r=>r.PicSpeed)).toEqual(delays);expect(frames.map(r=>r.PicOffset)).toEqual(delays.map((_,i)=>i));expect(frames.every(r=>r.PicNum===20)).toBe(true);
+ for(let offset=0;offset<20;offset+=5){expect(new Set(frames.slice(offset,offset+5).map(r=>r.PicData)).size).toBe(1);}
+ expect(new Set(frames.map(r=>r.PicData)).size).toBe(4);
  const session=(await app.inject('/api/player')).json().session;
- for(const invalidDelays of [Array<number>(21).fill(100),[50],[810]]){
-  const invalid=await imported(invalidDelays);const before=requests.length;
+ for(const invalidDelays of [Array<number>(21).fill(100),[50],[810],[100,200,500,800]]){
+  const invalid=await imported(invalidDelays);expect(invalid.frames.map((frame:{delayMs:number})=>frame.delayMs)).toEqual(invalidDelays);const before=requests.length;
+  expect((await app.inject(`/api/renditions/${invalid.id}/compatibility`)).json()).toMatchObject({compatible:false,profile:PIXOO64_GIF_PROFILE.name,physical:true});
   const replacement=await command({command:'show-media',renditionId:invalid.id});
   expect(replacement.statusCode).toBe(422);expect(replacement.json().error.code).toBe('profile-limit');
   expect(requests).toHaveLength(before);expect((await app.inject('/api/player')).json().session).toEqual(session);
@@ -47,10 +51,12 @@ it('explicitly selects the observed GIF profile and preserves all admitted frame
  expect((await reopened.inject('/api/player')).json().player.state).toBe('paused');expect(requests).toHaveLength(before);
 });
 it('accepts only the exact shipped evidence for each observed profile',()=>{
+ expect(deviceConfiguration.safeParse({ip:'192.168.50.20',profile:'pixoo64-gif-2026-09-30'}).success).toBe(false);
  for(const profile of [PIXOO64_SMOKE_PROFILE,PIXOO64_GIF_PROFILE]){
   expect(canonicalProfile(profile)).toEqual(profile);
   expect(()=>canonicalProfile({...profile,maxFrames:21})).toThrow();
   expect(()=>canonicalProfile({...profile,minDelayMs:10})).toThrow();
+  expect(()=>canonicalProfile({...profile,uniformTiming:false})).toThrow();
  }
 });
 it('stopping a twenty-frame upload aborts the in-flight frame and submits no later frames',async()=>{
