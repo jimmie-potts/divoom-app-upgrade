@@ -112,9 +112,13 @@ accepts one or two frames with exactly 500 ms animation delays, reflecting the
 [September 6 smoke test](https://github.com/jimmie-potts/divoom-app-upgrade/issues/4#issuecomment-5562714620).
 The user identified Pixoo64; firmware was unknown and early loading screens were
 observed. This profile establishes no broader limits or precise visible timing.
-Custom observed-device claims are rejected. Explicit device startup selects this
-profile for catalog imports and new renditions. Playback also validates older
-renditions against its actual frame/timing bounds without rewriting them.
+Custom observed-device claims are rejected. Catalog imports and new renditions
+use the existing simulator-v1 application budget in both runtime modes. Its
+stored name and evidence label remain unchanged to preserve rendition identity;
+they do not imply that an imported animation has been qualified for hardware.
+Playback independently validates all renditions against its active frame/timing
+bounds without rewriting them. The library UI reports compatibility separately
+from preview availability.
 The protocol spike's separate experimental profile is not changed by this renderer.
 
 Profile violations fail with `profile-limit`. The package does not truncate,

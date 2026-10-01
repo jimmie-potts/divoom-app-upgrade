@@ -45,6 +45,7 @@ No generic filesystem, raw device command or remote-URL import route exists.
 | `POST /assets/:id/renditions` | `{transform?: {fit,scaling,background}}`; returns `{status:"complete",asset,rendition}` after worker completion |
 | `DELETE /assets/:id` | 204, or reference error preserving the asset |
 | `GET /renditions/:id` | Validated immutable manifest |
+| `GET /renditions/:id/compatibility` | `{compatible,profile,physical}` against the active playback profile; no device request |
 | `GET /renditions/:id/frames/:index.png` | Effective PNG frame by validated hash/index |
 | `GET /playlists` | Playlist array with ordered items and revisions |
 | `POST /playlists` | `{name,repeat?,shuffle?}`; 201 |
@@ -63,7 +64,9 @@ session until an explicit restart-with-changes command. Still defaults are
 30000 ms; animation defaults are three total plays. See [library contracts](library-persistence.md).
 
 Uploads are limited to 10 MiB and validated by signatures, source pixel budget
-and the renderer profile. The whole bounded multipart body is validated before
+and the application renderer profile in both runtime modes. Physical playback
+compatibility is checked independently; previews remain available when playback
+is unqualified. The whole bounded multipart body is validated before
 import, so an extra part cannot fail after catalog publication. Filenames are
 display metadata, never paths. Originals and referenced renditions are preserved.
 The API admits at most four concurrent media requests and 32 requests overall,

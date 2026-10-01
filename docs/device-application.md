@@ -77,12 +77,15 @@ may continue looping. Cancellation cannot undo a request the display received.
 
 ## Use the recorded media limits
 
-Device mode renders with `pixoo64-smoke-2026-09-06`: one or two complete 64×64
-frames and exactly 500 ms per animation frame. The recorded smoke test had unknown
+Device mode imports and renders under the same bounded 500-frame application
+budget as the simulator. Physical playback still uses
+`pixoo64-smoke-2026-09-06`: one or two complete 64×64 frames and exactly 500 ms
+per animation frame. The recorded smoke test had unknown
 firmware and early loading screens. These bounds establish no wider capability.
 
-An incompatible GIF fails with `profile-limit`; the application does not drop
-frames or retime it. Older simulator renditions can play only when their actual
+An admitted GIF remains fully previewable even when physical playback is
+unqualified. Playback of an incompatible GIF fails with `profile-limit` before
+queueing device work; the application does not drop frames or retime it. Older simulator renditions can play only when their actual
 frames and delays satisfy the active bounds. Stored renditions stay immutable.
 A PNG/JPEG still uses a 500 ms transport placeholder; its duration policy alone
 sets dwell. GIF delays, including a single-frame GIF, retain their effective

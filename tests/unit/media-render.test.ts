@@ -117,3 +117,10 @@ describe('rendering limits and effective previews', () => {
     await expect(render(Buffer.concat([png.subarray(0,33),chunk,png.subarray(33)]))).rejects.toMatchObject({code:'unsupported'});
   });
 });
+
+it('admits all 500 frames and rejects 501 without truncation or duration caps',async()=>{
+ const frames=Array.from({length:500},(_,i)=>({width:1,height:1,pixels:[i%4],delay:i===499?65535:10+i}));
+ const admitted=await render(gifFixture(1,1,frames));
+ expect(admitted.frames).toHaveLength(500);expect(admitted.frames.map(f=>f.delayMs)).toEqual(frames.map(f=>f.delay*10));
+ await expect(render(gifFixture(1,1,[...frames,frames[0]!]))).rejects.toMatchObject({code:'profile-limit'});
+});

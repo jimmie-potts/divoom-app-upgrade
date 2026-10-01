@@ -38,6 +38,7 @@ read-only, report that instead of redirecting it.
 | `npm run test:browser` | Builds then tests the actual page and error/retry at desktop/mobile sizes |
 | `npm run check:workflow` | Validates current specs/changes and archived tasks |
 | `npm run test:workflow` | Exercises workflow CLI safeguards in temporary fixtures |
+| `npm run device:gif -- --help` | Offline-default GIF qualification tool; physical flags require separate authorization |
 | `npm run check` | Lint, typecheck, build/tests and both workflow checks |
 | `npm run simulator` | Builds then starts one loopback backend and UI |
 | `npm start` | Starts a previously built application |
