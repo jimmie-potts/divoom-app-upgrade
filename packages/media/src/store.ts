@@ -132,7 +132,7 @@ export class MediaStore {
     try { const info=await lstat(path); if(!info.isFile() || info.size>this.limits.maxUploadBytes || hash(await readFile(path))!==sourceHash) throw new Error(); }
     catch { throw new MediaError('cache-corrupt'); }
   }
-  private async load(root:string,id:string,optional:boolean): Promise<Rendition | undefined> {
+  private async load(root:string,id:string,optional:boolean,verifyFrames=true): Promise<Rendition | undefined> {
     if(!validHash(id)) throw new MediaError('invalid-input');
     const path=join(root,'renditions',id);
     try {
@@ -156,6 +156,8 @@ export class MediaStore {
         sourceTotal=sourceTotal===null || sourceDelay===null ? null : sourceTotal+sourceDelay!;
         effectiveTotal=effectiveTotal===null || f.delayMs===null ? null : effectiveTotal+f.delayMs;
         for(const [ext,digest] of [['rgb',f.rgbHash],['png',f.previewHash]] as const) {
+          if(!validHash(digest))throw new Error();
+          if(!verifyFrames)continue;
           const file=join(path,`${i}.${ext}`), info=await lstat(file);
           if(!info.isFile() || info.size>65536 || (ext==='rgb' && info.size!==12288) || hash(await readFile(file))!==digest) throw new Error();
         }
@@ -169,6 +171,24 @@ export class MediaStore {
       }
       throw new MediaError('cache-corrupt');
     }
+  }
+  /** Read only the requested immutable representation, not every frame in the animation. */
+  async readPreview(expected:Rendition,index:number|null,signal?:AbortSignal):Promise<{rendition:Rendition;bytes?:Buffer}>{
+    if(index!==null&&(!Number.isSafeInteger(index)||index<0||index>=expected.frames.length))throw new MediaError('invalid-input');
+    const check=()=>{if(signal?.aborted)throw signalError(signal);};
+    check();
+    try {
+      if(!validHash(expected.id)||renditionId(expected.sourceHash,expected.transform,expected.profile)!==expected.id)throw new MediaError('cache-corrupt');
+      const root=await this.getRoot(),path=join(root,'renditions',expected.id);check();
+      const rendition=(await this.load(root,expected.id,false,false))!;
+      if(JSON.stringify(rendition)!==JSON.stringify(expected))throw new MediaError('cache-corrupt');
+      check();if(index===null)return {rendition};
+      const framePath=join(path,`${index}.png`),frameInfo=await lstat(framePath);
+      if(!frameInfo.isFile()||frameInfo.size>65536)throw new MediaError('cache-corrupt');
+      const bytes=await readFile(framePath,signal?{signal}:undefined);check();
+      if(hash(bytes)!==rendition.frames[index]!.previewHash)throw new MediaError('cache-corrupt');
+      return {rendition,bytes};
+    }catch(error){check();if(error instanceof MediaError)throw error;throw new MediaError('cache-corrupt');}
   }
   async readFrame(id:string,index:number,format:'rgb'|'png'): Promise<Buffer> {
     if(!Number.isSafeInteger(index) || index<0 || !['rgb','png'].includes(format)) throw new MediaError('invalid-input');

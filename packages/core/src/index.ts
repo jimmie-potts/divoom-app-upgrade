@@ -9,3 +9,4 @@ export type Health = z.infer<typeof healthSchema>;
 export * from './api.js';
 export * from './integration.js';
 export * from './now-playing.js';
+export * from './catalog-integration.js';

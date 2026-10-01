@@ -4,9 +4,10 @@ import {authenticateCredential,validateMcpConfiguration,MCP_DEVICE_ID} from './m
 import type {ControlService} from './control-service.js';
 import {ApiError} from './security.js';
 import {ControllerState,failureStatus} from './controller-state.js';
-import {integrationPaths,nativeIntegrationRequest} from '@pixoo/core';
+import {integrationPaths,nativeIntegrationRequest,nativeReadPath} from '@pixoo/core';
 import {Events} from './events.js';
 import {parse} from './validation.js';
+import {catalogSnapshot,registerCatalogIntegration} from './catalog-integration.js';
 import {ControllerEvents} from './controller-events.js';
 
 export type ControllerIdentity=Pick<Identity,'deviceId'|'controllerId'|'sourceId'>;
@@ -30,12 +31,17 @@ export async function registerController(app:FastifyInstance,directory:string,se
    if(!principal.credential.scopes.includes(request.method==='POST'?'control':'read'))throw new ApiError('forbidden',403);
   }finally{if(timer)clearTimeout(timer);}
  }
- app.addHook('onRequest',async request=>{if(controllerPaths.has(request.url.split('?')[0]!))await authenticate(request);});
+ app.addHook('onRequest',async request=>{if(controllerPaths.has(request.url.split('?')[0]!)||nativeReadPath(request.url.split('?')[0]!))await authenticate(request);});
  if(service.monitor){
   const snapshot=()=>({...service.integrationSnapshot(),identity:{controllerId:identity.controllerId,deviceId:identity.deviceId,sourceId:identity.sourceId}});
   const extensionEvents=new Events(snapshot,authenticate),previous=service.monitor.onChange;
   service.monitor.onChange=()=>{previous();extensionEvents.publish();};
-  app.get(integrationPaths[0],snapshot);
+  app.get(integrationPaths[0],request=>{
+   const query=request.query as Record<string,unknown>;
+   if(Object.keys(query).some(key=>key!=='apiVersion')||query.apiVersion!==undefined&&!['pixoo-integration/1.0','pixoo-integration/1.1'].includes(String(query.apiVersion)))throw new ApiError('invalid-request',400);
+   return query.apiVersion==='pixoo-integration/1.1'?{...catalogSnapshot(service),identity:{controllerId:identity.controllerId,deviceId:identity.deviceId,sourceId:identity.sourceId}}:snapshot();
+  });
+  registerCatalogIntegration(app,service);
   app.post(integrationPaths[1],async request=>{
    const {controllerId,deviceId,...body}=parse(nativeIntegrationRequest,request.body);
    if(controllerId!==identity.controllerId||deviceId!==identity.deviceId)throw new ApiError('unknown-device',404);

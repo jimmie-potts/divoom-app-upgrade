@@ -175,3 +175,19 @@ Checkpoint source metadata is immutable on save. Older source-less checkpoints
 remain readable. A temporary session's generated internal traversal snapshot ID
 is not a saved playlist identity. Reference checks, offline verification and
 paused recovery preserve its actual asset and rendition until replacement/clear.
+
+## Native catalog revision and previews
+
+Migration 4 adds a persistent `catalog_revision` singleton and transactional
+triggers on catalog membership, names, playlists and items. Revisions are
+monotonic safe integers; a transaction may advance the counter more than once.
+Consumers compare equality, not increments of exactly one. Failed transactions
+roll back their revision changes. Session retention and playback checkpoints do
+not advance it. No existing assets, originals or renditions are rewritten.
+
+Native catalog pages/details return the revision from the same serialized read.
+`preview(id,index,signal)` confirms catalog membership and validates the immutable
+manifest and requested cached PNG digest without scanning all animation frames
+on each request. Cancellation is checked before queued work starts. Native HTTP
+admission supplies the queue bound and end-to-end deadline. These reads do not
+change playback state or contact the device.

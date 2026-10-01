@@ -179,3 +179,75 @@ Mismatched targets reject before admission. Browser and native requests with the
 same normalized envelope share receipts and conflicts. Mode/view changes do not
 add generic device commands or new MCP tools. Hub #6 can consume the exported
 `@pixoo/core` contracts and frontend adapter; its own overview remains separate.
+
+## Negotiated media catalog (integration 1.1)
+
+A native reader requests `GET /controller/pixoo-integration/v1/snapshot?apiVersion=pixoo-integration%2F1.1`
+to receive the catalog extension. Omission or explicit 1.0 retains the existing
+snapshot. Unsupported versions fail with `invalid-request`. Commands and event
+streams remain 1.0; poll the negotiated snapshot for catalog revision changes.
+The existing monitor and native-controller prerequisites remain in force.
+
+The 1.1 snapshot adds `catalogRevision`, the catalog capability
+`{supported:true,preview:"png-frames",maximumPageSize:100}`, and nullable
+`currentMedia`. That object contains rendition/item identity, nullable saved
+playlist identity/revision, zero-based item position and item count from the
+captured playlist, player state/intent/generation and transport uncertainty.
+It describes the player's selected item, including paused or loading context;
+it does not claim the display currently shows those pixels. Shuffling does not
+change an item's captured playlist position. A direct-media selection has null
+saved playlist fields. The selected rendition can differ from the last physical
+output during loading, failure, stopping or Monitor mode.
+
+All routes below share the `/controller/pixoo-integration/v1` prefix and require
+read scope, including conditional requests. A control-only credential cannot
+read them. They allocate no command ticket and make no device calls.
+
+| GET route | Response |
+| --- | --- |
+| `/catalog/renditions` | Paged asset/rendition IDs, name, format, effective frame count/duration and configured-profile compatibility |
+| `/catalog/playlists` | Paged saved playlist IDs, names, revisions, item counts and repeat/shuffle |
+| `/catalog/playlists/:id` | One playlist with its ordered item IDs, rendition IDs and duration/plays policies |
+| `/renditions/:id/preview.json` | Immutable 64x64 dimensions, frame count, ordered indexes/delays, effective duration and timing warnings |
+| `/renditions/:id/preview.png` | First cached effective PNG frame |
+| `/renditions/:id/frames/:index.png` | The selected cached effective PNG frame |
+
+List queries accept `limit` 1–100 (default 25) and nonnegative safe-integer
+`offset` (default 0), returning `items`, `total`, `limit`, `offset`, `apiVersion`
+and `catalogRevision`. Details return `apiVersion`, `catalogRevision` and
+`playlist`. Existing names retain their 120 UTF-16-code-unit validation and
+owner-chosen stored labels; imports use filenames when no other label exists.
+No private paths, originals, credentials or arbitrary URLs are exposed.
+
+A persistent catalog revision changes with media membership and playlist/name/item
+edits. Compare revisions across pages, details and snapshots, and refresh the
+affected view when they differ. Multiple requests are not one atomic snapshot.
+Immutable rendition IDs keep frame identity stable across unrelated edits.
+Compatibility describes admission under the active playback profile; it does
+not certify visible output and does not limit preview availability.
+
+Preview JSON contains `apiVersion`, `renditionId`, `width`, `height`,
+`frameCount`, nullable `durationMs`, `frames: [{index,delayMs}]` and the renderer's
+`warnings`. Stills keep null delay/duration. GIF frames preserve their effective
+delays, including repeated frames and the existing zero/missing-delay warnings.
+Animate only after validating the complete manifest and loading all required
+frames; a failed frame is not a complete animation. No GIF palette conversion
+or original decode occurs on reads.
+
+Preview ETags are quoted SHA-256 digests of actual representation bytes.
+Successful previews and conditional 304 use
+`Cache-Control: private, max-age=31536000, immutable`. Authorization and current
+catalog membership are checked before 304; deleted/unknown renditions return
+404. Catalog JSON, failures and ordinary snapshots stay `no-store`.
+
+At most eight native catalog/preview requests may be outstanding. Their five-second
+deadline includes time waiting for the library owner; expired work does not free
+admission until the underlying operation settles. Saturation returns 429
+`capacity`; deadline expiry returns 504 `timeout`. Cancellation prevents queued
+work from starting, and response bytes are fully verified before sending.
+The default 500-frame application allowance remains independent of the physical
+device profile. Existing custom simulator profiles can admit up to 1,000 frames;
+this interface previews those persisted renditions too. Preview JSON is bounded
+to 128 KiB and cached PNG frames to 64 KiB. Playlist detail consumers should allow
+at least 256 KiB for the existing 1,000-item bound. This interface adds no lower
+frame cap.

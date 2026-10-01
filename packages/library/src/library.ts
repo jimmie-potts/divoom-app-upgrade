@@ -58,9 +58,9 @@ export class Library {
     }
   }
 
-  private run<T>(action:()=>T|Promise<T>):Promise<T> {
+  private run<T>(action:()=>T|Promise<T>,signal?:AbortSignal):Promise<T> {
     if(this.closing) return Promise.reject(new LibraryError('closed'));
-    const result = this.tail.then(action).catch((error:unknown)=>{
+    const result = this.tail.then(()=>{if(signal?.aborted)throw new MediaError(signal.reason?.name==='TimeoutError'?'timeout':'cancelled');return action();}).catch((error:unknown)=>{
       if(error instanceof LibraryError || error instanceof MediaError) throw error;
       throw new LibraryError('database-error');
     });
@@ -95,23 +95,29 @@ export class Library {
   listAssets():Promise<Asset[]> {
     return this.run(()=>this.db.prepare('SELECT * FROM assets ORDER BY created_at,id').all().map(row=>this.asset(row)));
   }
-  async queryMedia(input:CatalogQuery,profile?:Readonly<MediaProfile>,stillDelayMs=100){
+  async queryMedia(input:CatalogQuery,profile?:Readonly<MediaProfile>,stillDelayMs=100,native=false,signal?:AbortSignal){
     const {q,offset,limit}=validate(catalogQuery,input);
     return this.run(()=>{
       const total=Number(this.db.prepare('SELECT count(*) AS n FROM renditions r JOIN assets a ON a.id=r.asset_id WHERE instr(lower(a.name),lower(?))>0').get(q)!.n);
       const rows=this.db.prepare('SELECT a.id AS asset_id,a.name,r.id,r.manifest_json FROM renditions r JOIN assets a ON a.id=r.asset_id WHERE instr(lower(a.name),lower(?))>0 ORDER BY a.created_at,a.id,r.id LIMIT ? OFFSET ?').all(q,limit,offset);
       const items=rows.map(row=>{const rendition=json<Rendition>(row.manifest_json);let compatible=true;try{renditionTiming(rendition,profile,stillDelayMs);}catch{compatible=false;}
         return {assetId:String(row.asset_id),renditionId:String(row.id),name:String(row.name),format:rendition.source.format,frameCount:rendition.frames.length,durationMs:rendition.effectiveDurationMs,compatible};});
-      return {items,total,offset,limit};
-    });
+      return {items,total,offset,limit,...(native?{catalogRevision:this.catalogRevision}: {})};
+    },signal);
   }
-  async queryPlaylists(input:CatalogQuery){
+  async queryPlaylists(input:CatalogQuery,native=false,signal?:AbortSignal){
     const {q,offset,limit}=validate(catalogQuery,input);
     return this.run(()=>{
       const total=Number(this.db.prepare('SELECT count(*) AS n FROM playlists WHERE instr(lower(name),lower(?))>0').get(q)!.n);
       const rows=this.db.prepare('SELECT p.id,p.name,p.revision,p.repeat,p.shuffle,(SELECT count(*) FROM items i WHERE i.playlist_id=p.id) AS item_count FROM playlists p WHERE instr(lower(p.name),lower(?))>0 ORDER BY p.created_at,p.id LIMIT ? OFFSET ?').all(q,limit,offset);
-      return {items:rows.map(row=>({id:String(row.id),name:String(row.name),revision:Number(row.revision),itemCount:Number(row.item_count),repeat:row.repeat===1,shuffle:row.shuffle===1})),total,offset,limit};
-    });
+      return {items:rows.map(row=>({id:String(row.id),name:String(row.name),revision:Number(row.revision),itemCount:Number(row.item_count),repeat:row.repeat===1,shuffle:row.shuffle===1})),total,offset,limit,...(native?{catalogRevision:this.catalogRevision}: {})};
+    },signal);
+  }
+  get catalogRevision():number {return Number(this.db.prepare('SELECT revision FROM catalog_revision WHERE slot=1').get()!.revision);}
+  async catalogPlaylist(id:string,signal?:AbortSignal){validate(idSchema,id);return this.run(()=>({catalogRevision:this.catalogRevision,playlist:this.playlist(id)}),signal);}
+  async preview(id:string,index:number|null,signal?:AbortSignal):Promise<{rendition:Rendition;bytes?:Buffer}>{
+    validate(hashSchema,id);
+    return this.run(async()=>{const rendition=this.manifest(id);return this.media.readPreview(rendition,index,signal);},signal);
   }
   async listRenditions(assetId:string):Promise<Rendition[]> {
     validate(idSchema,assetId);
