@@ -37,14 +37,15 @@ export function security(app:FastifyInstance,authenticate?:Authenticate,mcpEnabl
   if(!(mcpEnabled&&request.url==='/mcp')&&!nativeController&&!['GET','HEAD','OPTIONS'].includes(request.method)&&origin===undefined&&request.headers['x-pixoo-request']!=='1')throw new ApiError('forbidden',403);
   if((request.routeOptions.url?.startsWith('/api/')||request.url.split('?')[0]!.startsWith('/api/'))&&authenticate&&!(await authenticate(request)))throw new ApiError('unauthorized',401);
  });
- app.addHook('onSend',async(_request,reply,payload)=>{reply.header('x-content-type-options','nosniff');if(!nativeReadPath(_request.url.split('?')[0]!)||reply.statusCode>=400||!reply.hasHeader('etag'))reply.header('cache-control','no-store');return payload;});
+ app.addHook('onSend',async(request,reply,payload)=>{reply.header('x-content-type-options','nosniff');if(!nativeReadPath(request.routeOptions.url??request.url.split('?')[0]!)||reply.statusCode>=400||!reply.hasHeader('etag'))reply.header('cache-control','no-store');return payload;});
  app.setErrorHandler((error,request,reply)=>{
   const value=error as {code?:string;statusCode?:number;details?:Record<string,unknown>};
   let code='internal-error',status=500,details:Record<string,unknown>|undefined;
   if(error instanceof ApiError){code=error.code;status=error.status;details=error.details;}
   else if(error instanceof LibraryError||error instanceof MediaError||error instanceof PlaybackError){code=error.code;status=knownErrors[code]??500;if(error instanceof LibraryError)details=error.details;}
   else if(value.code?.startsWith('FST_')){status=value.statusCode===413?413:400;code=status===413?'upload-limit':'invalid-input';}
-  if(controllerEnabled&&(['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events',...integrationPaths].includes(request.url.split('?')[0]!)||nativeReadPath(request.url.split('?')[0]!))){
+  const path=request.routeOptions.url??request.url.split('?')[0]!;
+  if(controllerEnabled&&(['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events',...integrationPaths].includes(path)||nativeReadPath(path))){
    if(code==='busy'||code==='upload-limit'){code='capacity';status=429;}
    else if(code==='invalid-input')code='invalid-request';
   }

@@ -91,6 +91,26 @@ it('authenticates every preview and conditional read, validates paging, and reje
   await revokeCredential(f.dir,'reader');expect((await f.get(path,{'if-none-match':etag})).statusCode).toBe(401);
  }finally{await f.close();}
 });
+it('authenticates resolved native routes even when static path segments are encoded',async()=>{
+ const f=await setup();try{
+  const id=f.imported.rendition.id;
+  const paths=[`${prefix}/%63atalog/renditions`,`${prefix}/catalog/%72enditions`,`${prefix}/catalog/%70laylists`,
+   `${prefix}/renditions/${id}/preview%2epng`,`${prefix}/renditions/${id}/preview%2ejson`,`${prefix}/renditions/${id}/frames/0%2epng`,
+   `${prefix}/%73napshot?apiVersion=pixoo-integration%2F1.1`];
+  for(const url of paths){
+   expect((await f.app.inject({url})).statusCode,url).toBe(401);
+   expect((await f.app.inject({method:'HEAD',url})).statusCode,url).toBe(401);
+   expect((await f.app.inject({url,headers:{authorization:`Bearer ${f.control}`,'if-none-match':'*'}})).statusCode,url).toBe(403);
+   const response=await f.app.inject({url,headers:f.headers});expect(response.statusCode,url).toBe(200);
+   if(response.headers.etag){
+    const conditional=await f.app.inject({url,headers:{...f.headers,'if-none-match':String(response.headers.etag)}});
+    expect(conditional.statusCode,url).toBe(304);expect(conditional.headers['cache-control']).toBe('private, max-age=31536000, immutable');
+   }
+  }
+  await revokeCredential(f.dir,'reader');
+  for(const url of paths)expect((await f.app.inject({url,headers:{...f.headers,'if-none-match':'*'}})).statusCode,url).toBe(401);
+ }finally{await f.close();}
+});
 it('revisions identify playlist edits and survive restart without advancing on failed edits or duplicate imports',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'catalog-revision-'));let library=await Library.open({directory:dir});
  try{

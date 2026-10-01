@@ -31,7 +31,10 @@ export async function registerController(app:FastifyInstance,directory:string,se
    if(!principal.credential.scopes.includes(request.method==='POST'?'control':'read'))throw new ApiError('forbidden',403);
   }finally{if(timer)clearTimeout(timer);}
  }
- app.addHook('onRequest',async request=>{if(controllerPaths.has(request.url.split('?')[0]!)||nativeReadPath(request.url.split('?')[0]!))await authenticate(request);});
+ app.addHook('onRequest',async request=>{
+  const path=request.routeOptions.url??request.url.split('?')[0]!;
+  if(controllerPaths.has(path)||nativeReadPath(path))await authenticate(request);
+ });
  if(service.monitor){
   const snapshot=()=>({...service.integrationSnapshot(),identity:{controllerId:identity.controllerId,deviceId:identity.deviceId,sourceId:identity.sourceId}});
   const extensionEvents=new Events(snapshot,authenticate),previous=service.monitor.onChange;
