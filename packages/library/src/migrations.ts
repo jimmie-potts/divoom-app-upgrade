@@ -20,6 +20,11 @@ export const MIGRATIONS=[
   {version:3,sql:`
     CREATE TABLE playback_checkpoint(slot INTEGER PRIMARY KEY CHECK(slot=1), session_id TEXT NOT NULL UNIQUE REFERENCES sessions(id) ON DELETE RESTRICT, payload TEXT NOT NULL);
   `},
+  {version:4,sql:`
+    CREATE TABLE catalog_revision(slot INTEGER PRIMARY KEY CHECK(slot=1),revision INTEGER NOT NULL CHECK(revision>=0 AND revision<=9007199254740991));
+    INSERT INTO catalog_revision VALUES(1,0);
+    ${['assets','renditions','playlists','items'].flatMap(table=>['INSERT','UPDATE','DELETE'].map(operation=>`CREATE TRIGGER catalog_${table}_${operation.toLowerCase()} AFTER ${operation} ON ${table} BEGIN UPDATE catalog_revision SET revision=revision+1 WHERE slot=1; END;`)).join('\n')}
+  `},
 ] as const;
 export function transaction<T>(db:DatabaseSync,action:()=>T):T {
   db.exec('BEGIN IMMEDIATE');

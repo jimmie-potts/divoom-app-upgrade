@@ -152,3 +152,10 @@ JPEG orientation, PNG alpha, crop/scaling, queue/cancellation/process deadlines,
 cache identity/corruption, preservation and cleanup. A normally compressed GIF
 matches an independent sharp decode. Chromium decodes every stored preview pixel
 at desktop and mobile sizes and compares it to the effective RGB frames.
+
+Native integration preview reads validate the catalog-owned immutable manifest
+against the cached manifest and hash the requested PNG bytes. They do not decode
+originals or reread every other frame for each frame request. A missing/corrupt
+requested frame fails closed; successful frame reads do not certify unrequested
+frames. The client must load every manifest frame before presenting a complete
+animation. These source guarantees do not broaden physical playback support.
