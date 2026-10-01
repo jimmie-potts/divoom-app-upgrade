@@ -61,3 +61,17 @@ operation remain outside source delivery. Issues #12 and #26 own their separatel
 authorized physical observations.
 
 The simulator retains its existing recovery behavior; device-mode composition explicitly selects the uncertainty pause policy.
+
+## Library admission amendment — October 1, 2026
+
+[Issue #55](https://github.com/jimmie-potts/divoom-app-upgrade/issues/55) separates
+library admission from physical playback. Imports and new renditions now use the
+existing `simulator-v1` application resource budget in both runtime modes. This
+supersedes the earlier choice above to render new device-mode media with the
+smoke profile. Complete admitted GIFs remain available for previews and playlist
+authoring even when their physical playback is unqualified.
+
+Physical playback still validates every rendition against the active device
+profile before submitting device work. The historical smoke bounds, immutable
+renditions, ownership lock and uncertainty-pause behavior remain in force. Broader
+physical admission requires the separate observations and disposition in #55.
