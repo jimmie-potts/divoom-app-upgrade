@@ -37,11 +37,21 @@ test('player reports authoritative simulator state and supports clear session',a
 test('settings save explicit configuration without connecting hardware',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'Settings',exact:true}).click();
  await page.getByLabel('Device IP').fill('192.168.1.40');
- await page.getByLabel('Model observation').fill('Pixoo64');
+ await expect(page.getByLabel('Model',{exact:true})).toBeHidden();
+ await page.getByText('Device details',{exact:false}).click();
+ await page.getByLabel('Model',{exact:true}).fill('Pixoo64');
+ await page.getByLabel('Firmware version').fill('Observed version');
  await page.getByRole('button',{name:'Save configuration'}).click();
  await expect(page.getByText('Configuration saved. Simulator remains active.',{exact:true})).toBeVisible();
  await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).click();
  await expect(page.getByLabel('Device IP')).toHaveValue('192.168.1.40');
+ await expect(page.getByLabel('Model',{exact:true})).toBeHidden();
+ await page.getByRole('button',{name:'Save configuration'}).click();
+ await expect(page.getByText('Configuration saved. Simulator remains active.',{exact:true})).toBeVisible();
+ await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await page.getByText('Device details',{exact:false}).click();
+ await expect(page.getByLabel('Model',{exact:true})).toHaveValue('Pixoo64');
+ await expect(page.getByLabel('Firmware version')).toHaveValue('Observed version');
  await expect(page.getByText('No physical display connected.',{exact:true})).toBeVisible();
 });
 
