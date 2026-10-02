@@ -68,6 +68,7 @@ function SessionRow({session,disabled,shared}:{session:MonitorSession;disabled:b
  <p className="muted">Observed: {new Date(session.observedAtMs).toISOString()} · Last evidence: {new Date(session.lastEvidenceAtMs).toISOString()} · Observation age: {Math.floor(session.observationAgeMs/1000)} s</p>
  {session.title&&<p>Title: {session.title.value}</p>}
  <p>Project: {session.project??session.projectId??'No project'}</p>
+ {session.unavailable.length>0&&<><p>Unavailable evidence:</p><ul aria-label="Unavailable evidence">{session.unavailable.map((evidence,index)=><li key={index}>{evidence.dimension}: {evidence.reason}</li>)}</ul></>}
  <label>Chosen label<input aria-label={`Label for ${id}`} maxLength={160} value={label} onChange={e=>setLabel(e.target.value)}/></label>
  <button disabled={disabled} aria-label={`Save label for ${id}`} onClick={()=>shared({operation:'label',identity:session.identity,label:label||null})}>Save label</button>
  {session.notices.filter(n=>!n.acknowledgedBy.includes('pixoo')).map(n=><button key={n.id} disabled={disabled} aria-label={`Dismiss notice for ${id}`} onClick={()=>shared({operation:'acknowledge',identity:session.identity,noticeId:n.id})}>Dismiss turn-ended notice</button>)}

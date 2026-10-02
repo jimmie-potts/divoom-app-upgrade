@@ -321,9 +321,28 @@ three sketches and asked that it pulse only when a person is needed.
 | Attention, y=12–20 | Amber chip reading `APPROVAL`, `INPUT` or `QUESTION`. Only then does the picture pulse: a second 500 ms frame dims the tile and chip. `TURN END` without a chip is a retained turn-ended notice, never task success |
 | Label/title, y=26 and y=35 (y=27 and y=36 with a project) | Up to 20 characters in the 5×7 font on two lines of ten. The line breaks after a space, `-`, `_`, `/` or `.` when the rest fits, otherwise at ten |
 | Project, y=45 when present | Shared project name, accent-folded and shortened to 15 characters with a middle ellipsis |
-| Details, y=45 (y=21 with a project) | `+n SUB` active subagents; `+9+` means more than nine; `?` marks incomplete relationship or activity evidence. `UNSURE`, with a dimmed label, marks uncertain, stale or unknown evidence |
+| Details, y=45 (y=21 with a project) | `+n SUB` active subagents; `+9+` means more than nine; `?` marks incomplete relationship or activity evidence. `UNSURE`, with a dimmed label, follows the evidence policy below |
 | Summary, y=56 | Matching sessions, `!n` sessions with approval, input or questions across all pages and filters, and page dots, or `p/n` above eight pages |
 | Health, x=52 and x=58 | Source: filled current, ring stale, ✕ unavailable. Collector: filled running, ‖ quiesced, ✕ faulted, hollow square closed, ? unknown |
+
+The owner approved this presentation policy in [issue #102](https://github.com/jimmie-potts/divoom-app-upgrade/issues/102) on October 2, 2026. It applies equally with and without a project:
+
+| Evidence | `UNSURE` and identifier dimming |
+| --- | --- |
+| Non-current source connection, uncertain freshness, unknown activity or unknown parent | Warn |
+| Unknown ordering alone; ordering unavailable with `missing`, `unsupported` or `inaccessible` reason | Do not warn solely for this limit |
+| Ordering unavailable with `ambiguous` or `lost` reason | Warn |
+| Unknown optional read evidence; read unavailable with `missing`, `unsupported` or `inaccessible` reason | Do not warn solely for this limit |
+| Read unavailable with `ambiguous` or `lost` reason | Warn |
+| Unavailable `activity`, `attention`, `turn` or `parent`, for any supported reason | Warn |
+| Unknown turn without an unavailable entry | Warn |
+
+This is a presentation rule, not a claim that ordering or readership is known.
+The shared snapshot and complete unavailable list remain unchanged. Each Monitor
+session card lists every unavailable dimension and reason, including limits
+that do not trigger `UNSURE`. Conflicts and lost evidence remain visible; missing
+ordering alone does not obscure otherwise current status. Child uncertainty,
+attention priority and retained notices keep their existing meanings.
 
 Every mark differs in shape or words as well as colour. Labels use an original
 5×7 font. Small words use the 3×5 font, which covers ASCII A–Z, digits, space and
@@ -388,7 +407,9 @@ frame at native 64x64 and nearest-neighbor 4x, with full layout details. Every
 legend state appears: each activity, attention kind and provider, a retained
 notice, subagents above nine, uncertainty, each source and collector state, an
 empty view, more than eight pages and four unlabeled sessions whose IDs share a
-prefix. The browser checks compare every canvas frame to renderer RGB; fake-device
+prefix. Project and non-project examples include realistic missing ordering,
+both without a warning and alongside evidence that still warns; dedicated examples
+show ambiguous ordering and lost read evidence. The browser checks compare every canvas frame to renderer RGB; fake-device
 tests verify the same frames in one upload. These tests do not prove physical
 readability, installed hooks or timing.
 

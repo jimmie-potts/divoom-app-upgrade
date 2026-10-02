@@ -45,7 +45,7 @@ const lit=(frame:Frame,x0:number,y0:number,x1:number,y1:number)=>{const bits=[];
 const differs=(a:Frame,b:Frame)=>{const out:Array<[number,number]>=[];for(let i=0;i<4096;i++)if(a[i*3]!==b[i*3]||a[i*3+1]!==b[i*3+1]||a[i*3+2]!==b[i*3+2])out.push([i%64,Math.floor(i/64)]);return out;};
 async function renderOne(patch:Partial<SessionSnapshot>={},change:(state:MonitorView)=>void=()=>{}){
  const {renderDashboard}=await import('../../apps/server/src/dashboard-pixels.js');
- const state=view([session('a',{label:'Build',ordering:{status:'known',epoch:'e',sequence:1},...patch})]);change(state);
+ const state=view([session('a',{label:'Build',turn:{status:'known',id:'t'},ordering:{status:'known',epoch:'e',sequence:1},...patch})]);change(state);
  const layout=new DashboardPager().layout(state,0);
  return {layout,frames:renderDashboard(layout)};
 }
@@ -130,7 +130,7 @@ it('covers every legend state in the synthetic examples and matches their frame 
  expect(new Set(layouts.map(layout=>layout.collector))).toEqual(new Set(['running','quiesced','faulted','closed','unknown']));
  expect(layouts.some(layout=>!layout.rows.length)).toBe(true);
  expect(layouts.some(layout=>layout.pages>8)).toBe(true);
- expect(cases.map(c=>c.rendition.frames.length)).toEqual([2,2,2,1,1,1,1,1,1,1,1,1,1,2]);
+ expect(cases.map(c=>c.rendition.frames.length)).toEqual([2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,2]);
  for(const c of cases)expect(c.rendition.rgb).toEqual(c.rendition.frames[0]);
  expect(cases.map(c=>c.rendition.frames.map(frame=>createHash('sha256').update(new Uint8Array(frame)).digest('hex').slice(0,16)).join(' '))).toEqual([
   'd17b4eff2ddfa03d 120e94276ae78ec2',
@@ -146,11 +146,14 @@ it('covers every legend state in the synthetic examples and matches their frame 
   '52d07ec1c0a0ff50',
   'd4bccd3803d166b6',
   '94293ef42bd5c839',
+  '8049586657dfe10e',
+  '462e424af084472d',
   'aab42864520804b9 7fe1b2c9d92c799d'
  ]);
  expect(rows.some(row=>row.title&&!row.project&&row.label===row.title.value)).toBe(true);
  expect(rows.some(row=>row.project&&row.label==='Owner choice'&&row.title?.value==='Résumé monitor')).toBe(true);
  expect(rows.some(row=>row.project&&row.label===row.title?.value)).toBe(true);
+ for(const project of [true,false])for(const uncertain of [true,false])expect(rows.some(row=>Boolean(row.project)===project&&row.uncertain===uncertain&&row.unavailable.some(e=>e.dimension==='ordering'&&e.reason==='missing'))).toBe(true);
  expect(layouts[1]).toMatchObject({attentionTotal:3,page:1,rows:[{attention:'input'}]});
 });
 const sharedPrefix=['01a0d3e2-7c4b-7f10-9a3e-5b1c2d4e8f01','01a0d3e2-7c4b-7f10-b1c4-02d9e6a7c3b2','01a0d3e2-91f0-7a22-8d05-c7e3f1a09d43','01a0d3e4-0b6a-7c31-a7f2-4e8b9c2d1f54'];
@@ -215,4 +218,52 @@ it('places project below the title and moves details above it without overlappin
  expect(lit(frames[0]!,33,3,62,7)).toContain('1');
  expect(frames).toHaveLength(2);
  expect(differs(frames[0]!,frames[1]!).every(([x,y])=>(x>=1&&x<=20&&y>=1&&y<=20)||(x>=24&&x<=62&&y>=12&&y<=20))).toBe(true);
+});
+
+it('does not warn solely for routine missing ordering and preserves the complete evidence',()=>{
+ const state=view([session('a',{turn:{status:'known',id:'t'},unavailable:[{kind:'evidence.unavailable',dimension:'ordering',reason:'missing'}]})]);
+ const before=structuredClone(state),row=new DashboardPager().layout(state,0).rows[0]!;
+ expect(row.uncertain).toBe(false);
+ expect(row.unavailable).toEqual(before.snapshot!.sessions[0]!.unavailable);
+ expect(state).toEqual(before);
+ row.unavailable.length=0;
+ expect(state).toEqual(before);
+});
+
+const evidencePolicy=[
+ ['ordering','missing',false],['ordering','unsupported',false],['ordering','inaccessible',false],['ordering','ambiguous',true],['ordering','lost',true],
+ ['read','missing',false],['read','unsupported',false],['read','inaccessible',false],['read','ambiguous',true],['read','lost',true],
+ ...(['activity','attention','turn','parent'] as const).flatMap(dimension=>(['missing','unsupported','inaccessible','ambiguous','lost'] as const).map(reason=>[dimension,reason,true] as const)),
+] as const;
+it.each(evidencePolicy)('applies the approved %s / %s uncertainty policy (%s)',(dimension,reason,uncertain)=>{
+ const item=session('a',{turn:{status:'known',id:'t'},ordering:{status:'known',epoch:'e',sequence:1},unavailable:[{kind:'evidence.unavailable',dimension,reason}]});
+ const state=view([item]),before=structuredClone(state),row=new DashboardPager().layout(state,0).rows[0]!;
+ expect(row.uncertain).toBe(uncertain);
+ expect(row.unavailable).toEqual(item.unavailable);
+ expect(state).toEqual(before);
+});
+it('keeps unknown ordering and optional read separate from unknown turn and other state warnings',()=>{
+ const certain={turn:{status:'known',id:'t'},ordering:{status:'known',epoch:'e',sequence:1}} as const;
+ for(const patch of [{},{ordering:{status:'unknown'}},{read:'unknown'}] as Partial<SessionSnapshot>[])
+  expect(new DashboardPager().layout(view([session('a',{...certain,...patch})]),0).rows[0]!.uncertain).toBe(false);
+ for(const patch of [{turn:{status:'unknown'}},{activity:'unknown'},{parent:{status:'unknown'}},{freshness:'uncertain'}] as Partial<SessionSnapshot>[])
+  expect(new DashboardPager().layout(view([session('a',{...certain,...patch})]),0).rows[0]!.uncertain).toBe(true);
+ for(const connection of ['stale','unavailable'] as const){const state=view([session('a',certain)]);state.connection=connection;expect(new DashboardPager().layout(state,0).rows[0]!.uncertain).toBe(true);}
+});
+it.each([undefined,'DIVOOM'])('keeps warning words and label dimming accurate with project %s',async(project)=>{
+ const {drawText}=await import('../../apps/server/src/pixel-font.js');
+ const patch={...(project?{project}:{}),ordering:{status:'unknown'} as const};
+ const baseline=(await renderOne(patch)).frames[0]!;
+ const routine=(await renderOne({...patch,unavailable:[{kind:'evidence.unavailable',dimension:'ordering',reason:'missing'},{kind:'evidence.unavailable',dimension:'read',reason:'unsupported'}]})).frames[0]!;
+ expect(routine).toEqual(baseline);
+ const y=project?21:45,titleY=project?27:26;
+ expect(lit(routine,40,y,63,y+4)).not.toContain('1');
+ const expected=new Uint8Array(12288);drawText(expected,'UNSURE',40,y,[1,1,1]);
+ for(const dimension of ['ordering','read'] as const)for(const reason of ['ambiguous','lost'] as const){
+  const warning=(await renderOne({...patch,unavailable:[{kind:'evidence.unavailable',dimension,reason}]})).frames[0]!;
+  expect(lit(warning,40,y,63,y+4)).toBe(lit(expected,40,y,63,y+4));
+  let labelPixels=0;
+  for(let dy=0;dy<7;dy++)for(let x=2;x<32;x++){const i=((titleY+dy)*64+x)*3;if(routine[i]){labelPixels++;expect(warning[i]).toBeLessThan(routine[i]!);expect(warning[i]).toBeGreaterThan(0);}}
+  expect(labelPixels).toBeGreaterThan(0);
+ }
 });

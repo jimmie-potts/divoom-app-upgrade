@@ -19,7 +19,7 @@ function session({provider,label,activity,attention,notice,children}:Example,ind
   turn:{status:'known',id:'t1'},parent:{status:'top-level'},label,activity,
   attention:attention?[{kind:attention,id:{status:'known',id:'a'},turn:{status:'known',id:'t1'}}]:[],
   notices:notice?[{id:'notice',kind:'turn-ended',turn:{status:'known',id:'t0'},acknowledgedBy:[]}]:[],
-  read:'unknown',unavailable:[],ordering:{status:'known',epoch:'e',sequence:1},lastEvidenceAtMs:1000,observedAtMs:1000,observationAgeMs:0,freshness:'current',restartUncertain:false,children:children??{active:0,uncertain:0}};
+  read:'unknown',unavailable:[{kind:'evidence.unavailable',dimension:'ordering',reason:'missing'}],ordering:{status:'unknown'},lastEvidenceAtMs:1000,observedAtMs:1000,observationAgeMs:0,freshness:'current',restartUncertain:false,children:children??{active:0,uncertain:0}};
 }
 /** Named synthetic views; each is paged from zero to `atMs` so every legend state appears on some page. */
 export function syntheticDashboardViews():Array<{name:string;view:MonitorView;atMs:number}>{
@@ -43,8 +43,10 @@ export function syntheticDashboardViews():Array<{name:string;view:MonitorView;at
   {name:'Unknown activity, collector quiesced',view:variant(view=>{view.snapshot!.collector='quiesced';}),atMs:60000},
   {name:'Source unavailable',view:variant(view=>{view.connection='unavailable';view.snapshot=null;}),atMs:0},
   {name:'More than eight sessions',view:many,atMs:0},
-  {name:'Shared title, accents folded',view:titled({}),atMs:0},
-  {name:'Owner label wins; title and project retained',view:titled({label:'Owner choice',labelOrigin:'user',project:'DIVOOM-APP-UPGRADE'}),atMs:0},
+  {name:'Shared title, accents folded; missing ordering without a warning',view:titled({}),atMs:0},
+  {name:'Owner label wins; project and missing ordering without a warning',view:titled({label:'Owner choice',labelOrigin:'user',project:'DIVOOM-APP-UPGRADE'}),atMs:0},
+  {name:'Ordering conflict without a project',view:titled({unavailable:[{kind:'evidence.unavailable',dimension:'ordering',reason:'ambiguous'}]}),atMs:0},
+  {name:'Project with missing ordering and lost read evidence',view:titled({project:'DIVOOM-APP-UPGRADE',unavailable:[{kind:'evidence.unavailable',dimension:'ordering',reason:'missing'},{kind:'evidence.unavailable',dimension:'read',reason:'lost'}]}),atMs:0},
   {name:'Title and project, uncertain subagents and approval',view:titled({project:'DIVOOM-APP-UPGRADE',freshness:'uncertain',children:{active:2,uncertain:1},attention:[{kind:'approval',id:{status:'known',id:'a'},turn:{status:'known',id:'t1'}}]}),atMs:0},
  ];
 }

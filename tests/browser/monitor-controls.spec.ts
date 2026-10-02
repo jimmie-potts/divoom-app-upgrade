@@ -52,3 +52,40 @@ test('monitor panel uses explicit mode, shared labels, project filters and exact
   expect(await page.locator('body').evaluate(el=>el.scrollWidth<=window.innerWidth)).toBe(true);
  }finally{await page.context().close();await app.close();await rm(dataDir,{recursive:true,force:true});}
 });
+
+test('monitor lists all unavailable evidence while retaining suppressed limits and exact pixels',async({page})=>{
+ const dataDir=await mkdtemp(join(tmpdir(),'pixoo-evidence-ui-'));await mkdir(join(dataDir,'agent-monitor'));
+ await writeFile(join(dataDir,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));
+ const token=await provisionCredential(join(dataDir,'agent-monitor'),'fixture',['read','control']);
+ const app=createApp({dataDir,monitorEnabled:true,monitorRenderCadenceMs:1,webRoot:resolve('apps/web/dist')});
+ const address=await app.listen({host:'127.0.0.1',port:0});
+ const event={apiVersion:'1.1',title:{value:'Evidence policy',source:'provider'},project:'DIVOOM',identity:{provider:'codex',client:'cli',hostId:'fixture',sourceId:'fixture',sessionId:'evidence-session'},turn:{status:'known',id:'turn'},parent:{status:'top-level'},ordering:{status:'unknown'}};
+ const post=async(evidence:Record<string,string>)=>expect((await fetch(address+'/api/monitor/v1/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'x-pixoo-request':'1','content-type':'application/json'},body:JSON.stringify({...event,observedAtMs:Date.now(),event:evidence})})).ok).toBe(true);
+ const read=async()=>await (await fetch(address+'/api/integration/v1/view')).json();
+ try{
+  await post({kind:'activity.observed'});
+  await post({kind:'evidence.unavailable',dimension:'read',reason:'unsupported'});
+  await page.goto(address);await page.getByRole('button',{name:'Monitor',exact:true}).click();
+  const card=page.getByRole('article').filter({has:page.getByRole('heading',{name:'Evidence policy',exact:true})});
+  const evidence=card.getByRole('list',{name:'Unavailable evidence'});
+  await expect(evidence.getByRole('listitem')).toHaveText(['ordering: missing','read: unsupported']);
+  const initial=await read();
+  expect(initial.dashboard.rendition.layout.rows[0].uncertain).toBe(false);
+  const entries=[{dimension:'activity',reason:'missing'},{dimension:'attention',reason:'inaccessible'},{dimension:'turn',reason:'lost'},{dimension:'parent',reason:'ambiguous'}];
+  for(const entry of entries)await post({kind:'evidence.unavailable',...entry});
+  const expected=[{kind:'evidence.unavailable',dimension:'ordering',reason:'missing'},{kind:'evidence.unavailable',dimension:'read',reason:'unsupported'},...entries.map(entry=>({kind:'evidence.unavailable',...entry}))];
+  await expect(evidence.getByRole('listitem')).toHaveCount(expected.length);
+  for(const entry of expected)await expect(evidence.getByText(`${entry.dimension}: ${entry.reason}`,{exact:true})).toBeVisible();
+  await expect.poll(async()=>{
+   const current=await read();return current.dashboard.rendition.layout.rows[0].unavailable;
+  }).toEqual(expect.arrayContaining(expected));
+  const current=await read();
+  expect(current.source.snapshot.sessions[0].unavailable).toEqual(expect.arrayContaining(expected));
+  expect(current.dashboard.rendition.layout.rows[0].unavailable).toEqual(current.source.snapshot.sessions[0].unavailable);
+  expect(current.dashboard.rendition.layout.rows[0].uncertain).toBe(true);
+  const preview=page.getByLabel('Exact monitor preview');
+  await expect.poll(async()=>await preview.evaluate(el=>Array.from((el as HTMLCanvasElement).getContext('2d')!.getImageData(0,0,64,64).data).filter((_,i)=>i%4!==3))).toEqual(current.dashboard.rendition.rgb);
+  expect((await read()).source.snapshot.sessions[0].unavailable).toEqual(current.source.snapshot.sessions[0].unavailable);
+  expect(await page.locator('body').evaluate(el=>el.scrollWidth<=window.innerWidth)).toBe(true);
+ }finally{await page.context().close();await app.close();await rm(dataDir,{recursive:true,force:true});}
+});
