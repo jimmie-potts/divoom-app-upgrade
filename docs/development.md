@@ -38,6 +38,7 @@ read-only, report that instead of redirecting it.
 | `npm run test:browser` | Builds then tests the actual page and error/retry at desktop/mobile sizes |
 | `npm run check:workflow` | Validates current specs/changes and archived tasks |
 | `npm run test:workflow` | Exercises workflow CLI safeguards in temporary fixtures |
+| `npm run device:gif -- --help` | Offline-default GIF qualification tool; physical flags require separate authorization |
 | `npm run check` | Lint, typecheck, build/tests and both workflow checks |
 | `npm run simulator` | Builds then starts one loopback backend and UI |
 | `npm start` | Starts a previously built application |
@@ -394,3 +395,11 @@ This check establishes source contract compatibility only.
 fixtures and fake-backed native controller compatibility suite. It is suitable
 for hub CI after a Node 24 `npm ci`; it needs no device or installed credential.
 The full `npm run check` includes the same tests. See [native API](hub-controller-api.md).
+
+
+### Hosted GIF regression checks
+
+`npm run check` includes the hosted encoder, HTTP transfer, admission and adapter
+regressions. `npm run test:browser` checks the Settings/profile and full preview
+journeys. These device-free checks are required alongside separately authorized
+normal-player camera acceptance; neither replaces it.

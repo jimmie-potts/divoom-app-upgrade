@@ -1,0 +1,42 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {GIFEncoder} from 'gifenc';
+import {createApp} from '../../apps/server/src/app.js';
+import {gifFixture} from '../helpers/media-fixtures.js';
+import {multipart,mutationHeaders as headers} from '../helpers/http-api.js';
+const cleanup:(()=>Promise<unknown>)[]=[];
+afterEach(async()=>{for(const close of cleanup.splice(0).reverse())await close();});
+it('plays a 500-frame import through the player and rejects mixed timing and lossy replacements before effects',async()=>{
+ const dataDir=await mkdtemp(join(tmpdir(),'hosted-app-')),deviceLockDirectoryForTests=await mkdtemp(join(tmpdir(),'hosted-lock-'));
+ cleanup.push(()=>rm(dataDir,{recursive:true,force:true}),()=>rm(deviceLockDirectoryForTests,{recursive:true,force:true}));
+ await writeFile(join(dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.50.20',profile:'pixoo64-hosted-2026-10-01'}}));
+ await writeFile(join(dataDir,'hosted-gif.json'),JSON.stringify({bind:'127.0.0.1',port:0,origin:'http://127.0.0.1:0'}));
+ const commands:Record<string,unknown>[]=[],files:Buffer[]=[];
+ const transportForTests=async(body:Record<string,unknown>)=>{commands.push(body);if(body.Command==='Device/PlayTFGif')files.push(Buffer.from(await (await fetch(String(body.FileName))).arrayBuffer()));return {error_code:0,PicId:1};};
+ const app=createApp({dataDir,mode:'device',deviceLockDirectoryForTests,transportForTests});cleanup.push(()=>app.close());
+ const command=async(command:string,extra={})=>app.inject({method:'POST',url:'/api/player/commands',headers,payload:{requestId:(await app.inject('/api/player')).json().nextRequestId,command,...extra}});
+ const imported=async(bytes:Buffer)=>{const response=await app.inject({method:'POST',url:'/api/assets',...multipart(bytes)});expect(response.statusCode).toBe(201);return response.json().rendition;};
+ const good=await imported(gifFixture(1,1,Array.from({length:500},(_,i)=>({width:1,height:1,pixels:[Math.floor(i/5)%4],delay:6}))));
+ expect((await app.inject(`/api/renditions/${good.id}/compatibility`)).json().compatible).toBe(true);
+ expect(commands).toEqual([]);
+ expect((await command('show-media',{renditionId:good.id,playback:{mode:'plays',totalPlays:2}})).statusCode).toBe(200);
+ await vi.waitFor(async()=>expect((await app.inject('/api/player')).json().player.state).toBe('playing'),{timeout:5000});
+ expect(commands.map(c=>c.Command)).toEqual(['Device/PlayTFGif']);expect(files).toHaveLength(1);
+ const state=(await app.inject('/api/player')).json();
+ expect(state.player.dwellDeadlineMs-state.player.estimatedReadyAtMs).toBeCloseTo(60000,0);
+ const gif=GIFEncoder(),pixels=Uint8Array.from({length:4096},(_,i)=>i%256);
+ gif.writeFrame(pixels,64,64,{palette:Array.from({length:256},(_,i)=>[i,0,0]),delay:60,dispose:1,transparent:false,repeat:0});
+ gif.writeFrame(pixels,64,64,{palette:Array.from({length:256},(_,i)=>[i,255,0]),delay:60,dispose:1,transparent:false,repeat:0});gif.finish();
+ for(const bytes of [gifFixture(1,1,[{width:1,height:1,pixels:[1],delay:5},{width:1,height:1,pixels:[2],delay:6}]),Buffer.from(gif.bytes())]){
+  const invalid=await imported(bytes);
+  expect((await app.inject(`/api/renditions/${invalid.id}/compatibility`)).json().compatible).toBe(false);
+  expect((await command('show-media',{renditionId:invalid.id})).statusCode).toBe(422);
+  expect((await app.inject('/api/player')).json().session).toEqual(state.session);expect(commands).toHaveLength(1);
+ }
+ await command('stop');await app.close();
+ const reopened=createApp({dataDir,mode:'device',deviceLockDirectoryForTests,transportForTests});cleanup.push(()=>reopened.close());
+ expect((await reopened.inject('/api/player')).json().player.state).toBe('paused');expect(commands).toHaveLength(1);
+ expect((await reopened.inject(`/api/renditions/${good.id}`)).json().frames).toHaveLength(500);
+},20000);

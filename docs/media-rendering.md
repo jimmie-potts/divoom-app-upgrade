@@ -112,9 +112,13 @@ accepts one or two frames with exactly 500 ms animation delays, reflecting the
 [September 6 smoke test](https://github.com/jimmie-potts/divoom-app-upgrade/issues/4#issuecomment-5562714620).
 The user identified Pixoo64; firmware was unknown and early loading screens were
 observed. This profile establishes no broader limits or precise visible timing.
-Custom observed-device claims are rejected. Explicit device startup selects this
-profile for catalog imports and new renditions. Playback also validates older
-renditions against its actual frame/timing bounds without rewriting them.
+Custom observed-device claims are rejected. Catalog imports and new renditions
+use the existing simulator-v1 application budget in both runtime modes. Its
+stored name and evidence label remain unchanged to preserve rendition identity;
+they do not imply that an imported animation has been qualified for hardware.
+Playback independently validates all renditions against its active frame/timing
+bounds without rewriting them. The library UI reports compatibility separately
+from preview availability.
 The protocol spike's separate experimental profile is not changed by this renderer.
 
 Profile violations fail with `profile-limit`. The package does not truncate,
@@ -159,3 +163,23 @@ originals or reread every other frame for each frame request. A missing/corrupt
 requested frame fails closed; successful frame reads do not certify unrequested
 frames. The client must load every manifest frame before presenting a complete
 animation. These source guarantees do not broaden physical playback support.
+
+
+The explicitly selected `pixoo64-gif-2026-10-01` playback profile admits up to
+20 frames with one fixed delay of 100–800 ms per animation. Every frame must
+use that delay. To hold a pose, repeat its frame; repeats remain separate and
+count toward the 20-frame limit. For example, five identical frames at 100 ms
+request a 500 ms hold. There is no automatic conversion of mixed-delay GIFs.
+
+The envelope follows the [October 1 camera evidence](hardware-validation.md#recorded-gif-timing--october-1-2026)
+and owner disposition; it is not a hardware maximum or a measurement of every
+combination. It replaces the unreleased September 30 candidate, whose
+nonuniform-timing assumption the recordings disproved. The historical smoke
+profile is unchanged. Imports still use `simulator-v1` in either runtime mode,
+so existing rendition identities and complete mixed-delay previews remain valid.
+Physical admission independently rejects unequal effective frame delays.
+
+
+## Hosted profile integration
+
+The separately selected hosted profile requires lossless global-palette admission for multi-frame playback. Full import and preview remain unchanged. See [hosted playback](device-application.md#hosted-gif-playback) for the exact envelope and encoding. Compatibility and capture validate the immutable effective RGB frames, including combined color count, before context replacement.

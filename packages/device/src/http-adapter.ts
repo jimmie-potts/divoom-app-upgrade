@@ -3,6 +3,7 @@ import {
   type OperationOptions, type OperationResult, type ProbeResult, type UploadResult,
 } from './contracts.js';
 import { snapshotAnimation } from './frames.js';
+import type {HostedFiles} from './hosted-files.js';
 import { createDeviceTransport, DeviceRequestError, validateDeviceIp, type DeviceTransport } from './http-transport.js';
 
 export interface DeviceProfile {
@@ -19,9 +20,9 @@ export const SPIKE_PROFILE: Readonly<DeviceProfile> = Object.freeze({
   name: 'two-frame-smoke', evidence: 'unverified', maxFrames: 2,
   minDelayMs: 100, maxDelayMs: 1000, uniformTiming: true, readyDelayMs: 0,
 });
-interface HttpOptions { ip: string; profile: DeviceProfile; clock?: Clock }
+interface HttpOptions { ip: string; profile: DeviceProfile; clock?: Clock; hosted?:{files:HostedFiles;encode(animation:Animation):Uint8Array} }
 interface Work { start(): void; cancel(code: FailureCode): void }
-interface Context { send(body: Record<string, unknown>, mutating?: boolean): Promise<Record<string, unknown>> }
+interface Context { signal:AbortSignal;check():void;send(body: Record<string, unknown>, mutating?: boolean): Promise<Record<string, unknown>> }
 function integer(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max;
 }
@@ -39,7 +40,7 @@ export class HttpDeviceAdapter implements DeviceAdapter {
   private idle: (()=>void)[]=[];
   private waiting: Work[] = [];
   private active: Work | undefined;
-  constructor(options: HttpOptions, transportForTests?: DeviceTransport) {
+  constructor(private readonly options: HttpOptions, transportForTests?: DeviceTransport) {
     validateDeviceIp(options.ip);
     this.profile = { ...options.profile };
     const p = this.profile;
@@ -72,6 +73,15 @@ export class HttpDeviceAdapter implements DeviceAdapter {
     const valid = !!snapshot && snapshot.frames.length <= p.maxFrames && snapshot.frames.every(frame =>
       frame.delayMs >= p.minDelayMs && frame.delayMs <= p.maxDelayMs && (!p.uniformTiming || frame.delayMs === snapshot.frames[0]!.delayMs));
     return this.enqueue(options, valid, async context => {
+      if(this.options.hosted&&snapshot!.frames.length>1){
+        const bytes=this.options.hosted.encode(snapshot!);context.check();
+        const file=this.options.hosted.files.publish(bytes,context.signal);
+        try{
+          await context.send({Command:'Device/PlayTFGif',FileType:2,FileName:file.url},true);
+          await file.transferred;context.check();
+          return {estimatedReadyAtMs:this.clock.now()+p.readyDelayMs};
+        }finally{file.revoke();}
+      }
       const id = field((await context.send({ Command: 'Draw/GetHttpGifId' })).PicId, 0, 2 ** 31 - 1);
       for (const [offset, frame] of snapshot!.frames.entries()) {
         await context.send({ Command: 'Draw/SendHttpGif', PicNum: snapshot!.frames.length, PicWidth: 64,
@@ -139,7 +149,7 @@ export class HttpDeviceAdapter implements DeviceAdapter {
         if (startedAtMs === null) finish();
       };
       const abort = () => { cancel('cancelled'); };
-      const context: Context = { send: async (body, mutating = false) => {
+      const context: Context = {signal:controller.signal,check:()=>{const code=interrupted();if(code)throw new DeviceRequestError(code);},send: async (body, mutating = false) => {
         const code = interrupted(); if (code) throw new DeviceRequestError(code);
         if (mutating) priorEffects = 'possible';
         const response = await this.transport(body, controller.signal);

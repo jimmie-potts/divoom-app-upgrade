@@ -25,7 +25,7 @@ npm start
 ```
 
 In Settings, enter the explicitly supplied private IPv4 address and select
-`pixoo64-smoke-2026-09-06`. Leave model or firmware observations blank when unknown.
+`pixoo64-smoke-2026-09-06` or `pixoo64-gif-2026-10-01`. Leave model or firmware notes blank when unknown. Existing installations keep their selected profile until explicitly changed and restarted.
 Save configuration writes a version-1 file beneath `PIXOO_DATA_DIR`; saving does
 not enable hardware. Its shape is:
 
@@ -77,12 +77,25 @@ may continue looping. Cancellation cannot undo a request the display received.
 
 ## Use the recorded media limits
 
-Device mode renders with `pixoo64-smoke-2026-09-06`: one or two complete 64×64
-frames and exactly 500 ms per animation frame. The recorded smoke test had unknown
-firmware and early loading screens. These bounds establish no wider capability.
+Device mode imports and renders under the same bounded 500-frame application
+budget as the simulator. Physical playback uses the explicitly selected profile:
 
-An incompatible GIF fails with `profile-limit`; the application does not drop
-frames or retime it. Older simulator renditions can play only when their actual
+- `pixoo64-smoke-2026-09-06`: one or two complete 64×64 frames, exactly 500 ms per animation frame.
+- `pixoo64-gif-2026-10-01`: up to 20 complete 64×64 frames with one fixed delay of 100–800 ms per animation.
+
+Every frame in an animation must have the same delay. To hold a pose, repeat its
+frame; repeats count toward the frame limit. Five identical frames at 100 ms,
+for example, request a 500 ms hold. Imports are not automatically converted.
+
+The GIF profile is a bounded admission envelope based on the October 1 recorded
+timing tests and owner decision. It is not a hardware maximum or exhaustive
+timing qualification. Firmware remains unknown. The owner observed 1–3-second
+loading screens between animations, and later GIF-to-still flashing remains
+unresolved. See the [recorded hardware evidence](hardware-validation.md#recorded-gif-timing--october-1-2026).
+
+An admitted GIF remains fully previewable even when physical playback is
+unqualified. Playback of an incompatible GIF fails with `profile-limit` before
+queueing device work; the application does not drop frames or retime it. Older simulator renditions can play only when their actual
 frames and delays satisfy the active bounds. Stored renditions stay immutable.
 A PNG/JPEG still uses a 500 ms transport placeholder; its duration policy alone
 sets dwell. GIF delays, including a single-frame GIF, retain their effective
@@ -145,3 +158,60 @@ Codex supplies proxy settings when its network proxy is active; its permission
 profile must also allow the exact device IP. An allowed destination and a usable
 connection route are both needed. Physical observations remain separate from a
 successful probe.
+
+
+## Hosted GIF playback
+
+Select `pixoo64-hosted-2026-10-01` explicitly for hosted multi-frame playback.
+The earlier smoke and raw-upload profiles keep their existing meanings. The
+hosted software envelope is 500 frames, one uniform 50–800 ms delay in 10 ms
+steps, and at most 256 distinct effective RGB colors across the animation.
+Observed fixtures were 20×100 ms, 100×50 ms and 500×60 ms; the envelope is not an
+exhaustively measured hardware limit. No duration cap is imposed.
+
+The encoder maps exact effective colors to one global palette, with no local
+palettes, no transparency and disposal 1. It retains every repeated pause frame.
+Animations requiring more colors reject with `profile-limit` before context
+replacement. No quantization occurs. Full imports, exact previews, original
+bytes, existing rendition identities and saved references remain unchanged.
+Single-frame images retain the existing full-color RGB transport.
+
+Before activating this profile, provide private `hosted-gif.json` in the data
+directory with exactly `bind`, `port`, and `origin`. Bind is an explicit local
+IPv4 address (or 0.0.0.0); origin is a device-reachable private IPv4 HTTP origin,
+without a path, credentials, query or fragment. Example placeholders:
+
+```json
+{"bind":"<local-IPv4>","port":8790,"origin":"http://<device-reachable-private-IPv4>:8790"}
+```
+
+These invalid placeholders must be replaced by the selected host route. The
+control/browser listener stays on loopback with its existing authentication.
+The dedicated listener exposes only one prepared GIF via a random 256-bit URL;
+it exposes no catalog, filesystem path or arbitrary URL. Access lasts at most
+15 seconds, ten requests and five file lengths. GET/HEAD and valid single byte
+ranges are supported. Only a complete GET response establishes transfer
+completion. Cancellation, replacement and shutdown revoke the file and close
+its active transfers. Do not share capability URLs or put them in public logs.
+
+A directly reachable Linux host needs no helper. WSL NAT needs an explicitly
+owned device-reachable route; localhost is not such a route. Temporary acceptance
+may use a file-only Windows relay to this listener. Source delivery does not
+install a persistent relay or change firewall/router rules. Permanent routing
+requires an authorized deployment and rollback plan with its named owner.
+
+The existing adapter queue sends one `Device/PlayTFGif` command with FileType 2
+and the prepared URL. The hosted operation has a 15-second deadline including
+queue wait and transfer. It never retries or switches transport after uncertain
+effects. Failure after submission pauses the player. Success means command
+acknowledgment and complete HTTP response transfer, not optical verification.
+Readiness is estimated at transfer completion plus 1000 ms; duration and total
+plays count from that estimate. Precise finite plays remain unverified.
+
+Stop cancels advancement and retires pending transfers; an already downloaded
+GIF may continue looping. Closing a file server does not stop device playback.
+Restart restores the media context paused and does not replay it. The existing
+separately selected Monitor startup behavior is unchanged; use monitoring off
+for a no-write acceptance restart. No reset or invented device-stop command is
+sent. Normal-player camera acceptance must cover GIF-to-still and GIF-to-GIF
+transitions in addition to loop timing.

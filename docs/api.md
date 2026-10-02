@@ -45,6 +45,7 @@ No generic filesystem, raw device command or remote-URL import route exists.
 | `POST /assets/:id/renditions` | `{transform?: {fit,scaling,background}}`; returns `{status:"complete",asset,rendition}` after worker completion |
 | `DELETE /assets/:id` | 204, or reference error preserving the asset |
 | `GET /renditions/:id` | Validated immutable manifest |
+| `GET /renditions/:id/compatibility` | `{compatible,profile,physical}` against the active playback profile; no device request |
 | `GET /renditions/:id/frames/:index.png` | Effective PNG frame by validated hash/index |
 | `GET /playlists` | Playlist array with ordered items and revisions |
 | `POST /playlists` | `{name,repeat?,shuffle?}`; 201 |
@@ -63,7 +64,9 @@ session until an explicit restart-with-changes command. Still defaults are
 30000 ms; animation defaults are three total plays. See [library contracts](library-persistence.md).
 
 Uploads are limited to 10 MiB and validated by signatures, source pixel budget
-and the renderer profile. The whole bounded multipart body is validated before
+and the application renderer profile in both runtime modes. Physical playback
+compatibility is checked independently; previews remain available when playback
+is unqualified. The whole bounded multipart body is validated before
 import, so an extra part cannot fail after catalog publication. Filenames are
 display metadata, never paths. Originals and referenced renditions are preserved.
 The API admits at most four concurrent media requests and 32 requests overall,
@@ -119,12 +122,15 @@ silently executing twice without retaining an unbounded command journal.
 `restartRequired`, `activeProfile` and supported `profiles`. Simulator connectivity
 is false and active configuration is null. Device connectivity starts null;
 observed available/offline transport maps to true/false without visual claims. `PUT /device` accepts `{ip,profile,model?,firmware?}`.
-IP must be canonical RFC1918 IPv4. Profile is `simulator-v1` or
-`pixoo64-smoke-2026-09-06`. Port/path/URL overrides and unknown fields are rejected.
+IP must be canonical RFC1918 IPv4. Profile is `simulator-v1`,
+`pixoo64-smoke-2026-09-06`, `pixoo64-gif-2026-10-01` or
+`pixoo64-hosted-2026-10-01`. Port/path/URL overrides and unknown fields are rejected.
 Saving never changes the running adapter or active render profile. In device mode,
 `restartRequired` reports when saved settings differ from the active snapshot.
-Device startup requires the smoke profile; saving simulator settings during a
-device session is valid for storage but requires changing mode or profile before
+Device startup requires one of the three physical profiles; the hosted profile
+also requires the private file-listener configuration described in
+[device application setup](device-application.md). Saving simulator settings during
+a device session is valid for storage but requires changing mode or profile before
 that next startup.
 
 Settings are stored in versioned `device.json` under the private data directory.
@@ -204,3 +210,8 @@ is unsupported for temporary sessions; select a saved playlist explicitly instea
 The separately enabled [shared controller API](hub-controller-api.md) serves
 `/controller/v1` using machine credentials and the same command ledger/player.
 Its narrow originless mutation exception does not change `/api` authorization.
+
+
+## Hosted profile integration
+
+Hosted-profile compatibility uses effective timing, frame count and combined RGB colors consistently for the browser endpoint and catalog consumers. A `profile-limit` rejection leaves current context intact. The dedicated hosted GIF listener exposes no API or catalog routes and does not change authentication on this API. See [hosted playback](device-application.md#hosted-gif-playback).

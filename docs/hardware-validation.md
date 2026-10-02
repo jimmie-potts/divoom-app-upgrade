@@ -445,3 +445,130 @@ remain outside Git.
 HTTP receipts are transport evidence. No firmware, router, firewall, brightness
 or screen-power changes were made.
 
+
+
+## GIF frame-count and timing qualification — September 30, 2026
+
+Issue #55 used the fixed A–E runner at
+`71a85fc87708f9e40fb015d200a00fc8247b1a56` on the owner's configured Pixoo64;
+firmware remains unknown. The owner ran the private handoff, which stops the
+installed controller and acquires the target lock. The run completed in
+78.103 seconds with all 53 requests successful: two reads, five distinct
+animation ID queries and 46 sequential frames. Receipt hashes, offsets, counts
+and requested delays match the synthetic source. No reset, brightness, screen,
+retry or restoration command was sent. Raw receipts and the target stay private.
+
+The owner reported: “It looked good. There were just a few loading screens in
+between transitions.” They then explicitly confirmed all 20 numbered frames
+appeared in both the 500 ms and 100 ms sequences, and the longer-held frame
+switched from 02 to 01 between the 200/800 and 800/200 ms sequences. Loading
+screens appeared only between stages and lasted approximately 1–3 seconds;
+none were reported during looping. These are qualitative human observations,
+not video-derived per-frame measurements or an instrumented loop count.
+
+The two 20-frame uploads took 3,471.8 and 3,338.1 ms; the two-frame uploads took
+374.1–405.3 ms. Those are host transport durations, not measured visible loading
+or post-acknowledgment readiness. The earlier inconclusive September 8 timing
+observations above remain part of the record.
+
+The initial, unreleased `pixoo64-gif-2026-09-30` candidate admitted up to 20
+complete frames, delays from 100 through 800 ms, and nonuniform timing. This is
+an initial admission policy inferred from the observed endpoints and reversed
+asymmetric pair. Intermediate delays and other frame-count/timing combinations
+were not exhaustively measured; 20 is not a hardware maximum. The historical
+smoke profile remains unchanged. Keep the normal player's five-second operation
+deadline and zero estimated ready delay pending normal-player acceptance: these
+uploads fit that deadline, and the observations do not measure a separate ready
+delay. Loading transitions are a known limitation, not evidence of #52's rapid
+extra flashing or a correction for it.
+
+Normal-player play-count/duration transitions, cancellation and paused recovery
+still require the next bounded acceptance session. No production installation
+or saved-profile change is established by this runner result.
+
+## Recorded GIF timing — October 1, 2026
+
+The owner ran three camera-assisted, timing-only cases through the normal
+application at `47c6551535f642b4dde7f3fd066e8278fb033b83`. Each case uploaded one
+20-frame animation and then sent no more display frames. Each trace contains
+23 successful requests with the expected frame bytes, offsets and delays.
+Three approximately 65-second recordings captured the Pixoo64 at about 30 fps;
+firmware remains unknown. Original recordings, receipts and target stay private.
+
+| Case | Requested frame delays | Loop if individual delays were preserved | Observed mean loop |
+| --- | --- | ---: | ---: |
+| A | All 500 ms | 10 s | 10.048 s across four cycles |
+| B | 100/200/500/800 ms, repeated five times | 8 s | 16.048 s across two cycles |
+| C | 800/500/200/100 ms, repeated five times | 8 s | 2.049 s across 26 cycles |
+
+Independent moving-diamond and progress-bar analyses used original video
+timestamps. Digit contact sheets verify all 20 frames in order for a full cycle
+from each recording. Allow about 0.1 second uncertainty at individual visual
+boundaries due to camera sampling and panel scanning. In these cases, the final
+requested frame delay acted as the delay for the entire animation. The results
+supersede the September 30 qualitative interpretation of variable-delay support;
+that historical observation remains above. They do not establish firmware
+internals, a universal frame limit or exact timing for every input.
+
+The owner chose one fixed delay per animation, using repeated frames for pauses.
+The replacement `pixoo64-gif-2026-10-01` profile admits up to 20 frames at one
+uniform delay from 100 through 800 ms. This is a bounded admission envelope;
+intermediate values and all combinations were not exhaustively measured.
+Repeated frames count toward the limit. Complete mixed-delay imports and
+previews are retained, with no automatic conversion; native physical playback
+rejects their unequal effective delays.
+
+Earlier normal-player tests showed BLUE briefly, then prior content, before
+settling on BLUE. These timing-only recordings contain no GIF-to-still handoff
+and do not resolve that symptom or establish a shared cause with #52. Transition
+acceptance remains incomplete. No production installation or saved-profile
+change is established by these tests.
+
+
+## Hosted application playback — October 1, 2026
+
+Issue #55's normal-application acceptance ran at `84e24c2df6afecb8228afb008d2050641323fb1f`
+using the owner's authorized Pixoo64 (firmware unknown), a video-only camera and
+an isolated application runtime. A temporary file-only Windows relay supplied the
+device-reachable route from WSL NAT. It installed no service or network rule.
+The normal API/player imported the existing synthetic rabbit GIFs, persisted a
+playlist, served exact previews and played through the existing device owner and
+FIFO. Import, preview and restart produced no device command. A mixed-delay
+replacement rejected before context change.
+
+The application sent eleven commands, all acknowledged without a device error,
+including five hosted file plays, two RGB still uploads and their ID queries,
+and two probe reads. Five complete file responses were recorded. There were no
+retries, firmware resets, screen/brightness changes or automatic recovery writes.
+Command and HTTP completion are separate from the camera observations below.
+
+| Observed case | Evidence and limit |
+| --- | --- |
+| 100 frames × 50 ms | Five measured intervals averaged 5.0112 seconds (4.992–5.056). Two sampled restarts showed 100 → 001 → 002; some terminal-frame camera samples were scan-blended. |
+| 500 frames × 60 ms | The interval between the two internal recorded restarts was 29.984 seconds. Both showed 500 → 001 → 002. Samples across the intervening loop showed advancing frame numbers and artwork. |
+| GIF → GIF | The previous rabbit continued during loading, then the new rabbit appeared. No return to old content was found in the inspected transition. |
+| GIF → BLUE still | After BLUE appeared, 261 consecutive camera samples over 13.024 seconds stayed BLUE. No previous-animation flashback was observed. A second transition after Stop/restart held BLUE for 276 samples over 13.760 seconds. |
+| Replacement, Stop, restart | Explicit replacement reached the new GIF. Stop retired advancement, and restart restored paused context without another command. The downloaded GIF continued until a fresh explicit BLUE selection. |
+
+The recording contains 3,936 frames spanning 196.770 seconds, averaging 19.998 fps,
+with a maximum packet gap of 192 ms. Progress-bar thresholds were checked for
+sensitivity; timestamped contact sheets were inspected for sequence and handoff.
+These observations support bounded application acceptance. They do not certify
+every frame, arbitrary media, an exhaustive admission envelope or exact finite
+plays. In particular, the thirty-second item was replaced near the end of its
+third visible loop: total-plays remains an estimated dwell policy, not a device
+play-count acknowledgment. Readiness uses the documented transfer-plus-1000-ms
+estimate; command/camera alignment has about 0.3-second uncertainty.
+
+The source regressions independently verify lossless decoded pixels, timing,
+repeat preservation, palette structure, rejection, expiry, cancellation,
+missing fetch and no replay. They make no optical claim. The prior raw-upload
+flashing investigation in #52 remains open; this hosted-path observation does
+not establish that the historical path is fixed.
+
+Raw video, addresses, private runtime receipts and automatic-review JSON remain
+in the owner's ignored evidence store. The application, relay and camera exited;
+no process retained the camera. The installed controller remained inactive with
+MainPID 0, and the labeled BLUE still was the final display content. Permanent
+installation and persistent WSL routing were not changed. The owner approved the
+current hosted Settings UI after desktop/mobile screenshot review.

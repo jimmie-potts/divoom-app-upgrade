@@ -42,7 +42,7 @@ package renders files, and the library package persists metadata and playlists.
 The playback package orchestrates immutable sessions and paused recovery.
 The [controller API](api.md) exposes media, playlist and player operations with
 SSE. Startup defaults to simulator mode; explicit validated device activation
-uses the dated smoke profile through the same player and writer. The responsive media library, editor, player and settings UI uses those routes. M1 separates simulator/adapter source work
+uses the explicitly selected dated observed profile through the same player and writer. The responsive media library, editor, player and settings UI uses those routes. M1 separates simulator/adapter source work
 from physical observation, allowing simulator-backed M2-M5 work when hardware is
 unavailable. An incompatible or unacceptable hardware result requires a user
 decision before further hardware integration. M6 requires physical evidence;

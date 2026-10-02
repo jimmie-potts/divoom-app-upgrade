@@ -117,3 +117,8 @@ The server pins `@jimmie-potts/device-contracts` 1.0.0 from the private
 The adjacent vendor receipt records immutable source revision and release
 provenance. Ajv 8.20.0 is its MIT-licensed schema validator. Consumer checks
 verify the archive, every installed manifest hash and all 220 shared fixtures.
+
+
+## Hosted profile integration
+
+`gifenc` 1.0.3 (MIT, https://github.com/mattdesl/gifenc) supplies indexed GIF/LZW encoding. The application supplies an exact global palette and exact indices; it does not call the package quantizer or nearest-color mapping. Pixel/order/delay and palette-structure regressions validate the emitted files.

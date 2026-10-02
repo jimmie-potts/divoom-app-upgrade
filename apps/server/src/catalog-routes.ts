@@ -1,6 +1,6 @@
 import multipart from '@fastify/multipart';
 import type {FastifyInstance} from 'fastify';
-import type {Library} from '@pixoo/library';
+import {type Library} from '@pixoo/library';
 import {SIMULATOR_PROFILE,type MediaProfile} from '@pixoo/media';
 import {apiId,apiHash,apiName,playlistCreate,playlistRename,playlistOptions,playlistItems,playlistOrder,expectedRevision,assetQuery,renditionRequest} from '@pixoo/core';
 import {parse} from './validation.js';
@@ -23,14 +23,18 @@ export async function catalogRoutes(app:FastifyInstance,library:Library,profile:
   }
   if(!bytes||!name)throw new ApiError('invalid-input');
   const input=bytes;async function* stream(){yield input;}
-  const result=await library.importMedia(stream(),name,{profile});reply.code(201);return result;
+  const result=await library.importMedia(stream(),name,{profile:SIMULATOR_PROFILE});reply.code(201);return result;
  }));
  app.get<Id>('/api/assets/:id',async request=>{const id=parse(apiId,request.params.id);return {asset:await library.getAsset(id),renditions:await library.listRenditions(id)};});
  app.post<Id>('/api/assets/:id/renditions',async request=>media(async()=>{
   const id=parse(apiId,request.params.id),options=parse(renditionRequest,request.body);
-  return {status:'complete',...await library.renderAsset(id,{profile,...(options.transform?{transform:options.transform}:{})})};
+  return {status:'complete',...await library.renderAsset(id,{profile:SIMULATOR_PROFILE,...(options.transform?{transform:options.transform}:{})})};
  }));
  app.delete<Id>('/api/assets/:id',async(request,reply)=>{await library.deleteAsset(parse(apiId,request.params.id));return reply.code(204).send();});
+ app.get<Id>('/api/renditions/:id/compatibility',async request=>{
+  const compatible=await library.playbackCompatible(parse(apiHash,request.params.id),profile,profile.evidence==='observed-device'?500:100);
+  return {compatible,profile:profile.name,physical:profile.evidence==='observed-device'};
+ });
  app.get<Id>('/api/renditions/:id',request=>library.getRendition(parse(apiHash,request.params.id)));
  app.get<{Params:{id:string;index:string}}>('/api/renditions/:id/frames/:index.png',async(request,reply)=>{
   const id=parse(apiHash,request.params.id),index=request.params.index;

@@ -1,3 +1,4 @@
+import {hostedPalette} from '@pixoo/media';
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, realpath } from 'node:fs/promises';
@@ -95,13 +96,28 @@ export class Library {
   listAssets():Promise<Asset[]> {
     return this.run(()=>this.db.prepare('SELECT * FROM assets ORDER BY created_at,id').all().map(row=>this.asset(row)));
   }
+  private async validateHosted(id:string,profile?:Readonly<MediaProfile>,signal?:AbortSignal):Promise<void> {
+    const rendition=this.manifest(id);
+    if(profile?.name!=='pixoo64-hosted-2026-10-01'||rendition.frames.length<2)return;
+    if(signal?.aborted)throw new LibraryError('cancelled');
+    const loaded=await this.media.readFrames(id,signal);
+    if(JSON.stringify(rendition)!==JSON.stringify(loaded.rendition))throw new LibraryError('catalog-corrupt');
+    hostedPalette(loaded.frames.map((rgb,index)=>({rgb,delayMs:rendition.frames[index]!.delayMs??100})));
+  }
+  async playbackCompatible(id:string,profile:Readonly<MediaProfile>,stillDelayMs=100):Promise<boolean>{
+    validate(hashSchema,id);
+    return this.run(async()=>{
+      try{renditionTiming(this.manifest(id),profile,stillDelayMs);await this.validateHosted(id,profile);return true;}
+      catch(error){if(error instanceof MediaError&&error.code==='profile-limit')return false;throw error;}
+    });
+  }
   async queryMedia(input:CatalogQuery,profile?:Readonly<MediaProfile>,stillDelayMs=100,native=false,signal?:AbortSignal){
     const {q,offset,limit}=validate(catalogQuery,input);
-    return this.run(()=>{
+    return this.run(async()=>{
       const total=Number(this.db.prepare('SELECT count(*) AS n FROM renditions r JOIN assets a ON a.id=r.asset_id WHERE instr(lower(a.name),lower(?))>0').get(q)!.n);
       const rows=this.db.prepare('SELECT a.id AS asset_id,a.name,r.id,r.manifest_json FROM renditions r JOIN assets a ON a.id=r.asset_id WHERE instr(lower(a.name),lower(?))>0 ORDER BY a.created_at,a.id,r.id LIMIT ? OFFSET ?').all(q,limit,offset);
-      const items=rows.map(row=>{const rendition=json<Rendition>(row.manifest_json);let compatible=true;try{renditionTiming(rendition,profile,stillDelayMs);}catch{compatible=false;}
-        return {assetId:String(row.asset_id),renditionId:String(row.id),name:String(row.name),format:rendition.source.format,frameCount:rendition.frames.length,durationMs:rendition.effectiveDurationMs,compatible};});
+      const items=[];for(const row of rows){const rendition=json<Rendition>(row.manifest_json);let compatible=true;try{renditionTiming(rendition,profile,stillDelayMs);await this.validateHosted(rendition.id,profile,signal);}catch(error){if(error instanceof MediaError&&error.code==='profile-limit')compatible=false;else throw error;}
+        items.push({assetId:String(row.asset_id),renditionId:String(row.id),name:String(row.name),format:rendition.source.format,frameCount:rendition.frames.length,durationMs:rendition.effectiveDurationMs,compatible});}
       return {items,total,offset,limit,...(native?{catalogRevision:this.catalogRevision}: {})};
     },signal);
   }
@@ -274,7 +290,10 @@ export class Library {
 
   async createPlaybackCheckpoint(playlistId:string,options:CaptureOptions={}):Promise<PlaybackCheckpoint> {
     validate(idSchema,playlistId);if(options.revision!==undefined)validate(revisionSchema,options.revision);
-    return this.run(()=>{const record=transaction(this.db,()=>{
+    return this.run(async()=>{
+      const candidate=options.revision===undefined?this.playlist(playlistId):this.expected(playlistId,options.revision);
+      for(const item of candidate.items){if(options.guard&&!options.guard())throw new LibraryError('cancelled');await this.validateHosted(item.renditionId,options.profile);}
+      const record=transaction(this.db,()=>{
       const snapshot=options.revision===undefined?this.playlist(playlistId):this.expected(playlistId,options.revision);
       for(const item of snapshot.items)playbackPolicy(this.manifest(item.renditionId),item.playback,options.profile,options.stillDelayMs);
       return createCheckpoint(this.db,snapshot,options);
@@ -282,7 +301,7 @@ export class Library {
   }
   async createMediaCheckpoint(renditionId:string,playback:PlaybackPolicy|undefined,options:CaptureOptions={}):Promise<PlaybackCheckpoint>{
     validate(hashSchema,renditionId);
-    return this.run(()=>{const record=transaction(this.db,()=>{
+    return this.run(async()=>{await this.validateHosted(renditionId,options.profile);const record=transaction(this.db,()=>{
       const rendition=this.manifest(renditionId),row=this.db.prepare('SELECT a.* FROM assets a JOIN renditions r ON r.asset_id=a.id WHERE r.id=?').get(renditionId);
       const asset=this.asset(row),now=new Date().toISOString();
       const snapshot:Playlist={id:randomUUID(),revision:1,name:asset.name,createdAt:now,updatedAt:now,repeat:true,shuffle:false,

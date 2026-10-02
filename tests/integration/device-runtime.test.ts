@@ -10,7 +10,7 @@ import {gifFixture} from '../helpers/media-fixtures.js';
 import {createApp} from '../../apps/server/src/app.js';
 import {loadConfig} from '../../apps/server/src/config.js';
 import {sendJson} from '../../packages/device/dist/http-transport.js';
-import {PIXOO64_SMOKE_PROFILE} from '@pixoo/media';
+import {PIXOO64_SMOKE_PROFILE,SIMULATOR_PROFILE} from '@pixoo/media';
 import {deviceServer} from '../helpers/http-device-server.js';
 const headers={'x-pixoo-request':'1'};
 const configuration={ip:'192.168.50.20',profile:'pixoo64-smoke-2026-09-06'} as const;
@@ -69,7 +69,7 @@ it('uses the validated config snapshot even if settings change before applicatio
  const app=createApp({dataDir,runtime,deviceLockDirectoryForTests,transportForTests:async()=>({error_code:0})});cleanup.push(()=>app.close());
  expect((await app.inject('/api/device')).json()).toMatchObject({activeConfiguration:configuration,configuration});
 });
-it('applies smoke limits at import and uploads complete frames before a queued brightness control',async()=>{
+it('imports under application limits and uploads admitted frames before a queued brightness control',async()=>{
  let release=()=>{};
  const {app,server}=await appFixture((body,res)=>{
   if(body.Command==='Draw/SendHttpGif'&&body.PicOffset===0)release=()=>res.end('{"error_code":0}');
@@ -77,12 +77,12 @@ it('applies smoke limits at import and uploads complete frames before a queued b
  });
  cleanup.push(async()=>{release();});
  const invalid=await app.inject({method:'POST',url:'/api/assets',...multipart(gifFixture(1,1,[{width:1,height:1,pixels:[1],delay:10}]))});
- expect(invalid.statusCode).toBe(422);expect(server.requests).toEqual([]);
+ expect(invalid.statusCode).toBe(201);expect(server.requests).toEqual([]);
  const uploaded=await app.inject({method:'POST',url:'/api/assets',...multipart(gifFixture(1,1,[{width:1,height:1,pixels:[1],delay:50},{width:1,height:1,pixels:[2],delay:50}]))});
- expect(uploaded.statusCode).toBe(201);expect(uploaded.json().rendition.profile).toEqual(PIXOO64_SMOKE_PROFILE);
+ expect(uploaded.statusCode).toBe(201);expect(uploaded.json().rendition.profile).toEqual(SIMULATOR_PROFILE);
  const {asset,rendition}=uploaded.json();
  const rerender=await app.inject({method:'POST',url:`/api/assets/${asset.id}/renditions`,headers,payload:{transform:{fit:'crop',scaling:'nearest',background:[1,2,3]}}});
- expect(rerender.statusCode).toBe(200);expect(rerender.json().rendition.profile).toEqual(PIXOO64_SMOKE_PROFILE);
+ expect(rerender.statusCode).toBe(200);expect(rerender.json().rendition.profile).toEqual(SIMULATOR_PROFILE);
  const playlist=(await app.inject({method:'POST',url:'/api/playlists',headers,payload:{name:'Smoke'}})).json();
  await app.inject({method:'PUT',url:`/api/playlists/${playlist.id}/items`,headers,payload:{revision:1,items:[{renditionId:rendition.id}]}});
  const requestId=(await app.inject('/api/player')).json().nextRequestId;
@@ -231,4 +231,32 @@ it('persists a possible physical write paused across application restart and res
  expect((await reopened.inject({method:'POST',url:'/api/player/commands',headers,payload:{requestId:restored.nextRequestId,command:'resume'}})).statusCode).toBe(200);
  await vi.waitFor(async()=>expect((await reopened.inject('/api/player')).json().player).toMatchObject({state:'playing',lastError:null}));
  expect(server.requests.map(r=>r.Command)).toEqual(['Draw/GetHttpGifId','Draw/SendHttpGif','Draw/GetHttpGifId','Draw/SendHttpGif']);
+});
+
+it.each(['device','simulator'] as const)('preserves a complete varied 20-frame GIF in %s without preview/import device writes',async mode=>{
+ const dataDir=await directory(),deviceLockDirectoryForTests=await directory();await settings(dataDir);let requests=0;
+ const options={dataDir,mode,deviceLockDirectoryForTests,transportForTests:async()=>{requests++;return {error_code:0,PicId:1};}};
+ const app=createApp(options);cleanup.push(()=>app.close());
+ const delays=Array.from({length:20},(_,i)=>10+i);
+ const bytes=gifFixture(1,1,delays.map((delay,i)=>({width:1,height:1,pixels:[i%4],delay})));
+ const upload=await app.inject({method:'POST',url:'/api/assets',...multipart(bytes)});
+ expect(upload.statusCode).toBe(201);const {asset,rendition}=upload.json();
+ expect(rendition.frames.map((f:{delayMs:number})=>f.delayMs)).toEqual(delays.map(d=>d*10));
+ expect(rendition.profile.name).toBe('simulator-v1');
+ const compatibility=await app.inject(`/api/renditions/${rendition.id}/compatibility`);
+ expect(compatibility.json()).toMatchObject({compatible:mode==='simulator'});
+ const rendered=await app.inject({method:'POST',url:`/api/assets/${asset.id}/renditions`,headers,payload:{transform:{fit:'crop',scaling:'nearest',background:[1,2,3]}}});
+ expect(rendered.statusCode).toBe(200);expect(rendered.json().rendition.frames).toHaveLength(20);
+ for(let i=0;i<20;i++)expect((await app.inject(`/api/renditions/${rendition.id}/frames/${i}.png`)).statusCode).toBe(200);
+ expect(requests).toBe(0);await app.close();
+ const reopened=createApp(options);cleanup.push(()=>reopened.close());
+ expect((await reopened.inject(`/api/renditions/${rendition.id}`)).json()).toEqual(rendition);expect(requests).toBe(0);
+ if(mode==='device'){
+  const playlist=(await reopened.inject({method:'POST',url:'/api/playlists',headers,payload:{name:'Unqualified'}})).json();
+  const saved=await reopened.inject({method:'PUT',url:`/api/playlists/${playlist.id}/items`,headers,payload:{revision:1,items:[{renditionId:rendition.id}]}});
+  expect(saved.statusCode).toBe(200);expect(saved.json().items).toMatchObject([{renditionId:rendition.id}]);
+  const before=(await reopened.inject('/api/player')).json();
+  const start=await reopened.inject({method:'POST',url:'/api/player/commands',headers,payload:{requestId:before.nextRequestId,command:'start',playlistId:playlist.id}});
+  expect(start.statusCode).toBe(422);expect(start.json()).toMatchObject({error:{code:'profile-limit'}});expect(requests).toBe(0);
+ }
 });
