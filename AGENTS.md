@@ -18,6 +18,15 @@ those documents only. A normal implementation request includes issue updates,
 an isolated worktree, tests, PR publication, independent review, an eligible merge,
 and main CI readback. Narrower user instructions prevail.
 
+Before delivery cleanup, read [the cleanup procedure](docs/sdlc.md#cleanup-after-delivery)
+for owned resource removal, retention gates and readback. Complete ordinary
+authorized delivery and explicit `deliver-work` with a separate outcome for
+branch, worktree, scratch, clone, staging and remote in the existing delivery
+evidence: removed with readback, retained with reason, owner or unknown ownership
+and next action, or not applicable. Retention is a valid cleanup outcome and
+does not block otherwise eligible source completion. Historical cleanup needs
+a separately approved candidate list.
+
 When drafting or picking up a story, or after a material scope or assumption
 change, apply the [scope defaults](docs/sdlc.md#scope-defaults), including in
 ordinary work without `plan-work` or `deliver-work`. A read-only request reports
