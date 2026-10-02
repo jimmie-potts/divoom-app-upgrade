@@ -207,3 +207,8 @@ is unsupported for temporary sessions; select a saved playlist explicitly instea
 The separately enabled [shared controller API](hub-controller-api.md) serves
 `/controller/v1` using machine credentials and the same command ledger/player.
 Its narrow originless mutation exception does not change `/api` authorization.
+
+
+## Hosted profile integration
+
+Hosted-profile compatibility uses effective timing, frame count and combined RGB colors consistently for the browser endpoint and catalog consumers. A `profile-limit` rejection leaves current context intact. The dedicated hosted GIF listener exposes no API or catalog routes and does not change authentication on this API. See [hosted playback](device-application.md#hosted-gif-playback).

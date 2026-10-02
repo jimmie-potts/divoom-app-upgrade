@@ -101,3 +101,8 @@ disables it so repeated playback does not retain frame buffers indefinitely.
 `counts` stays available either way: for each operation kind, the number the
 writer admitted to its queue and the number that succeeded. The server exposes
 them as `GET /api/device/simulator`.
+
+
+## Hosted profile integration
+
+The optional hosted-file boundary keeps multi-frame file preparation, command submission and transfer wait inside the same FIFO operation. Cancellation revokes its capability URL; possible effects remain explicit after submission. Single-frame and historical-profile uploads retain their existing RGB path. See [hosted operation limits and readiness](device-application.md#hosted-gif-playback).

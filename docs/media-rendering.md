@@ -178,3 +178,8 @@ nonuniform-timing assumption the recordings disproved. The historical smoke
 profile is unchanged. Imports still use `simulator-v1` in either runtime mode,
 so existing rendition identities and complete mixed-delay previews remain valid.
 Physical admission independently rejects unequal effective frame delays.
+
+
+## Hosted profile integration
+
+The separately selected hosted profile requires lossless global-palette admission for multi-frame playback. Full import and preview remain unchanged. See [hosted playback](device-application.md#hosted-gif-playback) for the exact envelope and encoding. Compatibility and capture validate the immutable effective RGB frames, including combined color count, before context replacement.

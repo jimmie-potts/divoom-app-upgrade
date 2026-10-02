@@ -1,7 +1,7 @@
 import multipart from '@fastify/multipart';
 import type {FastifyInstance} from 'fastify';
-import {renditionTiming,type Library} from '@pixoo/library';
-import {MediaError,SIMULATOR_PROFILE,type MediaProfile} from '@pixoo/media';
+import {type Library} from '@pixoo/library';
+import {SIMULATOR_PROFILE,type MediaProfile} from '@pixoo/media';
 import {apiId,apiHash,apiName,playlistCreate,playlistRename,playlistOptions,playlistItems,playlistOrder,expectedRevision,assetQuery,renditionRequest} from '@pixoo/core';
 import {parse} from './validation.js';
 import {ApiError} from './security.js';
@@ -32,8 +32,7 @@ export async function catalogRoutes(app:FastifyInstance,library:Library,profile:
  }));
  app.delete<Id>('/api/assets/:id',async(request,reply)=>{await library.deleteAsset(parse(apiId,request.params.id));return reply.code(204).send();});
  app.get<Id>('/api/renditions/:id/compatibility',async request=>{
-  const rendition=await library.getRendition(parse(apiHash,request.params.id));
-  let compatible=true;try{renditionTiming(rendition,profile,profile.evidence==='observed-device'?500:100);}catch(error){if(!(error instanceof MediaError)||error.code!=='profile-limit')throw error;compatible=false;}
+  const compatible=await library.playbackCompatible(parse(apiHash,request.params.id),profile,profile.evidence==='observed-device'?500:100);
   return {compatible,profile:profile.name,physical:profile.evidence==='observed-device'};
  });
  app.get<Id>('/api/renditions/:id',request=>library.getRendition(parse(apiHash,request.params.id)));

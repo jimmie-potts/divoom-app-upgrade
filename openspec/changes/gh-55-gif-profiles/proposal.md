@@ -16,6 +16,7 @@
 
 ### Modified Capabilities
 
+- `device-adapter`: bounded hosted file transport and transfer-based readiness.
 - `media-rendering`: separate library rendering from active playback limits.
 - `controller-ui`: display playback compatibility without limiting previews, simplify optional device notes, and show the active profile limits.
 - `application-foundation`: accept either dated observed profile at explicit device startup.
@@ -23,4 +24,4 @@
 
 ## Impact
 
-Server catalog composition, browser media library, device qualification tooling and tests. No dependency, database migration or default hardware activation change. Add an explicit 20-frame production playback profile with one fixed 100–800 ms delay per animation; preserve the historical profile and require normal-player acceptance. Issue criteria AC1–AC2 and AC6 cover source work; AC3–AC5 require physical evidence and acceptance.
+Server catalog composition, browser media library, device qualification tooling and tests. No database migration or default hardware activation change. gifenc supplies lossless indexed encoding. Add an explicit 20-frame production playback profile with one fixed 100–800 ms delay per animation; preserve the historical profile and require normal-player acceptance. Add a separate hosted profile and bounded file listener through the existing writer; see design.md. Issue criteria AC1–AC2 and AC6 cover source work; AC3–AC5 require physical evidence and acceptance.

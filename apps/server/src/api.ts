@@ -1,7 +1,8 @@
 import type {FastifyInstance} from 'fastify';
 import {Library} from '@pixoo/library';
 import {Player,LibraryPlaybackStore} from '@pixoo/playback';
-import {FakeDeviceAdapter,HttpDeviceAdapter,type DeviceTransport} from '@pixoo/device';
+import {FakeDeviceAdapter,HttpDeviceAdapter,startHostedFiles,type DeviceTransport} from '@pixoo/device';
+import {encodeHostedGif} from '@pixoo/media';
 import {deviceRoutes} from './device-routes.js';
 import {Events} from './events.js';
 import {Commands} from './commands.js';
@@ -12,7 +13,7 @@ import {join} from 'node:path';
 import {catalogRoutes} from './catalog-routes.js';
 import {assertRuntimeDirectory} from './operations.js';
 import {diagnosticsSchema} from '@pixoo/core';
-import {loadRuntimeSelection,selectRuntime,playbackProfile,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
+import {loadRuntimeSelection,selectRuntime,playbackProfile,readHostedSettings,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
 import {acquireDeviceOwner} from './device-owner.js';
 import {registerController,type ControllerIdentity} from './controller.js';
 export interface ApiRuntimeOptions {
@@ -32,16 +33,19 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
  const runtime=options.runtime?selectRuntime(options.runtime.mode,options.runtime.savedConfiguration):await loadRuntimeSelection(dataDir,options.mode??'simulator');
  const profile=playbackProfile(runtime);
  let closeMonitor:(()=>Promise<void>)|undefined;
+ let hosted:Awaited<ReturnType<typeof startHostedFiles>>|undefined;
+ const usesHosted=profile.name==='pixoo64-hosted-2026-10-01';
  let releaseOwner:(()=>void)|undefined,library:Library|undefined,physical:HttpDeviceAdapter|undefined,player:Player|undefined;
- const close=async()=>{try{await closeMonitor?.();await player?.close();}finally{try{await physical?.close();}finally{try{await library?.close();}finally{releaseOwner?.();}}}};
+ const close=async()=>{try{await closeMonitor?.();await player?.close();}finally{try{await physical?.close();}finally{try{await hosted?.close();hosted=undefined;await library?.close();}finally{releaseOwner?.();}}}};
  try{
   if(runtime.activeConfiguration)releaseOwner=await acquireDeviceOwner(runtime.activeConfiguration.ip,options.deviceLockDirectoryForTests);
+  if(usesHosted)hosted=await startHostedFiles(await readHostedSettings(dataDir));
   library=await Library.open({directory:join(dataDir,'library')});
   let simulator:FakeDeviceAdapter|undefined;
   const device=runtime.activeConfiguration?(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration.ip,
-   profile:{...profile,evidence:'observed',readyDelayMs:0}},options.transportForTests)):(simulator=new FakeDeviceAdapter({recordHistory:false}));
+   profile:{...profile,evidence:'observed',readyDelayMs:usesHosted?1000:0},...(hosted?{hosted:{files:hosted,encode:animation=>encodeHostedGif(animation.frames)}}:{})},options.transportForTests)):(simulator=new FakeDeviceAdapter({recordHistory:false}));
   await assertRuntimeDirectory(dataDir);
-  player=await Player.open({store:new LibraryPlaybackStore(library,{profile,stillDelayMs:runtime.mode==='device'?500:100}),device,pauseOnUncertain:runtime.mode==='device'});
+  player=await Player.open({store:new LibraryPlaybackStore(library,{profile,stillDelayMs:runtime.mode==='device'?500:100}),device,pauseOnUncertain:runtime.mode==='device',operationTimeoutMs:usesHosted?15000:5000});
   const active=player;
   const observed=():RuntimeStatus=>({mode:runtime.mode,connected:runtime.mode==='simulator'?false:active.getState().availability==='unknown'?null:active.getState().availability==='available'});
   const started=performance.now();

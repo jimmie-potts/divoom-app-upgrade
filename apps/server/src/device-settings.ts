@@ -1,9 +1,23 @@
 import {lstat,open} from 'node:fs/promises';
+import {validateHostedFileConfig,type HostedFileConfig} from '@pixoo/device';
 import {join} from 'node:path';
 import {deviceConfiguration,type DeviceConfiguration} from '@pixoo/core';
 import {DEVICE_PROFILES,SIMULATOR_PROFILE} from '@pixoo/media';
 import {ApiError} from './security.js';
 export type RuntimeMode='simulator'|'device';
+export async function readHostedSettings(directory:string):Promise<HostedFileConfig>{
+ const path=join(directory,'hosted-gif.json'),info=await lstat(path);
+ if(!info.isFile()||info.isSymbolicLink()||info.size>4096)throw new Error('Invalid hosted GIF settings');
+ const file=await open(path,'r');
+ try{
+  const opened=await file.stat();if(opened.ino!==info.ino||opened.dev!==info.dev)throw new Error('Invalid hosted GIF settings');
+  const bytes=Buffer.alloc(4097);const {bytesRead}=await file.read(bytes,0,bytes.length,0);
+  if(bytesRead>4096)throw new Error('Invalid hosted GIF settings');
+  const config:unknown=JSON.parse(bytes.subarray(0,bytesRead).toString());
+  if(!config||typeof config!=='object'||Object.keys(config).sort().join(',')!=='bind,origin,port')throw new Error('Invalid hosted GIF settings');
+  return validateHostedFileConfig(config as HostedFileConfig);
+ }finally{await file.close();}
+}
 export interface RuntimeSelection {
  readonly mode:RuntimeMode;
  readonly savedConfiguration:Readonly<DeviceConfiguration>|null;

@@ -215,3 +215,8 @@ context paused. Explicit start/show-media/restart/resume selects Media through
 ControlService, including existing MCP operations. Screen-on and simulator
 startup never resume either presentation; device-mode startup restores a saved
 Monitor selection but never resumes playback. Obsolete upload completions cannot reclaim ownership.
+
+
+## Hosted profile integration
+
+Hosted operations wait for command acknowledgment and complete file transfer before returning an estimated ready time. The player starts duration/total-plays accounting at that estimate. Stop does not claim to stop a downloaded loop. Hosted lossless admission runs before retiring the previous session, including every item of a saved playlist. See [hosted playback](device-application.md#hosted-gif-playback).

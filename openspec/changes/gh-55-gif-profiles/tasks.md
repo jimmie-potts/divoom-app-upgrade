@@ -16,3 +16,12 @@
 - [x] 3.1 Replace the unreleased mixed-delay candidate with the dated uniform-only profile; prove mixed-delay rejection before writes and preservation of repeated pause frames.
 - [x] 3.2 Reconcile guidance, Settings and the historical evidence with the October 1 camera results and owner decision; retain full imports/previews.
 - [ ] 3.3 Run source/browser/workflow checks, renew independent reviews and obtain approval of the updated Settings text before final delivery.
+
+
+## 4. Hosted application integration
+
+- [ ] 4.1 Add lossless global-palette encoding and consistent hosted admission without changing prior profiles or stored renditions.
+- [ ] 4.2 Add bounded application-owned file serving and single-writer file-play transport with cancellation, transfer evidence and uncertainty handling.
+- [ ] 4.3 Validate source and browser behavior, including failures, restart, compatibility and timing policies.
+- [ ] 4.4 Run bounded normal-player physical acceptance and automatically review recordings, transitions, cancellation and cleanup.
+- [ ] 4.5 Reconcile all contracts, obtain current UI approval, archive, independently review the committed candidate, and complete head/main CI and delivery readbacks.

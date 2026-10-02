@@ -395,3 +395,11 @@ This check establishes source contract compatibility only.
 fixtures and fake-backed native controller compatibility suite. It is suitable
 for hub CI after a Node 24 `npm ci`; it needs no device or installed credential.
 The full `npm run check` includes the same tests. See [native API](hub-controller-api.md).
+
+
+### Hosted GIF regression checks
+
+`npm run check` includes the hosted encoder, HTTP transfer, admission and adapter
+regressions. `npm run test:browser` checks the Settings/profile and full preview
+journeys. These device-free checks are required alongside separately authorized
+normal-player camera acceptance; neither replaces it.

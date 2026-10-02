@@ -4,6 +4,7 @@ import {LibraryError,policySchema,validate,type PlaybackPolicy} from './contract
 export function renditionTiming(rendition:Rendition,profile?:Readonly<MediaProfile>,stillDelayMs=100):number[]{
  const delays=rendition.frames.map(frame=>rendition.source.format==='gif'?frame.delayMs??100:stillDelayMs);
  if(!delays.length||delays.some(value=>!Number.isSafeInteger(value)||value<1))throw new MediaError('invalid-input');
+ if(profile?.name==='pixoo64-hosted-2026-10-01'&&delays.some(delay=>delay%10))throw new MediaError('profile-limit');
  if(profile&&(delays.length>profile.maxFrames||delays.some(delay=>delay<profile.minDelayMs||delay>profile.maxDelayMs)||profile.uniformTiming&&delays.some(delay=>delay!==delays[0])))throw new MediaError('profile-limit');
  return delays;
 }

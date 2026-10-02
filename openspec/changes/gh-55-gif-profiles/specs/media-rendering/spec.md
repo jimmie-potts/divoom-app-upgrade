@@ -39,3 +39,19 @@ Applications in both runtime modes SHALL render new library media under the exis
 - **WHEN** a GIF has differing effective frame delays, even if every delay is between 100 and 800 ms
 - **THEN** physical admission rejects it before replacing current context or sending a device request
 - **AND** imports and complete previews preserve its effective delays without automatic conversion
+
+
+## ADDED Requirements
+
+### Requirement: Lossless hosted profile admission
+The separate pixoo64-hosted-2026-10-01 profile SHALL admit at most 500 frames with uniform 50–800 ms whole-centisecond delays, and multi-frame renditions SHALL contain at most 256 distinct effective RGB colors in total. These bounds SHALL be identified as a software admission envelope informed by observed 20×100 ms, 100×50 ms and 500×60 ms fixtures, not a hardware maximum or exhaustive qualification. Prior profiles SHALL remain unchanged. Browser/catalog compatibility and playback admission SHALL agree. Unsupported color or timing SHALL reject before context replacement, preserving full imports, previews, originals and immutable identities. Single-frame images SHALL retain full-color RGB transport. Trace: issue #55 AC1–AC2 and AC4–AC6.
+
+#### Scenario: Too many effective colors
+- **WHEN** an otherwise admitted multi-frame rendition needs more than 256 distinct effective colors
+- **THEN** hosted compatibility is false and playback rejects with profile-limit before replacing the previous context or issuing a device command
+- **AND** complete import and preview remain available without quantization
+
+#### Scenario: Long uniform animation
+- **WHEN** a 500-frame animation at uniform 60 ms fits the global color budget
+- **THEN** hosted playback can prepare every effective frame and delay without truncation or deduplication
+- **AND** a saved or restarted media context preserves its immutable rendition identity
