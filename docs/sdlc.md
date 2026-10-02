@@ -177,25 +177,111 @@ used.
 
 ### Cleanup after delivery
 
-Start once step 7 has confirmed that the merged revision's push CI succeeded and
-read back the issue state. Cleanup does not wait for installation or physical
-acceptance unless that work still uses the worktree. Clean up only what this
-delivery created:
+Apply this procedure to ordinary authorized delivery and explicit `deliver-work`.
+Start after the merged revision's required push CI succeeds and the issue state
+is read back. Any applicable CI exception must already be documented; cleanup
+creates no exception. Record source/CI completion and cleanup outcomes separately.
+Retention is a valid completed cleanup outcome and does not prevent otherwise
+eligible source completion.
 
-1. Confirm the PR is merged and the delivery worktree's `HEAD` is the PR's reviewed head (`headRefOid`, the `--match-head-commit` value), not the squash commit on `main`. Squash merges leave a branch's commits off `main`, so judge delivery by the PR's merged state, never by commit ancestry. Commits after the reviewed head are unfinished work.
-2. Run `git status --short --ignored` in the worktree, and look inside the scratch folder. `git worktree remove` deletes ignored files, including the worktree's own `.local/`, `.env`, databases, test output, and `node_modules/`. Move anything the issue still needs into the PR, the issue, or the canonical repository's `.local/evidence/gh-<issue-number>-<slug>/`. The PR and issue are public, so private material goes only to `.local/evidence/`. Confirm the other ignored files are disposable.
-3. In every case, clean up the canonical repository's `.local/scratch/gh-<issue-number>-<slug>/` folder: remove each worktree registered inside it with ordinary `git worktree remove`, confirm that `git worktree list` shows none there, then delete the folder. Step 1's `HEAD` check applies only to the delivery worktree.
-4. For a delivery worktree created with `git worktree add`, run `git worktree remove <path>` from the canonical repository and confirm with `git worktree list` that the path is gone. Do not delete the delivery branch yourself.
-5. Leave a tool-managed worktree, such as a Claude Code session worktree under `.claude/worktrees/`, to that tool's own exit flow instead of `git worktree remove`; that flow may also delete its branch. Once steps 1 and 2 pass on a clean worktree, accepting the tool's option to discard the squash-merged commits is allowed. If this session cannot run that flow, keep the worktree and report it as ready to remove.
+Account for each resource this delivery created: local branch, worktree, scratch,
+standalone clone or review copy, staging directory or branch, and remote branch.
+Discover clones, scratch and staging from task ownership records as well as the
+Git worktree registry; they can be outside the registered paths. These records
+establish what this task owns, not permission to remove other work. Existing
+accumulated artifacts require a separately approved candidate list
+([Hub #477](https://github.com/jimmie-potts/agent-device-hub/issues/477)).
 
-Keep the worktree and scratch, and report the path and reason, when a worktree
-is dirty or locked, another process or session uses it, the delivery worktree's
-`HEAD` differs from the reviewed head, evidence is not yet preserved, an ignored
-file is not confirmed disposable, or `git worktree remove` refuses. Without the
-user's explicit approval, never force removal or reset, clean, or discard files
-to make a worktree removable. If main CI fails, or the work failed or was
-abandoned, ask the user whether to keep or remove it and keep it until they
-decide. Leave other tasks' worktrees, branches, and scratch alone.
+1. Verify the merged PR and its exact reviewed head (`headRefOid`, the
+   `--match-head-commit` value). The delivery worktree's `HEAD` and local branch
+   tip must still equal that head, not the squash commit on `main`. Squash-merge
+   delivery is established by the merged PR and exact head; commit ancestry and
+   `git branch --merged` cannot establish it. A moved tip or commits after the
+   reviewed head are unfinished or unknown work: retain the affected resources.
+2. Establish ownership and release for each resource. No other session may use
+   it, and no remaining acceptance, installation, publication or other consumer
+   may need it. A lack of visible processes is not proof that a session released
+   a worktree. Unknown ownership or release, active consumers, locks, dirty
+   state, unavailable or unsuccessful required CI, or needed ignored files retain
+   the affected resources, including scratch, clones and staging. An independent
+   clone must also have no stashes or unpushed work that still needs preservation.
+3. Inspect `git status --short --ignored` in each owned worktree and clone, and
+   inspect scratch and staging contents, including registered worktrees inside
+   them. Removing a directory deletes its ignored files too, including `.local/`,
+   `.env`, databases, test output and `node_modules/`. Preserve needed evidence in
+   the PR/issue when public, or in the canonical repository's surviving private
+   `.local/evidence/gh-<issue-number>-<slug>/`. Confirm all remaining contents are
+   disposable before removal. Keep private paths, configurations and runtime
+   metadata in private evidence; public receipts use neutral task labels.
+4. Recheck state, ownership, evidence preservation and consumers immediately
+   before each removal. For an owned worktree created with `git worktree add`,
+   use ordinary `git worktree remove <path>` from the canonical repository, then
+   confirm its absence with `git worktree list --porcelain` and a path readback.
+   A tool-managed worktree, such as a Claude Code session worktree, uses that
+   tool's exit flow. After the same gates pass, accepting its option to discard
+   squash-merged commits is allowed. If this session cannot run the flow, retain
+   the worktree with the tool/session owner and the next exit action. Never
+   substitute manual removal for its lifecycle.
+5. Remove an eligible owned local delivery branch only after its worktree is
+   gone. Immediately recheck the branch identity and tip against the merged PR's
+   exact reviewed head. Run `git worktree list --porcelain` and confirm no
+   registered worktree has that branch checked out; also establish that no
+   session or remaining consumer uses it and that this delivery has exclusive
+   ownership for the removal. Delete only the exact local ref using:
+
+   ```bash
+   git update-ref -d refs/heads/<branch> <verified-tip-sha>
+   ```
+
+   This expected-tip guard rejects a moved tip. It does not atomically prevent
+   another session from checking out the branch between the worktree check and
+   deletion, and it bypasses `git branch -d`'s checked-out-branch protection.
+   Retain the branch when exclusive ownership cannot be established. Never use
+   `git branch -D` or a broad forced branch sweep. After successful deletion,
+   remove only that branch's configuration section if present:
+
+   ```bash
+   git config --remove-section branch.<branch>
+   ```
+
+   Read back both absences with `git show-ref --verify --quiet refs/heads/<branch>`
+   (exit 1 for an absent ref) and
+   `git config --get-regexp '^branch\.<escaped-branch>\.'` (exit 1 for no matching
+   configuration); escape regex metacharacters in the branch name. A command
+   error or remaining configuration is an incomplete cleanup result, not proof
+   of absence. If the tool exit flow removed the branch, verify the same ref and
+   configuration absences before reporting removal.
+6. Remove owned scratch, independent temporary clones, review copies and staging
+   only after their ownership, state, evidence and consumer gates pass. For the
+   canonical `.local/scratch/gh-<issue-number>-<slug>/`, remove each eligible
+   registered worktree inside it through its designated lifecycle first, then
+   confirm the registry has none there before removing the directory. The exact
+   reviewed-head check applies to delivery branches/worktrees; disposable fixture
+   repositories instead require known task ownership and disposable contents.
+   If a nested resource is retained, retain its containing directory. Verify each
+   directory's absence after removal. Never delete an unregistered clone merely
+   because it is absent from `git worktree list`.
+7. Read back remote state separately. A host-deleted remote branch is removed
+   only with a current absence readback. If it remains, record retention; do not
+   infer local cleanup from remote absence. GitHub automatic deletion and the old
+   remote backlog belong to
+   [Hub #309](https://github.com/jimmie-potts/agent-device-hub/issues/309). Enabling
+   deletion or pruning old remote branches requires its own authorization and is
+   not a prerequisite for eligible local removal.
+8. Record a concise separate outcome for **branch, worktree, scratch, clone,
+   staging and remote** in the existing PR, issue or delivery evidence:
+   - **Removed:** successful removal with current ref/configuration, registry or
+     path readback as applicable; name the host when it performed the removal.
+   - **Retained:** concrete reason, owner or **unknown ownership**, and next action.
+     A partially removed resource records what is absent and what remains.
+   - **Not applicable:** this delivery created no resource of that kind.
+
+Any refusal or changed state stops removal of the affected resource and retains
+what remains, with reason, owner or unknown ownership, and next action. Never
+force worktree removal, reset, clean or discard files to make cleanup pass.
+Preserve other tasks' branches, worktrees, deployments and scratch. Failed or
+abandoned deliveries keep their resources pending the owner's keep/remove
+choice; ask and retain them until that decision. Retention does not claim removal.
 
 ## Completion evidence
 
