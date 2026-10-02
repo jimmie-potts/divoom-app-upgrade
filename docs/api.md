@@ -122,12 +122,15 @@ silently executing twice without retaining an unbounded command journal.
 `restartRequired`, `activeProfile` and supported `profiles`. Simulator connectivity
 is false and active configuration is null. Device connectivity starts null;
 observed available/offline transport maps to true/false without visual claims. `PUT /device` accepts `{ip,profile,model?,firmware?}`.
-IP must be canonical RFC1918 IPv4. Profile is `simulator-v1` or
-`pixoo64-smoke-2026-09-06`. Port/path/URL overrides and unknown fields are rejected.
+IP must be canonical RFC1918 IPv4. Profile is `simulator-v1`,
+`pixoo64-smoke-2026-09-06`, `pixoo64-gif-2026-10-01` or
+`pixoo64-hosted-2026-10-01`. Port/path/URL overrides and unknown fields are rejected.
 Saving never changes the running adapter or active render profile. In device mode,
 `restartRequired` reports when saved settings differ from the active snapshot.
-Device startup requires the smoke profile; saving simulator settings during a
-device session is valid for storage but requires changing mode or profile before
+Device startup requires one of the three physical profiles; the hosted profile
+also requires the private file-listener configuration described in
+[device application setup](device-application.md). Saving simulator settings during
+a device session is valid for storage but requires changing mode or profile before
 that next startup.
 
 Settings are stored in versioned `device.json` under the private data directory.
