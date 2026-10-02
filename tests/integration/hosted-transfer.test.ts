@@ -1,4 +1,4 @@
-import {afterEach,expect,it} from 'vitest';
+import {afterEach,expect,it,vi} from 'vitest';
 import {startHostedFiles} from '../../packages/device/src/hosted-files.js';
 import {HttpDeviceAdapter} from '../../packages/device/src/http-adapter.js';
 import {encodeHostedGif} from '../../packages/media/src/hosted-gif.js';
@@ -19,7 +19,7 @@ it('serves only prepared bytes and requires a complete GET, then revokes access'
  const full=await fetch(file.url);expect(Buffer.from(await full.arrayBuffer())).toEqual(bytes);await file.transferred;
  file.revoke();expect((await fetch(file.url)).status).toBe(404);
 });
-it('expires an unfetched file and never exposes a replacement under the old URL',async()=>{
+it('retires an unfetched file and never exposes a replacement under the old URL',async()=>{
  const h=await host(),first=h.publish(Buffer.from('one'),new AbortController().signal);
  const failure=expect(first.transferred).rejects.toThrow('upload-failed');
  const controller=new AbortController(),second=h.publish(Buffer.from('two'),controller.signal);await failure;
@@ -43,4 +43,17 @@ it.each(['cancelled','stale-generation','timeout'] as const)('retires an unfetch
  if(code==='cancelled')abort.abort();else if(code==='stale-generation')device.invalidateGeneration();else clock.advance(200);
  expect(await upload).toMatchObject({ok:false,code,priorEffects:'possible'});
  expect(commands).toEqual(['Device/PlayTFGif']);expect((await fetch(url)).status).toBe(404);
+});
+
+it('expires access at fifteen seconds and bounds cumulative transfers',async()=>{
+ const h=await host();vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+ try{
+  const file=h.publish(Buffer.from('bytes'),new AbortController().signal);
+  const expired=expect(file.transferred).rejects.toThrow('upload-failed');
+  vi.advanceTimersByTime(15000);await expired;vi.useRealTimers();
+  expect((await fetch(file.url)).status).toBe(404);
+ }finally{vi.useRealTimers();}
+ const file=h.publish(Buffer.alloc(10),new AbortController().signal);
+ for(let i=0;i<5;i++){const response=await fetch(file.url);expect(response.status).toBe(200);await response.arrayBuffer();}
+ expect((await fetch(file.url)).status).toBe(429);expect((await fetch(file.url)).status).toBe(404);
 });

@@ -523,3 +523,52 @@ settling on BLUE. These timing-only recordings contain no GIF-to-still handoff
 and do not resolve that symptom or establish a shared cause with #52. Transition
 acceptance remains incomplete. No production installation or saved-profile
 change is established by these tests.
+
+
+## Hosted application playback — October 1, 2026
+
+Issue #55's normal-application acceptance ran at `84e24c2df6afecb8228afb008d2050641323fb1f`
+using the owner's authorized Pixoo64 (firmware unknown), a video-only camera and
+an isolated application runtime. A temporary file-only Windows relay supplied the
+device-reachable route from WSL NAT. It installed no service or network rule.
+The normal API/player imported the existing synthetic rabbit GIFs, persisted a
+playlist, served exact previews and played through the existing device owner and
+FIFO. Import, preview and restart produced no device command. A mixed-delay
+replacement rejected before context change.
+
+The application sent eleven commands, all acknowledged without a device error,
+including five hosted file plays, two RGB still uploads and their ID queries,
+and two probe reads. Five complete file responses were recorded. There were no
+retries, firmware resets, screen/brightness changes or automatic recovery writes.
+Command and HTTP completion are separate from the camera observations below.
+
+| Observed case | Evidence and limit |
+| --- | --- |
+| 100 frames × 50 ms | Five measured intervals averaged 5.0112 seconds (4.992–5.056). Two sampled restarts showed 100 → 001 → 002; some terminal-frame camera samples were scan-blended. |
+| 500 frames × 60 ms | The interval between the two internal recorded restarts was 29.984 seconds. Both showed 500 → 001 → 002. Samples across the intervening loop showed advancing frame numbers and artwork. |
+| GIF → GIF | The previous rabbit continued during loading, then the new rabbit appeared. No return to old content was found in the inspected transition. |
+| GIF → BLUE still | After BLUE appeared, 261 consecutive camera samples over 13.024 seconds stayed BLUE. No previous-animation flashback was observed. A second transition after Stop/restart held BLUE for 276 samples over 13.760 seconds. |
+| Replacement, Stop, restart | Explicit replacement reached the new GIF. Stop retired advancement, and restart restored paused context without another command. The downloaded GIF continued until a fresh explicit BLUE selection. |
+
+The recording contains 3,936 frames spanning 196.770 seconds, averaging 19.998 fps,
+with a maximum packet gap of 192 ms. Progress-bar thresholds were checked for
+sensitivity; timestamped contact sheets were inspected for sequence and handoff.
+These observations support bounded application acceptance. They do not certify
+every frame, arbitrary media, an exhaustive admission envelope or exact finite
+plays. In particular, the thirty-second item was replaced near the end of its
+third visible loop: total-plays remains an estimated dwell policy, not a device
+play-count acknowledgment. Readiness uses the documented transfer-plus-1000-ms
+estimate; command/camera alignment has about 0.3-second uncertainty.
+
+The source regressions independently verify lossless decoded pixels, timing,
+repeat preservation, palette structure, rejection, expiry, cancellation,
+missing fetch and no replay. They make no optical claim. The prior raw-upload
+flashing investigation in #52 remains open; this hosted-path observation does
+not establish that the historical path is fixed.
+
+Raw video, addresses, private runtime receipts and automatic-review JSON remain
+in the owner's ignored evidence store. The application, relay and camera exited;
+no process retained the camera. The installed controller remained inactive with
+MainPID 0, and the labeled BLUE still was the final display content. Permanent
+installation and persistent WSL routing were not changed. The owner approved the
+current hosted Settings UI after desktop/mobile screenshot review.

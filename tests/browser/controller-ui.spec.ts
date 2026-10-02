@@ -55,7 +55,7 @@ test('settings save explicit configuration without connecting hardware',async({p
  await expect(page.getByText('No physical display connected.',{exact:true})).toBeVisible();
 });
 
-for(const profile of ['pixoo64-smoke-2026-09-06','pixoo64-gif-2026-10-01'])test(`device settings distinguish active target, saved changes and unverified output for ${profile}`,async({page})=>{
+for(const profile of ['pixoo64-smoke-2026-09-06','pixoo64-gif-2026-10-01','pixoo64-hosted-2026-10-01'])test(`device settings distinguish active target, saved changes and unverified output for ${profile}`,async({page})=>{
  const active={ip:'192.168.1.40',profile};
  let saved={...active};
  const source=await (await page.request.get('/api/device')).json();
@@ -71,6 +71,7 @@ for(const profile of ['pixoo64-smoke-2026-09-06','pixoo64-gif-2026-10-01'])test(
  await expect(page.getByText('Device transport: unknown. Visible output is unverified.',{exact:true})).toBeVisible();
  await expect(page.getByText(/Every frame must use the same delay/)).toBeVisible();
  await expect(page.getByText(/repeat the frame; repeats count toward the frame limit/)).toBeVisible();
+ if(profile==='pixoo64-hosted-2026-10-01'){await expect(page.getByText(/up to 500 complete 64×64 frames, 50–800 ms/)).toBeVisible();await expect(page.getByText(/at most 256 colors across all frames/)).toBeVisible();await expect(page.getByText(/Stop ends advancement but a downloaded animation can keep looping/)).toBeVisible();}
  if(profile==='pixoo64-gif-2026-10-01')await expect(page.getByText(/up to 20 complete 64×64 frames, 100–800 ms/)).toBeVisible();
  await expect(page.getByText('Active target: 192.168.1.40',{exact:true})).toBeVisible();
  await page.getByLabel('Device IP').fill('192.168.1.41');
