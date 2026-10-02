@@ -41,6 +41,11 @@ function notices(session:SessionSnapshot,consumer:string):string[]{return sessio
 function rank(session:SessionSnapshot,consumer:string):number {
  const kind=attention(session);return kind==='approval'||kind==='input'?0:kind==='question'?1:notices(session,consumer).length?2:3;
 }
+/** Routine ordering/read limits stay in metadata without dimming an otherwise known session. */
+function warnsForUnavailable(evidence:SessionSnapshot['unavailable'][number]):boolean {
+ return !((evidence.dimension==='ordering'||evidence.dimension==='read')&&
+  (evidence.reason==='missing'||evidence.reason==='unsupported'||evidence.reason==='inaccessible'));
+}
 export class DashboardPager {
  private page=0;
  private membership='';
@@ -62,7 +67,7 @@ export class DashboardPager {
   return {version:1,ownerId:view.ownerId,revision:view.snapshot?.revision??null,asOfMs:view.snapshot?.asOfMs??null,connection:view.connection,collector:view.snapshot?.collector??'unknown',
    total:top.length,matched:ordered.length,attentionTotal:top.filter(s=>attention(s)!=='none').length,page:this.page,pages,
    rows:ordered.slice(this.page*PAGE_SIZE,this.page*PAGE_SIZE+PAGE_SIZE).map(s=>({identity:{...s.identity},label:s.label??s.title?.value??s.identity.sessionId,shortLabel:s.label===undefined&&s.title===undefined?shortSessionId(s.identity.sessionId):shortLabel((s.label??s.title?.value)!),...(s.title?{title:{...s.title}}:{}),...(s.project?{project:s.project}:{}),activity:s.activity,attention:attention(s),
-    uncertain:view.connection!=='current'||s.freshness==='uncertain'||s.unavailable.length>0||s.activity==='unknown'||s.parent.status==='unknown'||s.ordering.status==='unknown',
+    uncertain:view.connection!=='current'||s.freshness==='uncertain'||s.unavailable.some(warnsForUnavailable)||s.activity==='unknown'||s.parent.status==='unknown'||s.turn.status==='unknown',
     activeChildren:s.children.active,childrenUncertain:unknownChildren||s.children.uncertain>0||view.connection!=='current',noticeIds:notices(s,this.consumer),observedAtMs:s.observedAtMs,lastEvidenceAtMs:s.lastEvidenceAtMs,freshness:s.freshness,unavailable:structuredClone(s.unavailable)}))};
  }
 }

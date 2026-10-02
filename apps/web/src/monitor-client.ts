@@ -24,6 +24,7 @@ export interface MonitorSession {
  observedAtMs:number;lastEvidenceAtMs:number;observationAgeMs:number;parent:{status:string};
  children:{active:number;uncertain:number};attention:Array<{kind:string}>;
  notices:Array<{id:string;acknowledgedBy:string[]}>;
+ unavailable:Array<{kind:'evidence.unavailable';dimension:string;reason:string}>;
 }
 export interface MonitorRead {
  integration:IntegrationSnapshot;
