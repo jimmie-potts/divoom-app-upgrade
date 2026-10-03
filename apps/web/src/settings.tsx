@@ -7,6 +7,13 @@ export function Settings({controller}:{controller:Controller}){
  const dirty=useRef(false);
  const [ip,setIp]=useState(''),[model,setModel]=useState(''),[firmware,setFirmware]=useState(''),[profile,setProfile]=useState('simulator-v1');
  const [brightness,setBrightness]=useState(50),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const [copyNotice,setCopyNotice]=useState<{revision:string;message:string}|null>(null);
+ const build=controller.connected?controller.runtime?.build:null,revision=build?.sourceRevision;
+ async function copyRevision(){
+  if(!revision||revision==='unknown')return;
+  try{await navigator.clipboard.writeText(revision);setCopyNotice({revision,message:'Revision copied.'});}
+  catch{setCopyNotice({revision,message:'Clipboard unavailable. Select and copy the full revision below.'});}
+ }
  async function load(){await controller.refresh(true);}
  useEffect(()=>{if(device&&!dirty.current){setIp(device.configuration?.ip??'');setModel(device.configuration?.model??'');setFirmware(device.configuration?.firmware??'');setProfile(device.configuration?.profile??'simulator-v1');}},[device]);
  async function run(work:()=>Promise<void>){if(busy)return;setBusy(true);setError('');setNotice('');try{await work();}catch(e){setError(explain(e));}finally{setBusy(false);}}
@@ -31,5 +38,12 @@ export function Settings({controller}:{controller:Controller}){
  <div className="panel"><h3>{physical?'Device display controls':device?'Simulated display controls':'Display controls'}</h3><p>{physical?`Device transport: ${availability}. Visible output is unverified.`:'Physical connection: unverified'}</p>{!physical&&<p>Adapter availability: {availability}</p>}
  <button disabled={disabled||!device} onClick={()=>void run(async()=>{if(!await controller.probe())return;setNotice(physical?'Device probe completed. Transport responded; visible output is unverified.':'Simulator probe completed. Physical connectivity is unverified.');})}>{physical?'Probe device':'Probe simulator'}</button>
  <form onSubmit={e=>{e.preventDefault();controller.display({brightness});}}><label>Requested brightness (0–100)<input aria-label="Requested brightness" type="number" min={0} max={100} step={1} required value={brightness} onChange={e=>setBrightness(e.target.valueAsNumber)}/></label><button disabled={disabled}>Apply brightness</button></form>
- <div className="actions"><button disabled={disabled} onClick={()=>controller.display({screenOn:false})}>Screen off</button><button disabled={disabled} onClick={()=>controller.display({screenOn:true})}>Screen on</button></div><p className="muted">Screen off pauses advancement. Screen on does not resume. Brightness is a requested value, not observed telemetry.</p></div></div></section>;
+ <div className="actions"><button disabled={disabled} onClick={()=>controller.display({screenOn:false})}>Screen off</button><button disabled={disabled} onClick={()=>controller.display({screenOn:true})}>Screen on</button></div><p className="muted">Screen off pauses advancement. Screen on does not resume. Brightness is a requested value, not observed telemetry.</p></div></div>
+ <section className="panel" aria-label="Running build"><h3>Running build</h3>
+ <p>{!revision?'Build identity unavailable':revision==='unknown'?'Source revision unknown':<>Source revision <code>{revision.slice(0,12)}</code></>}{build&&<> · Version {build.version}</>}</p>
+ <button type="button" className="quiet" disabled={!revision||revision==='unknown'} onClick={()=>void copyRevision()}>Copy revision</button>
+ <p role="status">{copyNotice?.revision===revision?copyNotice?.message:''}</p>
+ <label>Full source revision<input readOnly value={revision??'unavailable'} onFocus={event=>event.currentTarget.select()}/></label>
+ <p className="muted">This identifies the running backend. A package version alone does not identify its source.</p>
+ </section></section>;
 }

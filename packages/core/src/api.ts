@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {buildIdentitySchema} from './build.js';
 export const apiId=z.uuid(),apiHash=z.string().regex(/^[a-f0-9]{64}$/);
 export const apiRevision=z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const apiName=z.string().trim().min(1).max(120).refine(s=>Array.from(s).every(c=>c.charCodeAt(0)>31&&c.charCodeAt(0)!==127));
@@ -30,6 +31,7 @@ export const apiErrorSchema=z.object({error:z.object({code:z.string(),message:z.
 export const emptyRequest=z.object({}).strict();
 
 export const diagnosticsSchema=z.object({
+ build:buildIdentitySchema,
  status:z.literal('ready'),mode:z.enum(['simulator','device']),uptimeMs:z.number().int().nonnegative(),library:z.literal('ready'),
  device:z.object({connected:z.boolean().nullable(),availability:z.enum(['unknown','available','offline'])}).strict(),
  player:z.object({state:z.enum(['idle','loading','playing','paused','reconnecting','error']),intent:z.enum(['active','paused','stopped'])}).strict(),

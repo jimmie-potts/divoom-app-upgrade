@@ -43,6 +43,13 @@ read-only, report that instead of redirecting it.
 | `npm run simulator` | Builds then starts one loopback backend and UI |
 | `npm start` | Starts a previously built application |
 
+The full build stamps `apps/server/dist/build.json` from the same clean source
+revision before and after compilation. `build:types` and `typecheck` invalidate
+the old stamp before changing compiled output; a subsequent full build restores
+qualified identity. Runtime code reads only the stamp captured at startup.
+The existing unit/integration suite checks provenance and frozen identity;
+the browser suite checks Settings and copying without a physical device.
+
 GitHub Actions requires Workflow checks, Application checks and Simulator
 browser checks, all on Ubuntu. The application
 job includes a production build through `npm test`. Browser artifacts are

@@ -182,11 +182,13 @@ observed display timing.
 
 ## Runtime diagnostics
 
-`GET /api/diagnostics` reports uptime, mode, library readiness, adapter availability,
+`GET /api/diagnostics` reports the running `build: {sourceRevision, version}`, uptime, mode, library readiness, adapter availability,
 player state/intent and fixed transient bounds. It uses the same host/origin and
 authentication boundary as other API reads. It excludes paths, IPs, media names
 and raw errors. Readiness is not a disk integrity scan or a hardware claim. See
 [local operations](local-operations.md) for CLI diagnostics and offline verification.
+`GET /api/health` reports the same build captured at process startup. Unknown
+source provenance is the literal `unknown`; it is separate from shared-state revisions.
 
 ## Local MCP bindings
 

@@ -165,6 +165,10 @@ unrelated improvements in separate issues.
 
 ## Review and merge
 
+No project UI requires human approval. UI changes retain applicable automated,
+browser and accessibility checks, independent Standards and Specification reviews,
+and every configured CI job. Physical-device acceptance remains separate.
+
 1. Complete implementation, docs, acceptance checks, and applicable OpenSpec artifacts/tasks. Obtain successful current CLI status and sync/archive instructions. Verify every affected capability; synchronize and archive on the delivery branch before final review. A failed lookup or incomplete artifact blocks archive. Run both workflow checks.
 2. Commit the full candidate and open its PR with `Refs #<issue>`. Record base SHA, head SHA, merge-base, diff command, and clean worktree state. Keep revision-specific evidence in the PR.
 3. Obtain independent read-only Standards and Specification reviews of that same comparison. Use fresh review agents and the code-review method with GitHub as scope owner. Give each the issue, relevant contracts, and its own rubric. Self-review is insufficient. Missing independent review leaves the issue blocked and PR open.

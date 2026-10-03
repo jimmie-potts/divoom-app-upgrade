@@ -154,6 +154,25 @@ data directory, device settings, credentials and shared hooks untouched.
 
 ## Diagnostics
 
+### Running build
+
+Settings shows the running backend's source revision, with a short value and a
+copyable full value. `/api/health` and `/api/diagnostics` return the same
+`build: {sourceRevision, version}`. Version `0.0.0` is informational.
+
+`npm run build` stamps the full commit only when the source checkout is clean
+at the same revision before and after the build. Dirty builds, unpacked sources
+without qualified provenance, and missing or malformed metadata report
+`sourceRevision: "unknown"`. Compiler-only commands invalidate any older stamp.
+The process loads this metadata once at startup; rebuilding files on disk does
+not change an already running process's identity. These reads contact no device.
+
+Build identity supports the upgrade command tracked in [#115](https://github.com/jimmie-potts/divoom-app-upgrade/issues/115).
+It does not by itself prove that an archive was verified or an installation
+succeeded. That issue owns the first installed readback of this capability.
+
+### Read diagnostics
+
 With the backend running and the same PIXOO_PORT in the current shell:
 
 ```bash
