@@ -1,3 +1,4 @@
+import {createDiagnostics,type Diagnostics} from '../../apps/server/src/diagnostics.js';
 import {expect,it,vi} from 'vitest';
 import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -13,13 +14,13 @@ import {gifFixture} from '../helpers/media-fixtures.js';
 import {Library} from '@pixoo/library';
 import type {DeviceTransport} from '@pixoo/device';
 import {provisionCredential,revokeCredential} from '../../apps/server/src/mcp-config.js';
-async function fixture(transportForTests?:DeviceTransport,prepare?:(dataDir:string)=>Promise<void>,monitor=false){
+async function fixture(transportForTests?:DeviceTransport,prepare?:(dataDir:string)=>Promise<void>,monitor=false,diagnostics?:Diagnostics){
  const dataDir=await mkdtemp(join(tmpdir(),'pixoo-mcp-'));
  if(prepare)await prepare(dataDir);
  const token=await provisionCredential(dataDir,'codex',['read','control']);
  if(transportForTests)await writeFile(join(dataDir,'device.json'),JSON.stringify({version:1,configuration:{ip:'192.168.50.20',profile:'pixoo64-smoke-2026-09-06'}}));
  if(monitor){await mkdir(join(dataDir,'agent-monitor'));await writeFile(join(dataDir,'agent-monitor','config.json'),JSON.stringify({version:1,mode:'embedded',ownerId:'owner',consumers:[{id:'pixoo',clearOnNewTurn:true}]}));await provisionCredential(join(dataDir,'agent-monitor'),'writer',['read','control']);}
- const app=createApp({dataDir,mcpEnabled:true,...(monitor?{monitorEnabled:true,monitorRenderCadenceMs:1}:{}),...(transportForTests?{mode:'device' as const,transportForTests,deviceLockDirectoryForTests:dataDir}:{})});
+ const app=createApp({dataDir,mcpEnabled:true,...(diagnostics?{diagnostics}:{}),...(monitor?{monitorEnabled:true,monitorRenderCadenceMs:1}:{}),...(transportForTests?{mode:'device' as const,transportForTests,deviceLockDirectoryForTests:dataDir}:{})});
  await app.listen({host:'127.0.0.1',port:0});
  const address=app.server.address();if(!address||typeof address==='string')throw new Error('No listener');
  const base=`http://127.0.0.1:${address.port}`;
@@ -31,7 +32,9 @@ async function fixture(transportForTests?:DeviceTransport,prepare?:(dataDir:stri
 }
 function data(result:unknown){return (result as {structuredContent:{data:Record<string,unknown>}}).structuredContent.data;}
 it('serves fixed tools from the built application and preserves cross-transport display replay',async()=>{
- const f=await fixture();try{
+ const records:Array<{scope:{name:string};attributes:Record<string,unknown>}>=[];
+ const diagnostics=await createDiagnostics({PIXOO_OBSERVABILITY_ENABLED:'1'},line=>{records.push(JSON.parse(line));});
+ const f=await fixture(undefined,undefined,false,diagnostics);try{
   expect((await f.client.listTools()).tools.map(t=>t.name).sort()).toEqual(['control_playback','get_status','list_media','list_playlists','play_playlist','set_brightness','set_screen','show_media']);
   const status=data(await f.client.callTool({name:'get_status',arguments:{}}));
   expect(status).toMatchObject({ready:true,mode:'simulator',connected:false});
@@ -46,6 +49,7 @@ it('serves fixed tools from the built application and preserves cross-transport 
   for(let n=0;n<40;n++)expect(data(await f.client.callTool({name:'get_status',arguments:{}})).connected).toBe(false);
   await f.client.close();expect((await fetch(`${f.base}/api/health`)).status).toBe(200);
  }finally{await f.close();}
+ expect(records.some(record=>record.scope.name==='bunny.mcp'&&record.attributes['bunny.operation']==='brightness'&&record.attributes['bunny.outcome']==='succeeded')).toBe(true);
 },20000);
 it('keeps status valid and honest after an explicitly activated dashboard upload',async()=>{
  const f=await fixture(undefined,undefined,true);try{

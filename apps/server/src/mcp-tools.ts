@@ -1,3 +1,5 @@
+import type {HostDiagnostics} from '@jimmie-potts/bunny-observability/host';
+import {diagnose} from './diagnostics.js';
 import {z} from 'zod';
 import {requestIdentity,apiId,apiHash,apiRevision,apiName,playbackPolicy,catalogQuery} from '@pixoo/core';
 import {LibraryError} from '@pixoo/library';
@@ -30,7 +32,7 @@ function publicDisplay(value:ReturnType<ControlService['status']>['display']){
 function safePlayer(value:ReturnType<ControlService['status']>['player']){
  return {...value,lastError:value.lastError?{...value.lastError,code:code.safeParse(value.lastError.code).success?value.lastError.code:'operation-failed'}:null};
 }
-export function createLocalTools(service:ControlService,changed:()=>void){
+export function createLocalTools(service:ControlService,changed:()=>void,diagnostics?:HostDiagnostics){
  const read:ServiceExtension={inputSchema:schema(z.object({}).strict()),outputSchema:schema(status),scope:'read',description:'Read application readiness and dated transport evidence. Null values are unavailable; acknowledged writes are not visual confirmation. This call never probes the display.',annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:true},async invoke(){const value=service.status();return {data:status.parse({...value,display:publicDisplay(value.display),player:safePlayer(value.player)})};}};
  const write=(kind:'brightness'|'screen'):ServiceExtension=>({inputSchema:schema(kind==='brightness'?z.object({percent:z.number().int().min(0).max(100),request_id:requestIdentity}).strict():z.object({on:z.boolean(),request_id:requestIdentity}).strict()),outputSchema:schema(outcome),scope:'control',description:kind==='brightness'?'Request brightness through the existing writer using the exact next request_id from status. Reuse that identity only for the same intent; never automatically retry uncertain effects.':'Request screen power through the existing writer. Off pauses playback; on never resumes it. Use the exact next request_id from status and never automatically replay uncertain effects.',annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:true},async invoke(args){
   const requestId=args.request_id as string;
@@ -80,6 +82,11 @@ export function createLocalTools(service:ControlService,changed:()=>void){
   }};
  };
  const extensions={get_status:read,set_brightness:write('brightness'),set_screen:write('screen'),list_media:catalog('media'),list_playlists:catalog('playlists'),show_media:mutate('show_media'),play_playlist:mutate('play_playlist'),control_playback:mutate('control_playback')};
+ if(diagnostics)for(const [name,extension] of Object.entries(extensions)){
+  const invoke=extension.invoke;
+  const operation=name==='set_brightness'?'brightness':name==='set_screen'?'power':name==='get_status'?'status':name.startsWith('list_')?'media':'playback';
+  extension.invoke=(...args)=>diagnose(diagnostics,{scope:'bunny.mcp',operation,root:true,spanName:'bunny.command.request'},()=>invoke(...args));
+ }
  const registry=createDeviceRegistry([{controllerId:'pixoo-controller',deviceId:MCP_DEVICE_ID,extensions}]);
  return {registry,tools:bindServiceTools(registry,{deviceId:MCP_DEVICE_ID,bindings:Object.keys(extensions).map(name=>({extension:name,name}))})};
 }

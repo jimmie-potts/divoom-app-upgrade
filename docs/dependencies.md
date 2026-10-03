@@ -122,3 +122,13 @@ verify the archive, every installed manifest hash and all 220 shared fixtures.
 ## Hosted profile integration
 
 `gifenc` 1.0.3 (MIT, https://github.com/mattdesl/gifenc) supplies indexed GIF/LZW encoding. The application supplies an exact global palette and exact indices; it does not call the package quantizer or nearest-color mapping. Pixel/order/delay and palette-structure regressions validate the emitted files.
+
+## Shared observability runtime
+
+Server and media-worker hosts pin `@jimmie-potts/bunny-observability` 1.1.0 from
+Hub PR736. `vendor/observability-1.1.0-source-receipt.json` records the merged
+source revision and archive/manifest SHA-256 values. Installed-byte tests verify
+all manifest entries. Pino 10.3.1 supplies structured logging; OpenTelemetry API
+1.9.1 and the artifact's pinned SDK supply explicit tracing. No global automatic
+instrumentation is enabled. Existing immutable controller/lifecycle artifacts
+are unchanged.

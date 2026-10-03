@@ -1,3 +1,4 @@
+import {registerDiagnostics} from './diagnostics.js';
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { healthSchema } from '@pixoo/core';
@@ -13,6 +14,7 @@ export function createApp(options:AppOptions={}) {
   if(mode==='device'&&!options.dataDir)throw new Error('Device mode requires a private runtime directory');
   const app = Fastify({ logger: false, bodyLimit:64*1024, requestTimeout:30000 });
   security(app,options.authenticate,options.mcpEnabled,options.controllerEnabled);
+  if(options.diagnostics)registerDiagnostics(app,options.diagnostics,!!options.authenticate);
   let observed=():RuntimeStatus=>({mode,connected:mode==='simulator'?false:null});
   app.get('/api/health',()=>{const state=observed();return healthSchema.parse({
     status:'ready',mode:state.mode,device:{connected:state.connected},canvas:canvasSize,

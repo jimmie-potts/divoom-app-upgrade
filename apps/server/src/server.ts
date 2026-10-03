@@ -1,3 +1,4 @@
+import {createDiagnostics} from './diagnostics.js';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,15 +8,18 @@ import { loadConfig } from './config.js';
 export const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 
 export async function startServer(env: NodeJS.ProcessEnv = process.env) {
-  // Missing build output must not produce a misleading ready listener.
-  await access(join(webRoot, 'index.html'));
-  const config = await loadConfig(env);
-  const app = createApp({ webRoot, dataDir:config.dataDir, runtime:config,mcpEnabled:config.mcpEnabled??false,monitorEnabled:config.monitorEnabled??false,controllerEnabled:config.controllerEnabled??false,...(config.controllerIdentity?{controllerIdentity:config.controllerIdentity}:{}) });
+  const diagnostics=await createDiagnostics(env);
+  let app:ReturnType<typeof createApp>|undefined;
   try {
+    // Missing build output must not produce a misleading ready listener.
+    await access(join(webRoot, 'index.html'));
+    const config = await loadConfig(env);
+    app = createApp({ diagnostics, webRoot, dataDir:config.dataDir, runtime:config,mcpEnabled:config.mcpEnabled??false,monitorEnabled:config.monitorEnabled??false,controllerEnabled:config.controllerEnabled??false,...(config.controllerIdentity?{controllerIdentity:config.controllerIdentity}:{}) });
     const address = await app.listen({ host: config.host, port: config.port });
     return { app, address, mode: config.mode };
   } catch (error) {
-    await app.close();
+    diagnostics.runtime.event('process.failed','bunny.host',{'bunny.operation':'startup'},'ERROR');
+    try{await app?.close();}finally{await diagnostics.runtime.shutdown();}
     throw error;
   }
 }

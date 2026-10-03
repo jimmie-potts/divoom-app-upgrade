@@ -403,3 +403,13 @@ The full `npm run check` includes the same tests. See [native API](hub-controlle
 regressions. `npm run test:browser` checks the Settings/profile and full preview
 journeys. These device-free checks are required alongside separately authorized
 normal-player camera acceptance; neither replaces it.
+
+### Operational diagnostics checks
+
+`npm run check` includes `tests/unit/observability.test.ts` and
+`tests/integration/observability.test.ts`: installed artifact hashes, canonical
+records, concurrent authenticated worker correlation and Collector failure.
+The existing application CI job executes these tests. Use `npm run test:controller`
+and `npm run test:browser` for the accompanying controller and browser regression
+checks. See [operational diagnostics](observability.md) for configuration and
+coverage. No physical device or permanent Collector is required.
