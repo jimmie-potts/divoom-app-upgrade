@@ -23,3 +23,20 @@ it('emits canonical process events and preserves thrown error identity',async()=
  await host.runtime.shutdown();expect(calls).toBe(1);
  expect(records).toHaveLength(1);expect(records[0]?.attributes['bunny.outcome']).toBe('uncertain');
 });
+
+it('retains actual HTTP error details and native receipt outcomes',async()=>{
+ const {ApiError}=await import('../../apps/server/src/security.js');
+ expect(diagnosticOutcome(new ApiError('timeout',503,{priorEffects:'possible'}))).toBe('uncertain');
+ expect(diagnosticOutcome({outcome:'cancelled',failure:{code:'stale-generation'}})).toBe('cancelled');
+ expect(diagnosticOutcome({outcome:'failed',failure:{code:'transport-failure'}})).toBe('failed');
+});
+it('reports shutdown failure before closing diagnostics',async()=>{
+ const records:Array<{event_name:string}>=[];
+ const diagnostics=await createDiagnostics({PIXOO_OBSERVABILITY_ENABLED:'1'},line=>{records.push(JSON.parse(line));});
+ const {createApp}=await import('../../apps/server/src/app.js');
+ const app=createApp({diagnostics});const error=new Error('synthetic-close');
+ app.addHook('onClose',async()=>{throw error;});await app.ready();
+ await expect(app.close()).rejects.toBe(error);
+ expect(records.map(record=>record.event_name)).toContain('process.failed');
+ expect(records.map(record=>record.event_name)).not.toContain('process.stopped');
+});

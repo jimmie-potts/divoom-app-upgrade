@@ -117,7 +117,7 @@ export class MediaStore {
         if(signal.aborted) throw signalError(signal);
         return existing;
       }
-      const decode=()=>runWorker({input:inputPath,output,sourceHash,id,transform,profile,limits:this.limits,...(this.diagnostics?{diagnostics:workerDiagnostics(this.diagnostics.worker)}:{})},signal);
+      const decode=()=>runWorker({input:inputPath,output,sourceHash,id,transform,profile,limits:this.limits,...(this.diagnostics?{diagnostics:workerDiagnostics(this.diagnostics.worker)}:{})},signal,undefined,record=>{this.diagnostics?.runtime.emit(record);});
       if(this.diagnostics)await this.diagnostics.runtime.run({scope:'bunny.queue',operation:'media',spanName:'bunny.command.queue'},decode);else await decode();
       if(signal.aborted) throw signalError(signal);
       try { await link(inputPath,join(root,'originals',sourceHash)); }

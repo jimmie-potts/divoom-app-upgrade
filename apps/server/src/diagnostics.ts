@@ -15,12 +15,16 @@ export async function createDiagnostics(env:NodeJS.ProcessEnv,localSink?:NonNull
  const collectorOrigin=env.PIXOO_OBSERVABILITY_COLLECTOR;
  const runtime=await createHostDiagnostics({enabled:true,tracing,samplingRatio,...(collectorOrigin?{collectorOrigin}:{}),...(localSink?{localSink}:{}),
   resource:{'service.name':'pixoo','service.namespace':'bunny','service.version':'0.0.0','service.instance.id':randomUUID(),'deployment.environment.name':'development'}});
- return {runtime,worker:{tracing,samplingRatio,...(collectorOrigin?{collectorOrigin}:{})}};
+ return {runtime,worker:{}};
 }
 const object=(value:unknown):Record<string,unknown>=>value!==null&&typeof value==='object'?value as Record<string,unknown>:{};
 export function diagnosticOutcome(value:unknown,status=200):string{
- const item=object(value),failure=object(item.failure),operation=object(item.operation),data=object(item.data);
- if(item.priorEffects==='possible'||operation.priorEffects==='possible'||data.priorEffects==='possible'||failure.code==='uncertain-result'||item.code==='uncertain-result')return 'uncertain';
+ const item=object(value),failure=object(item.failure),operation=object(item.operation),data=object(item.data),details=object(item.details);
+ if(details.priorEffects==='possible'||item.priorEffects==='possible'||operation.priorEffects==='possible'||data.priorEffects==='possible'||failure.code==='uncertain-result'||item.code==='uncertain-result')return 'uncertain';
+ for(const candidate of [item,operation,data]){
+  if(['cancelled','failed','rejected','queued','uncertain','timeout'].includes(String(candidate.outcome)))return String(candidate.outcome);
+  if(candidate.code==='cancelled'||candidate.code==='timeout')return candidate.code;
+ }
  if(item.outcome==='sent')return 'transport-acknowledged';
  if(item.ok===false||operation.ok===false||data.ok===false||item.isError===true||item.failure||status>=400)return 'rejected';
  return 'succeeded';
@@ -48,5 +52,14 @@ export function registerDiagnostics(app:FastifyInstance,diagnostics:Diagnostics,
   };
  });
  app.addHook('onReady',async()=>{host.event('process.started','bunny.host',{'bunny.operation':'startup'});});
- app.addHook('onClose',async()=>{host.event('process.stopped','bunny.host',{'bunny.operation':'shutdown'});await host.shutdown();});
+ const close=app.close.bind(app);let closing:Promise<void>|undefined;
+ app.close=((callback?: (error?:Error)=>void)=>{
+  closing??=(async()=>{
+   try{await close();host.event('process.stopped','bunny.host',{'bunny.operation':'shutdown'});}
+   catch(error){host.event('process.failed','bunny.host',{'bunny.operation':'shutdown'},'ERROR');throw error;}
+   finally{await host.shutdown();}
+  })();
+  if(callback){void closing.then(()=>callback(),error=>callback(error));return;}
+  return closing;
+ }) as typeof app.close;
 }

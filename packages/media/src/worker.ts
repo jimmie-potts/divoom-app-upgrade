@@ -1,4 +1,6 @@
-import {createHostDiagnostics,type HostDiagnostics} from '@jimmie-potts/bunny-observability/host';
+import {createPinoEmitter} from '@jimmie-potts/bunny-observability/node';
+import {parseTraceparent} from '@jimmie-potts/bunny-observability';
+import {writeSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -8,10 +10,7 @@ import { MediaError, RENDERER_VERSION, type Rendition } from './contracts.js';
 import type { WorkerRequest } from './worker-client.js';
 const hash = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 process.once('message', async (request: WorkerRequest) => {
-  let diagnostics:HostDiagnostics|undefined;
-  if(request.diagnostics){
-    try{diagnostics=await createHostDiagnostics({enabled:true,...request.diagnostics,resource:{'service.name':'pixoo-media-worker','service.namespace':'bunny','service.version':'0.0.0','service.instance.id':randomUUID(),'deployment.environment.name':'development'}});}catch{/* Diagnostics initialization cannot reject a render. */}
-  }
+  const started=performance.now();
   let response:{ok:boolean;code?:string};
   const render=async()=>{
     const bytes = await readFile(request.input);
@@ -27,9 +26,16 @@ process.once('message', async (request: WorkerRequest) => {
     await writeFile(join(request.output,'manifest.json'),JSON.stringify(manifest),{flag:'wx'});
   };
   try{
-    if(diagnostics)await diagnostics.run({scope:'bunny.media',operation:'media',spanName:'bunny.command.execute',root:true,traceparent:request.diagnostics?.traceparent,authenticated:true,owned:true},render);else await render();
+    await render();
     response={ok:true};
   }catch(error){response={ok:false,code:error instanceof MediaError?error.code:'decode-failed'};}
-  await diagnostics?.shutdown();
+  if(request.diagnostics){
+    // One bounded canonical record on a dedicated pipe; no Collector or flush dependency.
+    const emitter=createPinoEmitter(line=>{writeSync(4,line);},{maxRecords:1,maxBytes:8192});
+    const correlation=parseTraceparent(request.diagnostics.traceparent,{authenticated:true,owned:true});
+    emitter.emit({timestamp:new Date().toISOString(),event_name:response.ok?'operation.completed':'operation.failed',severity_text:response.ok?'INFO':'WARN',
+      ...(correlation??{}),resource:{'service.name':'pixoo-media-worker','service.namespace':'bunny','service.version':'0.0.0','service.instance.id':randomUUID(),'deployment.environment.name':'development'},
+      scope:{name:'bunny.media',version:'1.0.0'},attributes:{'bunny.provenance':'source','bunny.operation':'media','bunny.outcome':response.ok?'succeeded':'failed','bunny.duration_ms':Math.min(86400000,Math.max(0,performance.now()-started))}});
+  }
   process.send?.(response,()=>process.disconnect());
 });

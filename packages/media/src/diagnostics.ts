@@ -1,6 +1,6 @@
 import {context,trace} from '@opentelemetry/api';
 import type {HostDiagnostics} from '@jimmie-potts/bunny-observability/host';
-export interface WorkerDiagnostics {tracing:boolean;samplingRatio:number;collectorOrigin?:string;traceparent?:string}
+export interface WorkerDiagnostics {traceparent?:string}
 export interface MediaDiagnostics {runtime:HostDiagnostics;worker:WorkerDiagnostics}
 export function workerDiagnostics(settings:WorkerDiagnostics):WorkerDiagnostics{
  const current=trace.getSpanContext(context.active());

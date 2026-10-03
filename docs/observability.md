@@ -18,9 +18,10 @@ instrumentation or device/vendor trace headers are added.
 
 The shared contract limits records to 8 KiB and each signal queue to 1,024
 records or 4 MiB, dropping newest when full. Shutdown flush is bounded by the
-shared one-second deadline. Output failure cannot retry a command. A media
-child uses the same bounds inside its existing rendering deadline; cancellation
-still kills and reaps it before the slot is released.
+shared one-second deadline. Output failure cannot retry a command. A media child emits at most one 8 KiB canonical record through its dedicated
+diagnostic pipe. The parent queues local/Collector delivery; child completion
+never waits for Collector flushing. Cancellation still kills and reaps the child
+before the slot is released.
 
 ## Coverage
 
@@ -30,7 +31,7 @@ still kills and reaps it before the slot is released.
 | Selected HTTP handlers | Canonical operation result and duration; no URL/body capture |
 | Native controller commands | Authenticated request outcome, preserving uncertainty |
 | MCP tools | Outcome after gateway authentication; a fresh root per invocation |
-| Media imports/renditions | Request, owned queue handoff and child render span |
+| Media imports/renditions | Request, owned queue handoff and correlated child render record |
 | Player and monitor API operations | Registered playback/state operation summaries |
 
 Browser instrumentation, provider hooks, operational helper CLIs, background
@@ -42,8 +43,9 @@ controller commands accept validated traceparent after their credential check.
 Only the private owned worker request carries captured context onward.
 
 Query `service.name=pixoo` and `pixoo-media-worker`, then the canonical scope,
-`bunny.operation`, `bunny.outcome`, `trace_id` and `span_id`. Worker diagnostics
-use stderr, separate from its unchanged IPC result messages. Names, media,
+`bunny.operation`, `bunny.outcome`, `trace_id` and `span_id`. The parent writes worker diagnostics to stderr and the optional Collector,
+separate from the child’s unchanged IPC result messages. Worker logs refer to
+the owned queue span; there is no separate child SDK or child exporter. Names, media,
 paths, request bodies and raw exception text are not diagnostic fields.
 
 ## Validation boundary
