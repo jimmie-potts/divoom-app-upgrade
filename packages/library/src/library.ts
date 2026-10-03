@@ -4,7 +4,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, realpath } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { MediaError, MediaStore, type Rendition,type MediaProfile } from '@pixoo/media';
+import { MediaError, MediaStore, type MediaDiagnostics, type Rendition,type MediaProfile } from '@pixoo/media';
 import { z } from 'zod';
 import { LibraryError, hashSchema, idSchema, itemsSchema, nameSchema, revisionSchema, validate,
   type PlaybackPolicy, type Asset, type ImportResult, type ItemInput, type Playlist, type PlaylistItem, type SessionReference } from './contracts.js';
@@ -29,12 +29,12 @@ export class Library {
   private closed?:Promise<void>;
   private constructor(private db:DatabaseSync, private owner:DatabaseSync, private media:MediaStore, private mediaDirectory:string) {}
 
-  static async open(options:{directory:string;requireExisting?:boolean}):Promise<Library> {
+  static async open(options:{directory:string;requireExisting?:boolean;mediaDiagnostics?:MediaDiagnostics}):Promise<Library> {
     let db:DatabaseSync|undefined, owner:DatabaseSync|undefined;
     try {
       if(!options || typeof options.directory !== 'string') throw new LibraryError('invalid-input');
       if(options.requireExisting && !(await lstat(join(options.directory,'catalog.sqlite'))).isFile())throw new LibraryError('catalog-corrupt');
-      const media = new MediaStore({directory:join(options.directory,'media')});
+      const media = new MediaStore({directory:join(options.directory,'media'),...(options.mediaDiagnostics?{diagnostics:options.mediaDiagnostics}:{})});
       await media.initialize();
       const mediaDirectory = await realpath(join(options.directory,'media'));
       const directory = dirname(mediaDirectory);

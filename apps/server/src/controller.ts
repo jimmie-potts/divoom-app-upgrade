@@ -1,3 +1,5 @@
+import type {HostDiagnostics} from '@jimmie-potts/bunny-observability/host';
+import {diagnose} from './diagnostics.js';
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import {validate,type Identity} from '@jimmie-potts/device-contracts';
 import {authenticateCredential,validateMcpConfiguration,MCP_DEVICE_ID} from './mcp-config.js';
@@ -17,7 +19,7 @@ export function controllerIdentity(value:ControllerIdentity=defaultControllerIde
  return Object.freeze({...value});
 }
 export const controllerPaths=new Set<string>(['/controller/v1/snapshot','/controller/v1/commands','/controller/v1/events',...integrationPaths]);
-export async function registerController(app:FastifyInstance,directory:string,service:ControlService,configured?:ControllerIdentity):Promise<void>{
+export async function registerController(app:FastifyInstance,directory:string,service:ControlService,configured?:ControllerIdentity,diagnostics?:HostDiagnostics):Promise<void>{
  await validateMcpConfiguration(directory);
  const identity={...controllerIdentity(configured),controllerEpoch:service.commands.epoch};
  const state=new ControllerState(service,identity);
@@ -60,7 +62,10 @@ export async function registerController(app:FastifyInstance,directory:string,se
  });
  app.get('/controller/v1/snapshot',async()=>{await state.refreshCatalog();events.publish();return events.snapshot();});
  app.post('/controller/v1/commands',async(request,reply)=>{
-  const receipt=await state.execute(request.body);
+  const action=()=>state.execute(request.body);
+  const kind=(request.body as {command?:{kind?:unknown}}|null)?.command?.kind;
+  const operation=kind==='brightness.set'?'brightness':kind==='power.set'?'power':'mode';
+  const receipt=diagnostics?await diagnose(diagnostics,{scope:'bunny.controller',operation,root:true,spanName:'bunny.command.request',traceparent:request.headers.traceparent,authenticated:true,owned:true},action):await action();
   return reply.code(receipt.failure?failureStatus[receipt.failure.code]:200).send(receipt);
  });
  events.register(app);

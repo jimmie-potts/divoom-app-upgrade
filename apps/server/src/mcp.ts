@@ -1,11 +1,12 @@
+import type {HostDiagnostics} from '@jimmie-potts/bunny-observability/host';
 import type {FastifyInstance} from 'fastify';
 import {createMcpHandler,type McpHandler} from '@jimmie-potts/device-mcp';
 import {authenticateCredential,validateMcpConfiguration} from './mcp-config.js';
 import {createLocalTools} from './mcp-tools.js';
 import type {ControlService} from './control-service.js';
-export async function registerMcp(app:FastifyInstance,directory:string,service:ControlService,changed:()=>void):Promise<void>{
+export async function registerMcp(app:FastifyInstance,directory:string,service:ControlService,changed:()=>void,diagnostics?:HostDiagnostics):Promise<void>{
  await validateMcpConfiguration(directory);
- const {registry,tools}=createLocalTools(service,changed);
+ const {registry,tools}=createLocalTools(service,changed,diagnostics);
  let handler:McpHandler|undefined;
  app.addHook('onRequest',async(request,reply)=>{
   if(request.url!=='/mcp')return;

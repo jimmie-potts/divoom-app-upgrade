@@ -1,3 +1,4 @@
+import {createDiagnostics} from '../../apps/server/src/diagnostics.js';
 import {expect,it} from 'vitest';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -61,7 +62,9 @@ it('resyncs authenticated streams and terminates them after credential revocatio
 it('shares command identities, guards revisions and replays native outcomes without another write',async()=>{
  const dataDir=await mkdtemp(join(tmpdir(),'pixoo-hub-command-'));
  const token=await provisionCredential(dataDir,'hub',['read','control']);
- const app=createApp({dataDir,controllerEnabled:true});
+ const records:Array<{scope:{name:string};attributes:Record<string,unknown>}>=[];
+ const diagnostics=await createDiagnostics({PIXOO_OBSERVABILITY_ENABLED:'1'},line=>{records.push(JSON.parse(line));});
+ const app=createApp({dataDir,controllerEnabled:true,diagnostics});
  const headers={authorization:`Bearer ${token}`};
  try{
   const initial=(await app.inject({url:'/controller/v1/snapshot',headers})).json();
@@ -80,4 +83,5 @@ it('shares command identities, guards revisions and replays native outcomes with
   const stale=await post({...body,requestId:current.nextRequestId});
   expect(stale.statusCode).toBe(409);expect(stale.json()).toMatchObject({failure:{code:'revision-conflict'},priorEffects:'none'});
  }finally{await app.close();await rm(dataDir,{recursive:true,force:true});}
+ expect(records.some(record=>record.scope.name==='bunny.controller'&&record.attributes['bunny.operation']==='brightness'&&record.attributes['bunny.outcome']==='transport-acknowledged')).toBe(true);
 });

@@ -3,6 +3,7 @@ import { link, lstat, mkdir, mkdtemp, open, readFile, realpath, rename, rm, stat
 import { dirname, isAbsolute, join } from 'node:path';
 import { canonicalLimits, canonicalProfile, canonicalTransform, DEFAULT_TRANSFORM, MediaError, RENDERER_VERSION, SIMULATOR_PROFILE,
   type MediaLimits, type MediaProfile, type Rendition, type Transform } from './contracts.js';
+import {workerDiagnostics,type MediaDiagnostics} from './diagnostics.js';
 import { runWorker, signalError } from './worker-client.js';
 const hash = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
 const validHash = (s: string) => /^[a-f0-9]{64}$/.test(s);
@@ -49,7 +50,8 @@ export class MediaStore {
   private root: Promise<string> | undefined;
   private active = 0;
   private readonly queue: Waiting[] = [];
-  constructor(options: {directory:string;limits?:Partial<MediaLimits>}) { this.directory=options.directory; this.limits=canonicalLimits(options.limits); }
+  private diagnostics:MediaDiagnostics|undefined;
+  constructor(options: {directory:string;limits?:Partial<MediaLimits>;diagnostics?:MediaDiagnostics}) { this.diagnostics=options.diagnostics; this.directory=options.directory; this.limits=canonicalLimits(options.limits); }
   private getRoot() { return this.root ??= storageRoot(this.directory); }
   async initialize(): Promise<void> { await this.getRoot(); }
   async getRendition(id:string): Promise<Rendition> {
@@ -115,7 +117,8 @@ export class MediaStore {
         if(signal.aborted) throw signalError(signal);
         return existing;
       }
-      await runWorker({input:inputPath,output,sourceHash,id,transform,profile,limits:this.limits},signal);
+      const decode=()=>runWorker({input:inputPath,output,sourceHash,id,transform,profile,limits:this.limits,...(this.diagnostics?{diagnostics:workerDiagnostics(this.diagnostics.worker)}:{})},signal);
+      if(this.diagnostics)await this.diagnostics.runtime.run({scope:'bunny.queue',operation:'media',spanName:'bunny.command.queue'},decode);else await decode();
       if(signal.aborted) throw signalError(signal);
       try { await link(inputPath,join(root,'originals',sourceHash)); }
       catch(e) { if(code(e)!=='EEXIST') throw e; await this.verifyOriginal(root,sourceHash); }

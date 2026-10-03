@@ -1,12 +1,13 @@
+import type {WorkerDiagnostics} from './diagnostics.js';
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { MediaError, type MediaLimits, type MediaProfile, type Transform } from './contracts.js';
-export interface WorkerRequest { input: string; output: string; sourceHash: string; id: string; transform: Transform; profile: MediaProfile; limits: MediaLimits }
+export interface WorkerRequest { diagnostics?:WorkerDiagnostics; input: string; output: string; sourceHash: string; id: string; transform: Transform; profile: MediaProfile; limits: MediaLimits }
 export function signalError(signal: AbortSignal): MediaError { return new MediaError(signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError' ? 'timeout' : 'cancelled'); }
 export function runWorker(request: WorkerRequest, signal: AbortSignal, entry = new URL('./worker.js', import.meta.url)): Promise<void> {
   if (signal.aborted) return Promise.reject(signalError(signal));
   return new Promise((resolve,reject) => {
-    const child = fork(fileURLToPath(entry), { stdio:['ignore','ignore','ignore','ipc'], execArgv:['--max-old-space-size=256'], env:{PATH:process.env.PATH, SystemRoot:process.env.SystemRoot}, serialization:'advanced' });
+    const child = fork(fileURLToPath(entry), { stdio:['ignore','ignore',request.diagnostics?'inherit':'ignore','ipc'], execArgv:['--max-old-space-size=256'], env:{PATH:process.env.PATH, SystemRoot:process.env.SystemRoot}, serialization:'advanced' });
     let success = false, failure: MediaError | undefined;
     const abort = () => { failure = signalError(signal); child.kill('SIGKILL'); };
     signal.addEventListener('abort',abort,{once:true});

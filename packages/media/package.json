@@ -12,6 +12,8 @@
   "dependencies": {
     "gifenc": "1.0.3",
     "gifuct-js": "2.1.2",
-    "sharp": "0.35.4"
+    "sharp": "0.35.4",
+    "@jimmie-potts/bunny-observability": "file:../../vendor/jimmie-potts-bunny-observability-1.1.0.tgz",
+    "@opentelemetry/api": "1.9.1"
   }
 }

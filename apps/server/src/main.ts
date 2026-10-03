@@ -8,13 +8,13 @@ try {
     if (closing) return;
     closing = true;
     void app.close().catch((error: unknown) => {
-      console.error(error instanceof Error ? error.message : 'Shutdown failed');
+      console.error(process.env.PIXOO_OBSERVABILITY_ENABLED==='1'?'Shutdown failed':error instanceof Error ? error.message : 'Shutdown failed');
       process.exitCode = 1;
     });
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 } catch (error) {
-  console.error(error instanceof Error ? error.message : 'Startup failed');
+  console.error(process.env.PIXOO_OBSERVABILITY_ENABLED==='1'?'Startup failed':error instanceof Error ? error.message : 'Startup failed');
   process.exitCode = 1;
 }

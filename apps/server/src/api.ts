@@ -1,3 +1,4 @@
+import type {Diagnostics} from './diagnostics.js';
 import type {FastifyInstance} from 'fastify';
 import {Library} from '@pixoo/library';
 import {Player,LibraryPlaybackStore} from '@pixoo/playback';
@@ -17,6 +18,7 @@ import {loadRuntimeSelection,selectRuntime,playbackProfile,readHostedSettings,ty
 import {acquireDeviceOwner} from './device-owner.js';
 import {registerController,type ControllerIdentity} from './controller.js';
 export interface ApiRuntimeOptions {
+ diagnostics?:Diagnostics;
  controllerEnabled?:boolean;
  controllerIdentity?:ControllerIdentity;
  mcpEnabled?:boolean;
@@ -40,7 +42,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
  try{
   if(runtime.activeConfiguration)releaseOwner=await acquireDeviceOwner(runtime.activeConfiguration.ip,options.deviceLockDirectoryForTests);
   if(usesHosted)hosted=await startHostedFiles(await readHostedSettings(dataDir));
-  library=await Library.open({directory:join(dataDir,'library')});
+  library=await Library.open({directory:join(dataDir,'library'),...(options.diagnostics?.worker?{mediaDiagnostics:{runtime:options.diagnostics.runtime,worker:options.diagnostics.worker}}:{})});
   let simulator:FakeDeviceAdapter|undefined;
   const device=runtime.activeConfiguration?(physical=new HttpDeviceAdapter({ip:runtime.activeConfiguration.ip,
    profile:{...profile,evidence:'observed',readyDelayMs:usesHosted?1000:0},...(hosted?{hosted:{files:hosted,encode:animation=>encodeHostedGif(animation.frames)}}:{})},options.transportForTests)):(simulator=new FakeDeviceAdapter({recordHistory:false}));
@@ -59,8 +61,8 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   const commands=new Commands(),service=new ControlService(active,commands,runtime.mode,library,profile,runtime.mode==='device'?500:100),snapshot=playerRoutes(app,active,commands,()=>changed(),service);
   const events=new Events(snapshot);changed=()=>events.publish();const unsubscribe=active.subscribe(changed);events.register(app);
   if(options.monitorEnabled){const {registerMonitor}=await import('./monitor.js');closeMonitor=await registerMonitor(app,dataDir,service,options.monitorRenderCadenceMs);}
-  if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed);
-  if(options.controllerEnabled)await registerController(app,dataDir,service,options.controllerIdentity);
+  if(options.mcpEnabled)await registerMcp(app,dataDir,service,changed,options.diagnostics?.runtime);
+  if(options.controllerEnabled)await registerController(app,dataDir,service,options.controllerIdentity,options.diagnostics?.runtime);
   app.addHook('preClose',async()=>{
    unsubscribe();events.close();
    try{await active.close();}finally{await physical?.close();}
