@@ -91,9 +91,15 @@ it.each(['0','1'])('normal executable keeps startup separate with enablement %s'
    child.stdout.on('data',()=>{if(stdout.includes('Pixoo simulator listening on http://127.0.0.1:')){clearTimeout(deadline);resolve();}});
    child.once('exit',()=>{clearTimeout(deadline);reject(new Error('server exited before readiness'));});
   });
+  // Readiness must include a served request before testing graceful termination.
+  // The stdout pipe can reach a fast CI parent before main installs its signal handlers.
+  const address=stdout.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];expect(address).toBeDefined();
+  expect((await fetch(`${address}/api/health`)).status).toBe(200);
   child.kill('SIGTERM');expect(await closed).toBe(0);
   expect(stdout.trim()).toMatch(/^Pixoo simulator listening on http:\/\/127\.0\.0\.1:\d+$/);
   const records=stderr.split('\n').filter(line=>line.startsWith('{')).map(line=>JSON.parse(line));
-  expect(records.map(record=>record.event_name)).toEqual(enabled==='1'?['process.started','process.stopped']:[]);
+  for(const record of records)expect(validateRecord(record).ok).toBe(true);
+  expect(records.filter(record=>record.event_name.startsWith('process.')).map(record=>record.event_name)).toEqual(enabled==='1'?['process.started','process.stopped']:[]);
+  if(enabled==='0')expect(records).toEqual([]);
  }finally{child.kill('SIGKILL');await closed;await rm(root,{recursive:true,force:true});}
 },15000);
