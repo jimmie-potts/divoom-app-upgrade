@@ -66,6 +66,9 @@ configured CI job prevents automatic merge. Recheck head and base immediately
 before a squash merge guarded by `--match-head-commit`; never use `--admin`.
 Verify all merged-revision main CI jobs before issue closure.
 
+No project UI requires human approval. Preserve applicable browser/accessibility
+checks, independent reviews and CI under [Review and merge](docs/sdlc.md#review-and-merge).
+
 ## Runtime boundaries
 
 Application startup defaults to the simulator. Explicit PIXOO_MODE=device uses

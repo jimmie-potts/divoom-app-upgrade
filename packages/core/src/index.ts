@@ -1,5 +1,8 @@
 import { z } from 'zod';
+import {buildIdentitySchema} from './build.js';
+export * from './build.js';
 export const healthSchema = z.object({
+  build: buildIdentitySchema,
   status: z.literal('ready'),
   mode: z.enum(['simulator','device']),
   device: z.object({ connected: z.boolean().nullable() }),

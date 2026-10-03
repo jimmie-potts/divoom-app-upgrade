@@ -1,9 +1,9 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {healthSchema,type DeviceConfiguration,type PlayerCommand} from '@pixoo/core';
+import {healthSchema,type DeviceConfiguration,type PlayerCommand,type BuildIdentity} from '@pixoo/core';
 import {request,RequestError,explain,type PlayerState,type Playlist,type Rendition} from './api';
 export interface Snapshot {serverId:string;sampledAtMs:number;nextRequestId:string;player:PlayerState;session:{id:string;playlist:Playlist;source?:{kind:'playlist'}|{kind:'media';assetId:string;renditionId:string}}|null}
 export interface Device {mode:'simulator'|'device';connected:boolean|null;availability:'unknown'|'available'|'offline';configuration:DeviceConfiguration|null;activeConfiguration:DeviceConfiguration|null;restartRequired:boolean;activeProfile:Rendition['profile'];profiles:Rendition['profile'][]}
-type Runtime={serverId:string;device:Device};
+type Runtime={serverId:string;device:Device;build:BuildIdentity};
 type Pending={path:string;method:string;body:Record<string,unknown>};
 async function readSnapshot(){
  const value=await request<Snapshot>('/player');
@@ -28,7 +28,7 @@ export function useController(enabled=true){
     if(!current())return null;
     if(confirmed.serverId!==value.serverId)throw new Error('Server changed while reading runtime settings');
     value=confirmed;
-    const next={serverId:value.serverId,device};runtimeRef.current=next;setRuntime(next);
+    const next={serverId:value.serverId,device,build:health.build};runtimeRef.current=next;setRuntime(next);
    }
    if(!current())return null;
    setSample({value,received:performance.now()});

@@ -13,7 +13,7 @@ import {playerRoutes} from './player-routes.js';
 import {join} from 'node:path';
 import {catalogRoutes} from './catalog-routes.js';
 import {assertRuntimeDirectory} from './operations.js';
-import {diagnosticsSchema} from '@pixoo/core';
+import {diagnosticsSchema,type BuildIdentity} from '@pixoo/core';
 import {loadRuntimeSelection,selectRuntime,playbackProfile,readHostedSettings,type RuntimeSelection,type RuntimeMode} from './device-settings.js';
 import {acquireDeviceOwner} from './device-owner.js';
 import {registerController,type ControllerIdentity} from './controller.js';
@@ -30,7 +30,7 @@ export interface ApiRuntimeOptions {
  deviceLockDirectoryForTests?:string;
 }
 export interface RuntimeStatus {mode:RuntimeMode;connected:boolean|null}
-export async function registerApi(app:FastifyInstance,dataDir:string,options:ApiRuntimeOptions={}):Promise<()=>RuntimeStatus> {
+export async function registerApi(app:FastifyInstance,dataDir:string,options:ApiRuntimeOptions,build:BuildIdentity):Promise<()=>RuntimeStatus> {
  await assertRuntimeDirectory(dataDir);
  const runtime=options.runtime?selectRuntime(options.runtime.mode,options.runtime.savedConfiguration):await loadRuntimeSelection(dataDir,options.mode??'simulator');
  const profile=playbackProfile(runtime);
@@ -53,7 +53,7 @@ export async function registerApi(app:FastifyInstance,dataDir:string,options:Api
   const started=performance.now();
   app.get('/api/diagnostics',()=>{
    const state=active.getState();
-   return diagnosticsSchema.parse({status:'ready',mode:runtime.mode,uptimeMs:Math.floor(performance.now()-started),library:'ready',
+   return diagnosticsSchema.parse({status:'ready',mode:runtime.mode,uptimeMs:Math.floor(performance.now()-started),library:'ready',build,
     device:{connected:observed().connected,availability:state.availability},player:{state:state.state,intent:state.intent},
     logging:{persistent:false},limits:{requests:32,eventClients:16,eventHistory:32,commandReceipts:256,playbackRenditions:2}});
   });
