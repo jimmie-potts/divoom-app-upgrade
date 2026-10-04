@@ -2,10 +2,9 @@ import {parseArgs} from 'node:util';
 import {readInstallConfig} from './runtime-config.js';
 import {runtimeAssert,runtimeJson,runtimeOwned,runtimeWrite} from './runtime-files.js';
 import {canonicalRuntime} from './runtime-release.js';
-import {planRuntime,checkRuntimePlan,type InstallPlan} from './runtime-plan.js';
+import {parseRuntimePlan,planRuntime} from './runtime-plan.js';
 import {operateRuntime,RuntimeFinalizationFailure} from './runtime-upgrade.js';
-import {LinuxRuntimeHost} from './runtime-host.js';
-import {statusRuntime} from './runtime-status.js';
+import {statusRuntimePlan} from './runtime-status.js';
 import {executeRuntimeRequest,runtimeRequestJson} from './runtime-adapter.js';
 
 try{
@@ -20,8 +19,8 @@ try{
   if(args.values.output)await runtimeWrite(args.values.output,plan);console.log(JSON.stringify(plan,null,2));
  }else{
   runtimeAssert(args.values.plan&&!args.values.output&&!args.values.rollback,'exact-runtime-plan-required');await runtimeOwned(args.values.plan,false,true);
-  const plan=await runtimeJson(args.values.plan) as InstallPlan;runtimeAssert(canonicalRuntime(plan.config)===canonicalRuntime(config),'plan-configuration-mismatch');await guard();
-  if(command==='status'&&!target){await checkRuntimePlan(plan,new LinuxRuntimeHost(config));console.log(JSON.stringify(await statusRuntime(config),null,2));}
+  const plan=parseRuntimePlan(await runtimeJson(args.values.plan),config);await guard();
+  if(command==='status'&&!target){console.log(JSON.stringify(await statusRuntimePlan(config,plan),null,2));}
   else{runtimeAssert((command==='upgrade'||command==='rollback')&&plan.operation===command&&target===plan.requestedTarget,'native-plan-command-mismatch');
    const receipt=await operateRuntime(plan,guard);console.log(JSON.stringify(receipt,null,2));if(receipt.outcome!=='succeeded')process.exitCode=1;
   }

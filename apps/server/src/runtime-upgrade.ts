@@ -6,7 +6,7 @@ import {canonicalRuntime,runtimeHash,runtimeInventory,type RuntimeIdentity} from
 import {stageRuntimeBundle,verifyRuntimeBundle} from './runtime-bundle.js';
 import {runtimeAssert,runtimeDirectory,runtimeExists,runtimeFence,runtimeJson,runtimeSync,runtimeWrite,withRuntimeLock} from './runtime-files.js';
 import {runtimeConfigurationFacts,type InstallConfig} from './runtime-config.js';
-import {LinuxRuntimeHost,runtimeTicks,type RuntimeHost} from './runtime-host.js';
+import {inspectRuntimeUnit,LinuxRuntimeHost,runtimeTicks,type RuntimeHost} from './runtime-host.js';
 import {assertNoRuntimeBarrier,checkRuntimePlan,runtimeRollbackTarget,selectedRuntime,verifyRuntimeSelection,type InstallPlan,type RuntimeSelection} from './runtime-plan.js';
 import {runtimeCommand,runtimeDeadline} from './runtime-command.js';
 import {backupRuntimeState,qualifyRuntimeState,reopenRuntimeState,runtimeStateDigest,snapshotRuntimeState,withRuntimeOwners} from './runtime-state.js';
@@ -82,7 +82,7 @@ async function pruneRuntime(config:InstallConfig,host:RuntimeHost):Promise<void>
    const receipt=await runtimeJson(join(config.runtimeRoot,'receipts',file)) as RuntimeReceipt;
    if(validateInstallReceipt(receipt)&&receipt.runtime==='pixoo'&&receipt.outcome==='succeeded'&&canonicalRuntime(receipt.target)===canonicalRuntime(identity))owned=true;
   }
-  if(owned){await verifyRuntimeBundle(directory,identity);await rm(directory,{recursive:true});}
+  if(owned&&!(await host.writers([directory])).length){await verifyRuntimeBundle(directory,identity);await rm(directory,{recursive:true});}
  }
  await runtimeSync(join(config.runtimeRoot,'releases'));
 }
@@ -99,7 +99,10 @@ export async function transitionRuntime(plan:InstallPlan,prepared:RuntimeSelecti
   const receipt=runtimeReceipt(plan,target.identity,compatibility),records=join(config.runtimeRoot,'records'),receipts=join(config.runtimeRoot,'receipts');
   await runtimeDirectory(records);await runtimeDirectory(receipts);const record=join(records,receipt.operationId);await runtimeDirectory(record);
   await runtimeWrite(join(record,'plan.json'),plan);await runtimeWrite(join(record,'original-unit.json'),{unit:plan.service.unit,mode:plan.service.unitMode});
-  const newUnit=plan.service.unit.replace(/^ExecStart=.*$/m,'ExecStart="'+config.node+'" "'+join(config.runtimeRoot,'current/runtime/apps/server/dist/main.js')+'"');
+  const intendedProgram=join(config.runtimeRoot,'current/runtime');
+  const newUnit=plan.service.unit.split('\n').map(line=>line.trim().startsWith('ExecStart=')?
+   line.slice(0,line.indexOf('ExecStart='))+'ExecStart="'+config.node+'" "'+join(intendedProgram,'apps/server/dist/main.js')+'"':line).join('\n');
+  runtimeAssert(inspectRuntimeUnit(newUnit,config)===intendedProgram,'runtime-prepared-unit-target-mismatch');
   const unitCandidate=join(record,'pixoo-playlist-controller.service');
   // Unit verification occurs before outage and preserves every other directive.
   const {writeFile}=await import('node:fs/promises');await writeFile(unitCandidate,newUnit,{mode:plan.service.unitMode,flag:'wx'});await host.verifyUnit(unitCandidate);
@@ -125,7 +128,8 @@ export async function transitionRuntime(plan:InstallPlan,prepared:RuntimeSelecti
       await checkpoint('unit-written');await host.reload();await checkpoint('unit-reloaded');
      }
      adopting=false;switched=true;
-     });
+     },[{name:'service.env',path:config.environmentFile,sha256:plan.configuration.environment!},
+      {name:'pixoo-playlist-controller.service',path:config.unitFile,sha256:plan.service.unitSha256}]);
     });
    });
    phase='start';const started=await runtimeTicks();await host.start();phase='health';const health=await host.health(target.identity,target.program,started);

@@ -1,9 +1,9 @@
 import {DatabaseSync,backup} from 'node:sqlite';
 import {createHash} from 'node:crypto';
-import {cp,lstat,mkdir,readdir} from 'node:fs/promises';
+import {cp,lstat,mkdir,readdir,writeFile} from 'node:fs/promises';
 import {dirname,join} from 'node:path';
-import {runtimeAssert,runtimeExists,runtimeSync} from './runtime-files.js';
-import {canonicalRuntime,runtimeFileHash,runtimeHash,runtimeInventory} from './runtime-release.js';
+import {runtimeAssert,runtimeExists,runtimeOwned,runtimeSync,runtimeWrite} from './runtime-files.js';
+import {canonicalRuntime,readRuntimeFile,runtimeFileHash,runtimeHash,runtimeInventory} from './runtime-release.js';
 import {runtimeCommand} from './runtime-command.js';
 import {backupData} from './operations.js';
 import {ROOT_CONFIG,MONITOR_CONFIG} from './runtime-config.js';
@@ -63,14 +63,28 @@ export async function snapshotRuntimeState(source:string,destination:string):Pro
  for(const path of [...directories].sort((a,b)=>b.length-a.length))await runtimeSync(join(destination,path));
  await runtimeSync(destination);
 }
-/** Existing verified library backup plus every named non-library durable record. */
-export async function backupRuntimeState(source:string,destination:string,whileLocked?:(sha256:string)=>Promise<void>):Promise<string>{
+interface RuntimeBackupConfiguration {name:'service.env'|'pixoo-playlist-controller.service';path:string;sha256:string}
+/** Existing verified library backup, every named durable record and bound external configuration. */
+export async function backupRuntimeState(source:string,destination:string,whileLocked?:(sha256:string)=>Promise<void>,configuration:readonly RuntimeBackupConfiguration[]=[]):Promise<string>{
  await runtimeStatePaths(source);await mkdir(destination,{mode:0o700});
  let digest='';
  await backupData(source,join(destination,'library-backup'),async()=>{
   await snapshotRuntimeState(source,join(destination,'complete-state'));
-  // Both are independent retained evidence; neither is an automatic rollback input.
-  await runtimeSync(destination);digest=await runtimeStateDigest(join(destination,'complete-state'));await whileLocked?.(digest);
+  const retained=[];
+  if(configuration.length)await mkdir(join(destination,'configuration'),{mode:0o700});
+  for(const item of configuration){
+   await runtimeOwned(item.path,false,item.name==='service.env');const bytes=await readRuntimeFile(item.path,16384);
+   runtimeAssert(runtimeHash(bytes)===item.sha256,'runtime-backup-configuration-drift');
+   const path=join('configuration',item.name),copy=join(destination,path);await writeFile(copy,bytes,{mode:0o600,flag:'wx'});await runtimeSync(copy);
+   runtimeAssert(await runtimeFileHash(copy)===item.sha256,'runtime-backup-configuration-copy-failed');
+   retained.push({path,source:item.path,sha256:item.sha256,originalMode:(await lstat(item.path)).mode&0o777});
+  }
+  if(configuration.length)await runtimeSync(join(destination,'configuration'));
+  // Retained backup evidence is never an automatic rollback input.
+  const manifest=join(destination,'manifest.json');await runtimeWrite(manifest,{schemaVersion:1,
+   libraryBackupManifestSha256:await runtimeFileHash(join(destination,'library-backup/manifest.json')),
+   completeStateSha256:await runtimeStateDigest(join(destination,'complete-state')),configuration:retained});
+  await runtimeSync(destination);digest=await runtimeFileHash(manifest);await whileLocked?.(digest);
  });return digest;
 }
 

@@ -12,9 +12,9 @@ export class FakeRuntimeHost implements RuntimeHost{
  constructor(readonly config:InstallConfig){}
  async service():Promise<RuntimeService>{const unit=await readFile(this.config.unitFile,'utf8');return {active:this.active,program:inspectRuntimeUnit(unit,this.config),unit,unitMode:(await lstat(this.config.unitFile)).mode&0o777,unitSha256:runtimeHash(unit),process:this.active==='active'?this.process():null};}
  process(){return {pid:123,startTicks:1e12,uid:process.getuid!(),capabilities:'0',argv:[this.config.node,'fixture'],executable:this.config.node,state:'S'};}
- async qualify(){}async writers(){return [];}
+ async qualify(){}writers:RuntimeHost['writers']=async()=>[];
  async stop(){this.stops++;if(this.failStop)throw Error('fake-stop-failed');this.active='inactive';}
- async start(){this.starts++;this.active='active';}async reload(){this.reloads++;}async verifyUnit(){}
+ async start(){this.starts++;this.active='active';}async reload(){this.reloads++;}async verifyUnit(path:string){inspectRuntimeUnit(await readFile(path,'utf8'),this.config);}
  async health(identity:RuntimeIdentity):Promise<RuntimeHealth>{await this.healthHook?.(identity);if(this.failHealth)throw Error('fake-health-failed');return {process:this.process(),health:{status:'ready',mode:'simulator',device:{connected:false},...(identity.kind==='release'?{build:{sourceRevision:identity.sourceRevision,version:identity.version}}:{})},controller:null,indexSha256:runtimeHash('fixture'),verifiedAt:new Date().toISOString()};}
 }
 export async function runtimeFixture(){

@@ -1,21 +1,92 @@
 import {afterEach,expect,it} from 'vitest';
-import {rm,readFile,writeFile,mkdir,readlink,readdir,cp} from 'node:fs/promises';
+import {rm,readFile,writeFile,mkdir,readlink,readdir,cp,lstat} from 'node:fs/promises';
 import {join} from 'node:path';
+import {execFileSync} from 'node:child_process';
 import {Library} from '@pixoo/library';
 import {validateInstallReceipt} from '@jimmie-potts/install-contracts';
 import {runtimeFixture} from '../helpers/runtime-fixture.js';
 import {transitionRuntime,RuntimeFinalizationFailure} from '../../apps/server/src/runtime-upgrade.js';
-import {assertNoRuntimeBarrier} from '../../apps/server/src/runtime-plan.js';
+import {assertNoRuntimeBarrier,planRuntime,runtimeRollbackTarget,selectedRuntime} from '../../apps/server/src/runtime-plan.js';
 import {inspectRuntimeDelivery,executeRuntimeRequest,type RuntimeAdapterNative} from '../../apps/server/src/runtime-adapter.js';
 import {backupData} from '../../apps/server/src/operations.js';
+import {inspectRuntimeUnit} from '../../apps/server/src/runtime-host.js';
+import {canonicalRuntime,runtimeHash} from '../../apps/server/src/runtime-release.js';
+import {statusRuntimePlan} from '../../apps/server/src/runtime-status.js';
+import {stageRuntimeBundle} from '../../apps/server/src/runtime-bundle.js';
 const roots:string[]=[];
 afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
 async function fixture(){const value=await runtimeFixture();roots.push(value.root);return value;}
 const recheck=async()=>{};
+it('retains current plus three prior successful releases, active recovery code and unrelated history',async()=>{
+ const f=await fixture(),releases=join(f.config.runtimeRoot,'releases');await mkdir(releases,{mode:0o700});
+ const unrelated=join(releases,'other-owner');await mkdir(unrelated);await writeFile(join(unrelated,'keep'),'untouched');
+ const executing=join(releases,f.candidate.identity.sourceRevision);let active=true;
+ f.host.writers=async roots=>active&&roots.includes(executing)?[f.host.process()]:[];
+ for(const revision of ['b','c','d','e','f'].map(character=>character.repeat(40))){
+  await writeFile(join(f.config.sourceRoot,'apps/server/dist/build.json'),JSON.stringify({sourceRevision:revision,version:'0.0.0'}));
+  const directory=join(f.root,'release-'+revision),identity=await stageRuntimeBundle(f.config.sourceRoot,directory,revision);
+  const {process:running,...service}=await f.host.service();
+  const plan={...f.plan,requestedTarget:revision,targetRevision:revision,previous:await selectedRuntime(f.config,await f.host.service()),service,running,planSha256:''};plan.planSha256=runtimeHash(canonicalRuntime(plan));
+  expect((await transitionRuntime(plan,{directory,program:join(directory,'runtime'),identity,legacyOriginal:false},'fixture',{host:f.host,recheck})).outcome).toBe('succeeded');
+ }
+ expect(await readdir(releases)).toContain('b'.repeat(40));active=false;
+ const revision='1'.repeat(40);await writeFile(join(f.config.sourceRoot,'apps/server/dist/build.json'),JSON.stringify({sourceRevision:revision,version:'0.0.0'}));
+ const directory=join(f.root,'last-release'),identity=await stageRuntimeBundle(f.config.sourceRoot,directory,revision),{process:running,...service}=await f.host.service();
+ const plan={...f.plan,requestedTarget:revision,targetRevision:revision,previous:await selectedRuntime(f.config,await f.host.service()),service,running,planSha256:''};plan.planSha256=runtimeHash(canonicalRuntime(plan));
+ expect((await transitionRuntime(plan,{directory,program:join(directory,'runtime'),identity,legacyOriginal:false},'fixture',{host:f.host,recheck})).outcome).toBe('succeeded');
+ expect((await readdir(releases)).sort()).toEqual([revision,'d'.repeat(40),'e'.repeat(40),'f'.repeat(40),'other-owner']);
+ expect(await readFile(join(unrelated,'keep'),'utf8')).toBe('untouched');expect(await readdir(join(f.config.runtimeRoot,'legacy'))).toHaveLength(1);
+ expect(await readdir(join(f.config.runtimeRoot,'backups'))).toHaveLength(6);expect(await readdir(join(f.config.runtimeRoot,'receipts'))).toHaveLength(6);
+},30000);
+it('plans legacy rollback without invented source provenance and preserves newer state on explicit rollback',async()=>{
+ const f=await fixture();await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck});
+ const git=(...args:string[])=>execFileSync('git',args,{cwd:f.config.sourceRoot,encoding:'utf8'}).trim();
+ git('init','--quiet');git('config','user.email','fixture@example.invalid');git('config','user.name','Fixture');git('add','.');git('commit','--quiet','-m','Source fixture');
+ const head=git('rev-parse','HEAD');
+ const rollback=await planRuntime(f.config,'previous','rollback',f.host,()=>({...f.plan.source,head,target:head,mergedMain:head,comparison:{status:'complete'}}));
+ expect(rollback.source.comparison).toEqual({status:'unknown',reason:'legacy-source-unknown'});expect(rollback.source.target).toBe('unknown');expect(rollback.sourceTree).toBe('unknown');
+ expect(rollback.source.commits).toEqual([]);expect(rollback.source.removedCommits).toEqual([]);expect(rollback.source.components).toEqual([]);
+ const library=await Library.open({directory:join(f.config.dataDirectory,'library')});await library.createPlaylist('after upgrade');await library.close();
+ const receipt=await transitionRuntime(rollback,await runtimeRollbackTarget(f.config,'previous'),'fixture-compatible-rollback',{host:f.host,recheck});
+ expect(receipt).toMatchObject({operation:'rollback',outcome:'succeeded',target:f.plan.previous.identity});expect(validateInstallReceipt(receipt)).toBe(true);
+ expect(await readlink(join(f.config.runtimeRoot,'current'))).toBe('legacy/'+(f.plan.previous.identity.kind==='legacy'?f.plan.previous.identity.legacyId:''));
+ const reopened=await Library.open({directory:join(f.config.dataDirectory,'library')});try{expect((await reopened.listPlaylists()).map(item=>item.name)).toContain('after upgrade');}finally{await reopened.close();}
+});
+it('uses the original plan for read-only unresolved status and status after successful installation',async()=>{
+ const f=await fixture(),records=join(f.config.runtimeRoot,'records');await mkdir(records,{mode:0o700});
+ const barrier=join(records,'active.json');await writeFile(barrier,JSON.stringify({operationId:'pixoo-11111111-1111-1111-1111-111111111111'}),{mode:0o600});
+ const before=await readFile(barrier),entries=await readdir(f.config.runtimeRoot);
+ const unresolved=await statusRuntimePlan(f.config,f.plan,f.host,()=>f.plan.targetRevision);expect(unresolved.inspectionRequired).toBe(true);
+ expect(await readFile(barrier)).toEqual(before);expect(await readdir(f.config.runtimeRoot)).toEqual(entries);expect(f.host.stops).toBe(0);
+ await rm(barrier);await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck});
+ const observed=await statusRuntimePlan(f.config,f.plan,f.host,()=>f.plan.targetRevision);
+ expect(observed.inspectionRequired).toBe(false);expect(observed.installed).toEqual(f.candidate.identity);
+ expect(f.host.stops).toBe(1);expect(f.host.starts).toBe(1);
+ await expect(statusRuntimePlan(f.config,{...f.plan,planSha256:'0'.repeat(64)},f.host,()=>f.plan.targetRevision)).rejects.toThrow('runtime-plan-changed');
+});
+it('adopts an indented entrypoint and verifies its intended current path before stopping',async()=>{
+ const f=await fixture(),original=(await readFile(f.config.unitFile,'utf8')).replace('ExecStart=',' \tExecStart=');
+ await writeFile(f.config.unitFile,original);const {process:running,...service}=await f.host.service();f.plan.service=service;f.plan.running=running;
+ f.plan.planSha256=runtimeHash(canonicalRuntime({...f.plan,planSha256:''}));let verified=false;
+ f.host.verifyUnit=async(path:string)=>{expect(f.host.stops).toBe(0);expect(inspectRuntimeUnit(await readFile(path,'utf8'),f.config)).toBe(join(f.config.runtimeRoot,'current/runtime'));verified=true;};
+ const receipt=await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck});
+ expect(verified).toBe(true);expect(receipt.outcome).toBe('succeeded');
+ const adopted=await readFile(f.config.unitFile,'utf8');expect(adopted).toContain(' \tExecStart=');
+ expect(adopted.replace(/^\s*ExecStart=.*$/m,'ExecStart=')).toBe(original.replace(/^\s*ExecStart=.*$/m,'ExecStart='));
+});
 it('retains the existing library lease until the selection callback completes',async()=>{
  const f=await fixture();let reached=false;
  await backupData(f.config.dataDirectory,join(f.root,'backup'),async()=>{reached=true;await expect(Library.open({directory:join(f.config.dataDirectory,'library')})).rejects.toThrow();});
  expect(reached).toBe(true);const reopened=await Library.open({directory:join(f.config.dataDirectory,'library')});await reopened.close();
+});
+it('retains exact external environment and original unit bytes in the private bound backup',async()=>{
+ const f=await fixture(),environment=await readFile(f.config.environmentFile),unit=await readFile(f.config.unitFile);
+ const receipt=await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck});expect(receipt.outcome).toBe('succeeded');
+ const root=receipt.backup!.reference,env=join(root,'configuration/service.env'),service=join(root,'configuration/pixoo-playlist-controller.service');
+ expect(await readFile(env)).toEqual(environment);expect(await readFile(service)).toEqual(unit);
+ expect((await lstat(env)).mode&0o777).toBe(0o600);expect((await lstat(service)).mode&0o777).toBe(0o600);
+ const manifest=await readFile(join(root,'manifest.json'));expect(runtimeHash(manifest)).toBe(receipt.backup!.sha256);
+ expect(JSON.parse(manifest.toString()).configuration.map((entry:{sha256:string})=>entry.sha256)).toEqual([runtimeHash(environment),runtimeHash(unit)]);
 });
 it('adopts a legacy closure, preserves other history and emits validated installed readback',async()=>{
  const f=await fixture(),history=join(f.config.runtimeRoot,'older-other-owner');await mkdir(history);await writeFile(join(history,'keep'),'original');
@@ -48,6 +119,7 @@ it.each(['before-current','current-selected','unit-written','unit-reloaded'])('r
  const receipt=await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck,checkpoint:async step=>{if(step===boundary)throw Error('interrupted');}});
  expect(receipt.outcome).toBe('interrupted');expect(validateInstallReceipt(receipt)).toBe(true);expect(f.host.starts).toBe(0);
  await expect(assertNoRuntimeBarrier(f.config)).rejects.toThrow('unresolved-runtime-operation');
+ expect((await statusRuntimePlan(f.config,f.plan,f.host,()=>f.plan.targetRevision)).inspectionRequired).toBe(true);
  expect(JSON.parse(await readFile(join(f.config.runtimeRoot,'records',receipt.operationId,'original-unit.json'),'utf8')).unit).toBe(original);
 });
 it('does not switch after stop failure and blocks replay',async()=>{
@@ -69,6 +141,7 @@ it('retains the barrier when both candidate and recovery health fail',async()=>{
  const f=await fixture();f.host.failHealth=true;
  const receipt=await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck});expect(receipt.outcome).toBe('rollback-failed');expect(validateInstallReceipt(receipt)).toBe(true);
  await expect(assertNoRuntimeBarrier(f.config)).rejects.toThrow();
+ expect(await statusRuntimePlan(f.config,f.plan,f.host,()=>f.plan.targetRevision)).toMatchObject({inspectionRequired:true,health:'unknown',runningBuild:null});
 });
 it('refuses changed configuration before stopping',async()=>{
  const f=await fixture();await writeFile(f.config.environmentFile,'PIXOO_DATA_DIR=/foreign\n');

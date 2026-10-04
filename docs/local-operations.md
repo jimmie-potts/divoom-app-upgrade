@@ -165,7 +165,11 @@ make an upgrade pass. An inactive service blocks installation until
 the existing stop and startup authority are understood. Record that qualified
 handoff in `inactiveStartReason`; an empty reason cannot authorize startup.
 
-Before any install, rollback or status check, create and inspect an exact plan.
+Before a delivery, create and inspect an exact plan. Retain it for status checks
+after success or interruption; read-only status validates the retained document
+and owner configuration without requiring its old baseline to remain current.
+An unresolved transition or unverified health reports inspection required and
+does not remove its barrier. A later install or rollback requires a fresh plan.
 The plan reads state and source history, and writes only the requested private
 evidence file. It does not start the service or contact the display:
 
@@ -199,7 +203,9 @@ Manual delivery uses the shared claim described in `AGENTS.md`.
 
 Backup composes the existing verified library backup with all named monitor,
 playback, settings and credential records, including the retained operator token.
-Private environment and original unit evidence remain bound to the plan. First
+The backup also retains exact external environment and original unit bytes in
+owner-only files. Its manifest binds those hashes, the full state digest and
+the library backup manifest; the operation receipt binds that manifest. First
 adoption retains the original SHA-named tree, a complete hash-identified legacy
 copy and original unit bytes before changing `current` and only the unit's
 `ExecStart`. Unrelated history, environment values, settings and external Node
@@ -216,6 +222,10 @@ pre-upgrade database. For an explicit rollback:
 node apps/server/dist/runtime-cli.js plan previous --rollback --config <config.json> --output <rollback-plan.json>
 node apps/server/dist/runtime-cli.js rollback previous --config <config.json> --plan <rollback-plan.json>
 ```
+
+A retained legacy target has unknown source revision and tree provenance. Its
+rollback plan says so and provides no fabricated commit comparison; the trusted
+source checkout's revision does not identify legacy program bytes.
 
 `previous` is the preceding identity recorded by the latest successful operation;
 an explicit retained full revision is also supported. Successful receipt

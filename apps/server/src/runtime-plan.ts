@@ -2,7 +2,7 @@ import {lstat,readlink,realpath} from 'node:fs/promises';
 import {basename,dirname,join} from 'node:path';
 import {z} from 'zod';
 import {runtimeAssert,runtimeExists,runtimeJson} from './runtime-files.js';
-import {runtimeConfigurationFacts,runtimeEnvironment,runtimeControllerToken,type InstallConfig} from './runtime-config.js';
+import {runtimeConfigSchema,runtimeConfigurationFacts,runtimeEnvironment,runtimeControllerToken,type InstallConfig} from './runtime-config.js';
 import {canonicalRuntime,runtimeHash,runtimeInventory,type RuntimeIdentity,type RuntimeInventory,type RuntimeLegacy} from './runtime-release.js';
 import {verifyRuntimeBundle} from './runtime-bundle.js';
 import {inspectRuntimeSource,runtimeGit,type RuntimeSource} from './runtime-source.js';
@@ -62,15 +62,33 @@ export async function runtimeRollbackTarget(config:InstallConfig,requested:strin
  await verifyRuntimeSelection(selection);return selection;
 }
 export interface InstallPlan {schemaVersion:1;operation:'upgrade'|'rollback';requestedTarget:string;targetRevision:string;config:InstallConfig;configuration:Record<string,string>;previous:RuntimeSelection;service:Omit<RuntimeService,'process'>;running:RuntimeProcess|null;source:RuntimeSource;sourceTree:string;startupEffect:string;backupScope:string;recovery:string;blockers:string[];planSha256:string}
+const revisionOrUnknown=z.union([sha,z.literal('unknown')]),history=z.array(z.object({sha,subject:z.string(),pullRequests:z.array(z.number().int().positive())}).strict());
+const planSchema=z.object({schemaVersion:z.literal(1),operation:z.enum(['upgrade','rollback']),requestedTarget:z.union([sha,z.literal('previous')]),
+ targetRevision:z.string().regex(/^(?:[a-f0-9]{40}|legacy-[a-f0-9]{16})$/),config:runtimeConfigSchema,configuration:z.record(z.string(),digest),
+ previous:z.object({directory:z.string(),program:z.string(),identity:runtimeIdentitySchema,legacyOriginal:z.boolean()}).strict(),
+ service:z.object({active:z.string(),program:z.string(),unit:z.string(),unitMode:z.number().int().min(0).max(0o777),unitSha256:digest}).strict(),
+ running:z.object({pid:z.number().int().positive(),startTicks:z.number().int().positive(),uid:z.number().int().nonnegative(),capabilities:z.string().regex(/^[a-fA-F0-9]+$/),argv:z.array(z.string()),executable:z.string(),state:z.string()}).strict().nullable(),
+ source:z.object({repository:z.string(),head:sha,target:revisionOrUnknown,mergedMain:sha,clean:z.literal(true),comparison:z.discriminatedUnion('status',[
+  z.object({status:z.literal('complete')}).strict(),z.object({status:z.literal('unknown'),reason:z.string().min(1)}).strict()]),commits:history,removedCommits:history,components:z.array(z.string())}).strict(),
+ sourceTree:revisionOrUnknown,startupEffect:z.string(),backupScope:z.string(),recovery:z.string(),blockers:z.array(z.string()),planSha256:digest
+}).strict().refine(value=>value.operation==='rollback'||value.requestedTarget!=='previous');
+/** Validate a retained plan as an authority-bound record without asserting the old baseline is current. */
+export function parseRuntimePlan(input:unknown,config:InstallConfig):InstallPlan{
+ const value=planSchema.parse(input);runtimeAssert(canonicalRuntime(value.config)===canonicalRuntime(config),'plan-configuration-mismatch');
+ runtimeAssert(value.planSha256===runtimeHash(canonicalRuntime({...value,planSha256:''})),'runtime-plan-changed');return value;
+}
 export async function planRuntime(config:InstallConfig,target:string,operation:'upgrade'|'rollback'='upgrade',host:RuntimeHost=new LinuxRuntimeHost(config),sourceReader=inspectRuntimeSource):Promise<InstallPlan>{
  await assertNoRuntimeBarrier(config);const service=await host.service(),previous=await selectedRuntime(config,service),environment=await runtimeEnvironment(config);
  await host.qualify([service.program,previous.program]);await runtimeStatePaths(config.dataDirectory);
  if(environment.PIXOO_CONTROLLER_ENABLED==='1'&&(config.controllerTokenFile||config.controllerRegistration))await runtimeControllerToken(config,environment);
  const rollback=operation==='rollback'?await runtimeRollbackTarget(config,target):null;
- const source=sourceReader(config.sourceRoot,rollback?.identity.kind==='release'?rollback.identity.sourceRevision:rollback?runtimeGit(config.sourceRoot,['rev-parse','HEAD']):target,previous.identity.kind==='release'?previous.identity.sourceRevision:null);
+ const legacyRollback=rollback?.identity.kind==='legacy';
+ const inspected=sourceReader(config.sourceRoot,rollback?.identity.kind==='release'?rollback.identity.sourceRevision:legacyRollback?runtimeGit(config.sourceRoot,['rev-parse','HEAD']):target,!legacyRollback&&previous.identity.kind==='release'?previous.identity.sourceRevision:null);
+ // The source checkout can be qualified without inventing a revision for retained legacy bytes.
+ const source:RuntimeSource=legacyRollback?{...inspected,target:'unknown',comparison:{status:'unknown',reason:'legacy-source-unknown'},commits:[],removedCommits:[],components:[]}:inspected;
  const {process:running,...contract}=service;
  const value:InstallPlan={schemaVersion:1,operation,requestedTarget:target,targetRevision:rollback?(rollback.identity.kind==='release'?rollback.identity.sourceRevision:rollback.identity.legacyId):target,config,configuration:await runtimeConfigurationFacts(config),previous,service:contract,running,source,
-  sourceTree:runtimeGit(config.sourceRoot,['rev-parse',source.target+'^{tree}']),
+  sourceTree:legacyRollback?'unknown':runtimeGit(config.sourceRoot,['rev-parse',source.target+'^{tree}']),
   startupEffect:environment.PIXOO_MODE==='device'?'Starts the existing configured device mode. Saved Monitor selection can restore display content; media context remains paused.':'Starts the existing simulator; sends no physical device commands.',
   backupScope:'Verified offline library backup plus complete named library/media, monitor state, credentials, settings and external environment/unit evidence; excludes owner locks and transient staging.',
   recovery:'Only qualified previous code reopens latest durable state; no automatic backup restore. Unknown compatibility refuses before outage.',blockers:[
@@ -81,7 +99,7 @@ export async function planRuntime(config:InstallConfig,target:string,operation:'
 }
 export function runtimePlanBinding(value:InstallPlan):string{return canonicalRuntime(Object.fromEntries(Object.entries(value).filter(([key])=>key!=='running'&&key!=='planSha256')));}
 export async function checkRuntimePlan(value:InstallPlan,host:RuntimeHost):Promise<void>{
- runtimeAssert(value.planSha256===runtimeHash(canonicalRuntime({...value,planSha256:''})),'runtime-plan-changed');
+ parseRuntimePlan(value,value.config);
  const fresh=await planRuntime(value.config,value.requestedTarget,value.operation,host);
  runtimeAssert(runtimePlanBinding(value)===runtimePlanBinding(fresh),'runtime-plan-drift');
 }
