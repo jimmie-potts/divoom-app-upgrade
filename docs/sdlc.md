@@ -17,8 +17,9 @@ readback, and [cleanup after delivery](#cleanup-after-delivery). A narrower user
 request prevails. Skill handoffs preserve existing authority and return to the
 coordinator; they grant no extra authority.
 
-Source-only is the default delivery target. Installing the app, replacing display
-content, or testing physical behavior requires an explicit request and an owner.
+Authorized delivery includes routine installation on the established system under
+the owner's standing authority; use the [completion evidence](#completion-evidence)
+and owning upgrade procedure below. A source-only exception must be explicit.
 Before device tests obtain the explicit IP and permission to replace current
 content. Source and simulator checks never imply installation or hardware success.
 
@@ -26,8 +27,8 @@ content. Source and simulator checks never imply installation or hardware succes
 
 Search existing issues first. Draft features with the prompts in
 [scope defaults](#scope-defaults) and bugs with the bug form. Maintenance and
-investigation issues use the same headings in Markdown. Source-only is the
-default delivery target.
+investigation issues use the same headings in Markdown. Name the established
+installation target or the explicit source-only exception.
 
 Keep descriptive labels such as bug, enhancement, documentation, maintenance,
 hardware, and deferred. Each open delivery issue has exactly one status label:
@@ -294,6 +295,15 @@ abandoned deliveries keep their resources pending the owner's keep/remove
 choice; ask and retain them until that decision. Retention does not claim removal.
 
 ## Completion evidence
+
+Authorized delivery to the established system is complete after merge, successful
+main CI and the [owning upgrade procedure](local-operations.md#upgrade-and-roll-back),
+including the exact installed receipt, running revision and health. The owner has
+given standing authority for routine installation; do not add a repeated approval
+gate. A source-only exception needs narrower user scope or an accepted issue with
+a reason and linked installation obligation. Report overall installation pending
+until that obligation is met. Changed device effects, personal settings, new hosts,
+hooks and unqualified migrations remain outside routine installation authority.
 
 Report source revision, local checks, hosted CI, installation, and physical checks
 separately. Record blockers and next actions. Simulator-only completion must be

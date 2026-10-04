@@ -576,13 +576,15 @@ The actual shared feed recorded active → idle → active and automatic clearin
 of the previous notice. Explicit Pixoo dismissal preserved other consumers'
 acknowledgments. See the [dated receipt](hardware-validation.md#issue-34-monitoring-acceptance).
 
-The installed Pixoo source is `690f14d59c1db4025404ecf6c6ff4fce611470c4`,
-running as a user service since September 24, 2026 ([#77 receipt](hardware-validation.md#issue-77-user-service-installation)).
-The #34 acceptance above used `37031be56007b6b890ec7a2098aa6e283d9d01fa`.
-Its remote source is Hub 0.2.0 / agent-state 2.0.0 from
-`013b829a851277cd0cfbaeaba6d6d0dfc32727c7`. The older development-only SDK pin
-below remains the source rehearsal dependency; it is not the running remote
-owner. No second hook installation or shared-state owner is needed.
+The [#77 receipt](hardware-validation.md#issue-77-user-service-installation)
+records the September 24 service installation at
+`690f14d59c1db4025404ecf6c6ff4fce611470c4`. The #34 acceptance above used
+`37031be56007b6b890ec7a2098aa6e283d9d01fa` and Hub 0.2.0 / agent-state 2.0.0
+from `013b829a851277cd0cfbaeaba6d6d0dfc32727c7`. These are dated acceptance
+records. Use the [owning plan/status procedure](local-operations.md#upgrade-and-roll-back)
+and current private receipts for installed state. The older development-only
+SDK pin below remains a source rehearsal dependency. No second hook installation
+or shared-state owner is needed.
 
 Best-effort current status is the accepted v1 policy. An unseen delayed start
 can select the wrong turn; provider ordering remains unknown. Independent

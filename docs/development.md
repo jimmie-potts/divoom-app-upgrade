@@ -420,3 +420,24 @@ The existing application CI job executes these tests. Use `npm run test:controll
 and `npm run test:browser` for the accompanying controller and browser regression
 checks. See [operational diagnostics](observability.md) for configuration and
 coverage. No physical device or permanent Collector is required.
+
+### Runtime upgrade checks
+
+`npm run test:runtime-upgrade` builds the owning command and runs the source,
+inventory, admission, compatibility, native transition and supervisor-adapter
+checks. `npm test` includes them and the full install-receipt 1.2.0 conformance
+corpus in the existing Application checks CI job; do not run the focused command
+again after a successful full check without a changed input or new concern.
+Updater changes require `npm run check` and `npm run test:browser` from the
+assigned worktree with Node 24.5 or later in the 24.x line.
+
+Before final review, qualify the complete immutable candidate bundle with the
+fake-service packaged scenario in `scripts/qualify-runtime-upgrade.mjs`. Retain
+its revision, archive/manifest digests and native receipts in the canonical
+checkout's `.local/evidence/`. Use a private disposable Linux directory outside
+Git for its data and large runtime copies, and remove only that scenario's
+scratch afterward. This starts isolated simulator processes only, with explicit
+private fixture data and dynamically selected loopback ports. It changes no
+installed service, settings, credential, hook or physical device. The owning
+[installation procedure](local-operations.md#upgrade-and-roll-back) separately
+requires an actual read-only host plan before live delivery.

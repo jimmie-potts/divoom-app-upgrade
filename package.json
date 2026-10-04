@@ -26,6 +26,8 @@
     "backup": "node apps/server/dist/operations-cli.js backup",
     "restore": "node apps/server/dist/operations-cli.js restore",
     "diagnostics": "node apps/server/dist/operations-cli.js diagnostics",
+    "runtime:install": "node apps/server/dist/runtime-cli.js",
+    "test:runtime-upgrade": "npm run build && vitest run tests/unit/runtime-*.test.ts tests/integration/runtime-*.test.ts",
     "mcp:credentials": "node apps/server/dist/mcp-cli.js",
     "monitor:manage": "node apps/server/dist/monitor-cli.js",
     "monitor:hook": "node scripts/monitor-hook.mjs",

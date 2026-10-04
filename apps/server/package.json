@@ -17,6 +17,7 @@
     "zod": "4.5.4",
     "@jimmie-potts/agent-state": "file:../../vendor/jimmie-potts-agent-state-3.3.0.tgz",
     "@jimmie-potts/bunny-observability": "file:../../vendor/jimmie-potts-bunny-observability-1.1.0.tgz",
-    "@opentelemetry/api": "1.9.1"
+    "@opentelemetry/api": "1.9.1",
+    "@jimmie-potts/install-contracts": "file:../../vendor/jimmie-potts-device-contracts-1.2.0.tgz"
   }
 }

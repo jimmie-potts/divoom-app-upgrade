@@ -4,7 +4,8 @@ These commands use Node 24 and a local filesystem. They serve the production UI
 and API through one native backend process. Simulator mode requires no device.
 [Device startup](device-application.md) documents explicit physical activation
 and separately authorized acceptance. No shared hub or hook installer is needed.
-Source delivery does not install a service or change host settings. An optional
+Authorized delivery includes routine upgrades of the established installation;
+new service setup and changed host settings need their own scope. An optional
 [Linux user service](#run-as-a-linux-user-service) keeps an installed backend
 running across WSL restarts.
 
@@ -58,8 +59,9 @@ restarts it after a failure and stops it with SIGTERM so the player drains. Use
 it in WSL or Linux with systemd enabled. It replaces a manual launcher; do not
 run both against the same data directory or device.
 
-Installing, upgrading or removing the service on a real host is a separate,
-authorized step. Before installing, stop the manual backend, take an offline
+Creating or removing a service on a real host needs that named scope. Routine
+upgrades use the owner's standing installation authority. Before new setup,
+stop the manual backend, take an offline
 [backup](#back-up-and-restore) and record the prior launcher privately.
 
 ### Install
@@ -119,24 +121,145 @@ leaves time for in-flight transport to settle before systemd forces an exit.
 
 ### Upgrade and roll back
 
-Record the installed revision, then stop, update and restart:
+Use the owning command from a reviewed checkout with Node 24.5 or later in the
+24.x line. It builds the exact merged target in a clean detached checkout and
+retains a complete compiled closure, including dependencies. It never edits the
+shared Node installation or rebuilds the selected program in place. The shared
+[install contract](https://github.com/jimmie-potts/agent-device-hub/blob/controller-contracts-v1.2.0/docs/install-contract.md)
+defines receipt semantics; this procedure owns Pixoo's installation behavior.
 
-```bash
-systemctl --user stop pixoo-playlist-controller.service
-cd <installed-checkout>
-git rev-parse HEAD
-git fetch
-git checkout <reviewed-revision>
-fnm exec --using=.nvmrc -- npm ci
-fnm exec --using=.nvmrc -- npm run build
-systemctl --user start pixoo-playlist-controller.service
+Keep a mode-0600 JSON configuration outside Git. All paths are absolute,
+canonical and owned by the installation user. `runtimeRoot`, `dataDirectory`
+and `evidenceRoot` are private directories; runtime and data are outside Git on
+the Linux filesystem. `sourceRoot` is a clean checkout of the trusted repository.
+The external `node` is the unit's resolved Node executable; `npm` is its resolved
+`npm-cli.js`. Use the existing unit, environment, data and credentials:
+
+```json
+{
+  "schemaVersion": 1,
+  "owner": "<named-installation-owner>",
+  "runtimeRoot": "/absolute/pixoo-playlist-controller-runtime",
+  "sourceRoot": "/absolute/clean-source",
+  "unitFile": "/absolute/systemd/user/pixoo-playlist-controller.service",
+  "environmentFile": "/absolute/service.env",
+  "dataDirectory": "/absolute/private-data",
+  "node": "/absolute/node-24/bin/node",
+  "npm": "/absolute/node-24/lib/node_modules/npm/bin/npm-cli.js",
+  "evidenceRoot": "/absolute/private-install-evidence",
+  "controllerTokenFile": null,
+  "controllerRegistration": null,
+  "inactiveStartReason": null,
+  "transitionReserveSeconds": 600
+}
 ```
 
-If the new revision changes the `.nvmrc` Node line, update `ExecStart` and run
-`systemctl --user daemon-reload` before starting. Take a backup first when the new revision
-changes storage. To roll back, stop the service, check out the recorded revision,
-rebuild and start again. If the new revision migrated storage, restore the
-backup into a new directory and point `PIXOO_DATA_DIR` at it.
+When the existing controller is enabled, bind `controllerTokenFile` to its existing
+private read-capable bearer token file. Alternatively, set
+`controllerRegistration` to `{"file":"/absolute/existing-host.json","id":"pixoo"}`
+and leave `controllerTokenFile` null. This reads the existing Hub registration
+without copying its token and requires the exact Pixoo kind, loopback endpoint,
+device/controller identity and an enabled read principal. The plan binds the
+registration file's digest. Do not provision a credential or alter settings to
+make an upgrade pass. An inactive service blocks installation until
+the existing stop and startup authority are understood. Record that qualified
+handoff in `inactiveStartReason`; an empty reason cannot authorize startup.
+
+Before a delivery, create and inspect an exact plan. Retain it for status checks
+after success or interruption; read-only status validates the retained document
+and owner configuration without requiring its old baseline to remain current.
+An unresolved transition or unverified health reports inspection required and
+does not remove its barrier. A later install or rollback requires a fresh plan.
+If the owned unit was written but systemd has not reloaded it, status reports
+`needsDaemonReload: true` and does not claim a healthy running build. It preserves
+the unit and barrier; planning, health verification and mutation still refuse
+that stale loaded-unit state. Foreign unit paths or process ownership still refuse.
+The plan reads state and source history, and writes only the requested private
+evidence file. It does not start the service or contact the display:
+
+```bash
+node apps/server/dist/runtime-cli.js plan <full-merged-sha> --config <config.json> --output <plan.json>
+node apps/server/dist/runtime-cli.js status --config <config.json> --plan <plan.json>
+node apps/server/dist/runtime-cli.js upgrade <full-merged-sha> --config <config.json> --plan <plan.json>
+```
+
+Review the plan's blockers, full commit comparison, configuration digests,
+baseline inventory, service, startup effects and recovery sequence. Routine
+authorized delivery proceeds after merge and successful main CI without another
+approval request. Refresh a changed plan. A device-mode restart can restore the
+saved Monitor display; physical observation remains separate acceptance.
+
+Before outage, preparation compares the bounded durable implementation and runs
+candidate-write/previous-reopen checks for library/media/playback, monitor state,
+settings and credentials. It also reopens an isolated copy of the current data.
+Unknown compatibility refuses before stop. This is deliberately narrower than a
+promise to migrate arbitrary future formats automatically.
+
+An exclusive operation lock and durable intent prevent concurrent switches and
+blind replay. Admission temporarily removes search permission only from verified
+Pixoo program roots. It retains inode, mode and inventory evidence, stops the one
+named unit, waits for supported Node server/CLI entrypoints to exit and acquires
+the existing library, monitor and device ownership locks. Permission-bypass
+capabilities, foreign running copies, unknown unit effects or undrained writers
+refuse. Supported installed entrypoints resolve through the selected closure;
+historical copies and development launchers must not be used against live data.
+Manual delivery uses the shared claim described in `AGENTS.md`.
+
+Backup composes the existing verified library backup with all named monitor,
+playback, settings and credential records, including the retained operator token.
+The backup also retains exact external environment and original unit bytes in
+owner-only files. Its manifest binds those hashes, the full state digest and
+the library backup manifest; the operation receipt binds that manifest. First
+adoption retains the original SHA-named tree, a complete hash-identified legacy
+copy and original unit bytes before changing `current` and only the unit's
+`ExecStart`. Unrelated history, environment values, settings and external Node
+remain unchanged. Fully inventoried internal npm hardlinks are supported; an
+alias outside the selected program refuses.
+
+After the atomic selection, fresh PID/start-time/executable/listener evidence,
+running build, served UI, health and enabled controller reads establish success.
+The updater sends no extra device probe. Candidate failure can select only the
+qualified previous code over the **latest** durable state; it never restores the
+pre-upgrade database. For an explicit rollback:
+
+```bash
+node apps/server/dist/runtime-cli.js plan previous --rollback --config <config.json> --output <rollback-plan.json>
+node apps/server/dist/runtime-cli.js rollback previous --config <config.json> --plan <rollback-plan.json>
+```
+
+A retained legacy target has unknown source revision and tree provenance. Its
+rollback plan says so and provides no fabricated commit comparison; the trusted
+source checkout's revision does not identify legacy program bytes.
+
+`previous` is the preceding identity recorded by the latest successful operation;
+an explicit retained full revision is also supported. Successful receipt
+finalization precedes pruning of verified owned releases. Keep current plus
+three prior successful releases; legacy copies, unresolved recovery targets,
+backups, receipts and unrelated history are protected.
+
+An interrupted adoption, failed recovery or uncertain final receipt retains
+`records/active.json` and blocks another operation. Do not delete the barrier,
+locks or old copies, or restore a stale backup to make the command pass. Preserve
+the plan, original unit, fence record and receipt for qualified recovery. A
+read-only status or reconciliation cannot clear an uncertain result.
+
+The fixed supervisor bridge uses
+`node apps/server/dist/runtime-cli.js adapter --config <config.json>`. It accepts
+one strict JSON request on stdin with `schemaVersion: 1`, `operation: install`
+or `reconcile`, repository, issue, exact merge, named owner, an epoch-seconds
+deadline and a private evidence directory beneath `evidenceRoot`. It calls this
+same native plan and upgrade path. Reconcile only inspects; it never switches,
+retries, removes barriers or declares physical/client acceptance. Full semantic
+receipts and fresh readback distinguish installed success, a known healthy
+refusal/rollback, and unresolved state. Deadline reserve is checked before stop;
+once admitted, the native recovery path runs to a recorded result rather than
+being killed mid-switch. A host or storage stall can still leave uncertainty.
+
+Delivery is complete only after the reviewed source is merged, main CI passes,
+and the exact installation has a durable valid receipt plus healthy running
+identity. An explicit source-only exception needs narrower user scope or an
+accepted issue with a reason and linked installation obligation. Report the
+remaining installed and physical acceptance separately.
 
 ### Stop or remove
 
@@ -167,9 +290,9 @@ without qualified provenance, and missing or malformed metadata report
 The process loads this metadata once at startup; rebuilding files on disk does
 not change an already running process's identity. These reads contact no device.
 
-Build identity supports the upgrade command tracked in [#115](https://github.com/jimmie-potts/divoom-app-upgrade/issues/115).
+Build identity is one input to the [owning upgrade procedure](#upgrade-and-roll-back).
 It does not by itself prove that an archive was verified or an installation
-succeeded. That issue owns the first installed readback of this capability.
+succeeded. Consult current private receipts and live readback for installed state.
 
 ### Read diagnostics
 
