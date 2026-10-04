@@ -12,6 +12,7 @@ import {runtimeEnvironment,runtimeControllerToken,type InstallConfig} from './ru
 export const UNIT='pixoo-playlist-controller.service';
 export interface RuntimeProcess {pid:number;startTicks:number;uid:number;capabilities:string;argv:string[];executable:string;state:string}
 export interface RuntimeService {active:string;unitSha256:string;unitMode:number;unit:string;program:string;process:RuntimeProcess|null}
+export interface RuntimeServiceObservation extends RuntimeService {needsDaemonReload:boolean}
 export interface RuntimeHealth {process:RuntimeProcess;health:unknown;controller:unknown;indexSha256:string;verifiedAt:string}
 export async function runtimeProcess(pid:number):Promise<RuntimeProcess|null>{
  try{
@@ -47,19 +48,27 @@ export function inspectRuntimeUnit(text:string,config:InstallConfig):string{
 
 export interface RuntimeHost {
  service():Promise<RuntimeService>;qualify(roots:string[]):Promise<void>;writers(roots:string[]):Promise<RuntimeProcess[]>;
+ observeService?():Promise<RuntimeServiceObservation>;
  stop(roots:string[]):Promise<void>;start():Promise<void>;reload():Promise<void>;
  verifyUnit(path:string):Promise<void>;health(identity:RuntimeIdentity,program:string,startedAfter:number):Promise<RuntimeHealth>;
 }
 export class LinuxRuntimeHost implements RuntimeHost{
- constructor(readonly config:InstallConfig){}
+ constructor(readonly config:InstallConfig,private readonly readServiceProperties=async()=>
+  (await runtimeCommand('systemctl',['--user','show',UNIT,'--property=FragmentPath,DropInPaths,MainPID,ActiveState,User,AmbientCapabilities,NeedDaemonReload'],{timeout:15000})).toString()){}
  async service():Promise<RuntimeService>{
-  const output=(await runtimeCommand('systemctl',['--user','show',UNIT,'--property=FragmentPath,DropInPaths,MainPID,ActiveState,User,AmbientCapabilities,NeedDaemonReload'],{timeout:15000})).toString();
+  const {needsDaemonReload,...service}=await this.observeService();
+  runtimeAssert(!needsDaemonReload,'unsupported-service-ownership');return service;
+ }
+ /** Read owned disk/service facts even when an interrupted unit write awaits reload. */
+ async observeService():Promise<RuntimeServiceObservation>{
+  const output=await this.readServiceProperties();
   const fields=Object.fromEntries(output.trim().split('\n').map(line=>{const i=line.indexOf('=');return [line.slice(0,i),line.slice(i+1)];}));
-  runtimeAssert(fields.FragmentPath===this.config.unitFile&&!fields.DropInPaths&&!fields.AmbientCapabilities&&fields.NeedDaemonReload==='no'&&(!fields.User||fields.User===String(process.getuid!())),'unsupported-service-ownership');
+  runtimeAssert(fields.FragmentPath===this.config.unitFile&&!fields.DropInPaths&&!fields.AmbientCapabilities&&['yes','no'].includes(fields.NeedDaemonReload??'')&&(!fields.User||fields.User===String(process.getuid!())),'unsupported-service-ownership');
+  runtimeAssert(/^(0|[1-9][0-9]*)$/.test(fields.MainPID??''),'invalid-service-process');
   await runtimeOwned(this.config.unitFile);const unit=(await readRuntimeFile(this.config.unitFile,16384)).toString(),program=inspectRuntimeUnit(unit,this.config);
   const processIdentity=Number(fields.MainPID)?await runtimeProcess(Number(fields.MainPID)):null;
   if(processIdentity){ordinaryRuntimeProcess(processIdentity);runtimeAssert(processIdentity.argv.length===2&&processIdentity.argv[0]===this.config.node&&processIdentity.argv[1]===join(program,'apps/server/dist/main.js')&&processIdentity.executable===this.config.node,'service-process-mismatch');}
-  return {active:fields.ActiveState!,unit,unitSha256:runtimeHash(unit),unitMode:(await lstat(this.config.unitFile)).mode&0o777,program,process:processIdentity};
+  return {active:fields.ActiveState!,unit,unitSha256:runtimeHash(unit),unitMode:(await lstat(this.config.unitFile)).mode&0o777,program,process:processIdentity,needsDaemonReload:fields.NeedDaemonReload==='yes'};
  }
  async writers(roots:string[]):Promise<RuntimeProcess[]>{
   const result:RuntimeProcess[]=[];

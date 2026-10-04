@@ -170,6 +170,10 @@ after success or interruption; read-only status validates the retained document
 and owner configuration without requiring its old baseline to remain current.
 An unresolved transition or unverified health reports inspection required and
 does not remove its barrier. A later install or rollback requires a fresh plan.
+If the owned unit was written but systemd has not reloaded it, status reports
+`needsDaemonReload: true` and does not claim a healthy running build. It preserves
+the unit and barrier; planning, health verification and mutation still refuse
+that stale loaded-unit state. Foreign unit paths or process ownership still refuse.
 The plan reads state and source history, and writes only the requested private
 evidence file. It does not start the service or contact the display:
 

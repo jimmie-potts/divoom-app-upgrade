@@ -9,7 +9,7 @@ import {transitionRuntime,RuntimeFinalizationFailure} from '../../apps/server/sr
 import {assertNoRuntimeBarrier,planRuntime,runtimeRollbackTarget,selectedRuntime} from '../../apps/server/src/runtime-plan.js';
 import {inspectRuntimeDelivery,executeRuntimeRequest,type RuntimeAdapterNative} from '../../apps/server/src/runtime-adapter.js';
 import {backupData} from '../../apps/server/src/operations.js';
-import {inspectRuntimeUnit} from '../../apps/server/src/runtime-host.js';
+import {inspectRuntimeUnit,LinuxRuntimeHost} from '../../apps/server/src/runtime-host.js';
 import {canonicalRuntime,runtimeHash} from '../../apps/server/src/runtime-release.js';
 import {statusRuntimePlan} from '../../apps/server/src/runtime-status.js';
 import {stageRuntimeBundle} from '../../apps/server/src/runtime-bundle.js';
@@ -17,6 +17,20 @@ const roots:string[]=[];
 afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
 async function fixture(){const value=await runtimeFixture();roots.push(value.root);return value;}
 const recheck=async()=>{};
+it('observes an owned unit-written interruption requiring daemon reload without qualifying mutation',async()=>{
+ const f=await fixture();const receipt=await transitionRuntime(f.plan,f.candidate,'fixture-compatibility',{host:f.host,recheck,checkpoint:async step=>{if(step==='unit-written')throw Error('interrupted');}});
+ expect(receipt.outcome).toBe('interrupted');const barrier=join(f.config.runtimeRoot,'records/active.json');
+ const unit=await readFile(f.config.unitFile),intent=await readFile(barrier),entries=await readdir(f.config.runtimeRoot);let reads=0;
+ let properties=`FragmentPath=${f.config.unitFile}\nDropInPaths=\nMainPID=0\nActiveState=inactive\nUser=\nAmbientCapabilities=\nNeedDaemonReload=yes\n`;
+ const host=new LinuxRuntimeHost(f.config,async()=>{reads++;return properties;});
+ const observed=await statusRuntimePlan(f.config,f.plan,host,()=>f.plan.targetRevision);
+ expect(observed).toMatchObject({serviceState:'inactive',inspectionRequired:true,needsDaemonReload:true,runningBuild:null,runningProcess:null,health:'not-running'});
+ expect(reads).toBe(2);expect(await readFile(f.config.unitFile)).toEqual(unit);expect(await readFile(barrier)).toEqual(intent);expect(await readdir(f.config.runtimeRoot)).toEqual(entries);
+ await expect(host.service()).rejects.toThrow('unsupported-service-ownership');
+ await expect(planRuntime(f.config,f.plan.targetRevision,'upgrade',host)).rejects.toThrow('unresolved-runtime-operation');
+ properties=properties.replace('FragmentPath='+f.config.unitFile,'FragmentPath=/foreign/other.service');
+ await expect(statusRuntimePlan(f.config,f.plan,host,()=>f.plan.targetRevision)).rejects.toThrow('unsupported-service-ownership');
+});
 it('retains current plus three prior successful releases, active recovery code and unrelated history',async()=>{
  const f=await fixture(),releases=join(f.config.runtimeRoot,'releases');await mkdir(releases,{mode:0o700});
  const unrelated=join(releases,'other-owner');await mkdir(unrelated);await writeFile(join(unrelated,'keep'),'untouched');
