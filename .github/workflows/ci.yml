@@ -35,7 +35,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - name: Application tests, including runtime upgrade and receipt conformance
+        run: npm test
   browser:
     name: Simulator browser checks
     timeout-minutes: 10

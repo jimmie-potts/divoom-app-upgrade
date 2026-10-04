@@ -1,8 +1,16 @@
 import {it,expect} from 'vitest';
-import {mkdtemp,mkdir,writeFile,symlink,chmod,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,symlink,chmod,rm,link} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {runtimeInventory,verifyInventory} from '../../apps/server/src/runtime-release.js';
+
+it('accepts fully inventoried internal npm hardlinks but refuses an unowned external alias',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'pixoo-hardlinks-'));
+ try{const program=join(root,'program');await mkdir(program);await writeFile(join(program,'binary'),'same inode');await link(join(program,'binary'),join(program,'npm-alias'));
+  expect((await runtimeInventory(program)).entries).toHaveLength(2);
+  await link(join(program,'binary'),join(root,'outside'));await expect(runtimeInventory(program)).rejects.toThrow('unsafe-runtime-hardlink');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
 
 it('binds the complete release bytes, modes and internal dependency links',async()=>{
  const root=await mkdtemp(join(tmpdir(),'pixoo-release-'));

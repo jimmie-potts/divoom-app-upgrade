@@ -16,7 +16,8 @@ delivery targets. Reuse existing issues. Planning-only and review-only requests
 remain read-only, including GitHub. Explicit planning-document requests authorize
 those documents only. A normal implementation request includes issue updates,
 an isolated worktree, tests, PR publication, independent review, an eligible merge,
-and main CI readback. Narrower user instructions prevail.
+main CI readback and routine installation on the established system. Narrower
+user instructions prevail.
 
 Before delivery cleanup, read [the cleanup procedure](docs/sdlc.md#cleanup-after-delivery)
 for owned resource removal, retention gates and readback. Complete ordinary
@@ -31,6 +32,16 @@ When drafting or picking up a story, or after a material scope or assumption
 change, apply the [scope defaults](docs/sdlc.md#scope-defaults), including in
 ordinary work without `plan-work` or `deliver-work`. A read-only request reports
 the assessment without writing.
+
+When this repository participates in the shared delivery queue, acquire its
+manual claim before the first delivery write and retain it for the whole
+delivery, including while scheduling is paused or disabled:
+`python3 ~/.dotfiles/scripts/nightly_queue.py claim-run --config ~/.config/nightly-queue/config.json --repository jimmie-potts/divoom-app-upgrade --issue <n> -- <manual-client argv>`.
+Read `~/.dotfiles/docs/nightly-queue.md#shared-manual-claims` for claim and handoff
+rules. Workers explicitly delegated under a held supervisor claim do not nest
+claims. Existing unwrapped writers must finish or hand off before activation.
+Desktop and other clients that cannot be wrapped remain read-only until their
+claim or handoff is qualified; prose alone does not fence them.
 
 ## Skills and validation
 
@@ -89,8 +100,18 @@ one local backend and one serialized operation queue may write to the configured
 device. Keep private media, credentials, device details, databases, and runtime
 state outside Git. Preserve originals and referenced renditions.
 
-Source delivery does not install the app or operate the display. Before physical
-tests, obtain an explicit device IP and permission to replace current content.
+Before planning, running or checking an installation, upgrade or rollback, read
+[the owning upgrade procedure](docs/local-operations.md#upgrade-and-roll-back)
+and run its exact read-only plan first. Authorized delivery is complete when the
+reviewed source is merged and installed on the established system, with a valid
+receipt, running identity and health readback. Routine installation uses the
+owner's standing authority and needs no repeated approval. A source-only
+exception requires narrower user scope or an accepted issue with a reason and
+linked installation obligation; report installation pending. Preserve stopped
+services until the existing stop and startup authority are qualified. New hosts,
+settings, hooks, credentials, unqualified migrations and physical operations
+retain their separate boundaries. Before physical tests, obtain an explicit
+device IP and permission to replace current content.
 Never send requests to a guessed IP, change firmware, alter router/firewall
 settings, or claim physical accuracy from simulator or HTTP-only evidence.
 Preserve other worktrees, deployments, their owners, and live state.

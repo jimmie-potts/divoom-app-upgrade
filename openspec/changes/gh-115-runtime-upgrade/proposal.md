@@ -10,6 +10,7 @@
 - Qualify previous-code reopening of candidate-written state before stopping writers. Preserve the latest library, monitoring state, configuration and credentials during rollback.
 - Verify running revision, existing controller health/connectivity and retained state through bounded checks. Report partial adoption, failed recovery and uncertain finalization honestly.
 - Replace the in-place upgrade instructions with one procedure and conditional agent pointers for installation and shared delivery claims. Routine established installation uses the owner's standing authority; device and unqualified migration boundaries remain explicit.
+- Add the fixed owning stdin installation/reconciliation adapter for the shared supervisor, reusing the same plan, locks, recovery and semantic receipts. Preserve existing credential storage and stopped-service ownership.
 
 ## Capabilities
 
@@ -19,7 +20,7 @@
 
 ### Modified Capabilities
 
-None. Existing offline library backup remains unchanged and is composed with the other named durable-state backups; source build identity remains the #114 contract.
+None. Existing offline library backup behavior is preserved; a callback retains its owner lease through the updater's complete snapshot and selection. Source build identity remains the #114 contract.
 
 ## Impact
 

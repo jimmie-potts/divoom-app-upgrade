@@ -38,6 +38,7 @@ export async function stageRuntimeBundle(source:string,destination:string,revisi
 }
 
 export async function verifyRuntimeBundle(directory:string,identity:RuntimeRelease):Promise<void> {
+ if((await readdir(directory)).some(name=>!['runtime','manifest.json','runtime.tgz','release.json'].includes(name)))throw new Error('unexpected-runtime-bundle-entry');
  const bytes=await readRuntimeFile(join(directory,'manifest.json'));
  if(runtimeHash(bytes)!==identity.manifestSha256)throw new Error('runtime-manifest-changed');
  const manifest=JSON.parse(bytes.toString()) as RuntimeManifest;

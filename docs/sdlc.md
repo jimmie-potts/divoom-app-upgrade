@@ -295,6 +295,15 @@ choice; ask and retain them until that decision. Retention does not claim remova
 
 ## Completion evidence
 
+Authorized delivery to the established system is complete after merge, successful
+main CI and the [owning upgrade procedure](local-operations.md#upgrade-and-roll-back),
+including the exact installed receipt, running revision and health. The owner has
+given standing authority for routine installation; do not add a repeated approval
+gate. A source-only exception needs narrower user scope or an accepted issue with
+a reason and linked installation obligation. Report overall installation pending
+until that obligation is met. Changed device effects, personal settings, new hosts,
+hooks and unqualified migrations remain outside routine installation authority.
+
 Report source revision, local checks, hosted CI, installation, and physical checks
 separately. Record blockers and next actions. Simulator-only completion must be
 labeled software complete with hardware verification pending when appropriate.

@@ -27,11 +27,11 @@ export async function readRuntimeFile(path:string,maximum=8*1024*1024):Promise<B
 }
 
 /** Hash regular files without following a replacement link or buffering a whole dependency. */
-export async function runtimeFileHash(path:string,maximum=256*1024*1024):Promise<string> {
+export async function runtimeFileHash(path:string,maximum=256*1024*1024,internalLinks=false):Promise<string> {
  const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
  try{
   const before=await file.stat();
-  if(!before.isFile()||before.nlink!==1||before.size>maximum)throw new Error('unsafe-runtime-file');
+  if(!before.isFile()||!internalLinks&&before.nlink!==1||before.size>maximum)throw new Error('unsafe-runtime-file');
   const hash=createHash('sha256'),buffer=Buffer.alloc(64*1024);let total=0;
   for(;;){const {bytesRead}=await file.read(buffer,0,buffer.length,null);if(!bytesRead)break;total+=bytesRead;
    if(total>maximum)throw new Error('runtime-file-changed');hash.update(buffer.subarray(0,bytesRead));}
@@ -45,7 +45,7 @@ export async function runtimeFileHash(path:string,maximum=256*1024*1024):Promise
 export async function runtimeInventory(directory:string):Promise<RuntimeInventory> {
  const root=resolve(directory),stat=await lstat(root);
  if(!stat.isDirectory()||stat.isSymbolicLink()||await realpath(root)!==root)throw new Error('unsafe-runtime-root');
- const entries:RuntimeEntry[]=[];let total=0;
+ const entries:RuntimeEntry[]=[];let total=0;const hardlinks=new Map<string,{paths:string[];count:number}>();
  const inside=(path:string)=>path===root||path.startsWith(root+sep);
  async function visit(prefix:string):Promise<void>{
   for(const name of (await readdir(join(root,prefix))).sort()){
@@ -63,11 +63,17 @@ export async function runtimeInventory(directory:string):Promise<RuntimeInventor
     entries.push({path,kind:'directory',mode});await visit(path);
    }else if(info.isFile()){
     total+=info.size;if(total>1024*1024*1024)throw new Error('runtime-inventory-capacity');
-    entries.push({path,kind:'file',mode,sha256:await runtimeFileHash(absolute)});
+    if(info.nlink>1){const key=info.dev+':'+info.ino,group=hardlinks.get(key)??{paths:[],count:info.nlink};group.paths.push(absolute);hardlinks.set(key,group);}
+    entries.push({path,kind:'file',mode,sha256:await runtimeFileHash(absolute,256*1024*1024,true)});
    }else throw new Error('unsafe-runtime-entry');
   }
  }
- await visit('');return {entries,sha256:runtimeHash(canonicalRuntime(entries))};
+ await visit('');
+ for(const [key,group] of hardlinks){
+  if(group.paths.length!==group.count)throw new Error('unsafe-runtime-hardlink');
+  for(const path of group.paths){const info=await lstat(path);if(info.dev+':'+info.ino!==key||info.nlink!==group.count)throw new Error('unsafe-runtime-hardlink');}
+ }
+ return {entries,sha256:runtimeHash(canonicalRuntime(entries))};
 }
 
 export async function verifyInventory(directory:string,expected:RuntimeInventory):Promise<void> {

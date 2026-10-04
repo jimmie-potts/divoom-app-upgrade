@@ -93,6 +93,10 @@ and status. [Product direction](docs/product.md) links the preserved handoff,
 [reviewed foundation requirements](openspec/specs/application-foundation/spec.md),
 and future work. [Decisions](docs/decisions.md) records accepted architecture.
 Source delivery, app installation, and physical acceptance remain separate.
+Authorized delivery to the established system finishes after merge and verified
+installation through the [owning upgrade procedure](docs/local-operations.md#upgrade-and-roll-back).
+Routine installation uses the owner's standing authority. Source-only scope must
+be explicit and retain the linked installation obligation.
 
 [Shared monitoring contracts](docs/agent-monitoring-vocabulary.md) pin the released Hub schema and fixtures. [Consumer requirements](docs/agent-monitoring.md) define task, attention, freshness and ownership behavior. The opt-in backend and Monitor tab implement selected-source monitoring and explicit Monitor/Media ownership. Installed acceptance remains separate in the [integration sequence](docs/hub-integration.md).
 

@@ -112,7 +112,7 @@ async function verifyTree(root:string,files:Entry[]):Promise<void>{
  }
  if(expected.size)fail();
 }
-export async function backupData(source:string,destination:string):Promise<void>{
+export async function backupData(source:string,destination:string,whileLocked?:()=>Promise<void>):Promise<void>{
  const [from,to]=await paths(source,destination);await assertRuntimeDirectory(from);
  // Require a real existing catalog; a typo must not initialize a new library.
  if(await regular(from,'library/catalog.sqlite')<100)fail('invalid-catalog');
@@ -133,6 +133,7 @@ export async function backupData(source:string,destination:string):Promise<void>
   await writeFile(join(to,'manifest.json'),data,{flag:'wx',mode:0o600});
   await writeFile(join(to,BACKUP),'Pixoo private backup version 1\n',{flag:'wx',mode:0o600});
   await rm(join(to,INCOMPLETE));
+  await whileLocked?.();
  }finally{await library.close();}
 }
 export async function restoreData(source:string,destination:string):Promise<void>{
