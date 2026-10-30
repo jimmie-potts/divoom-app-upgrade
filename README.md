@@ -1,5 +1,25 @@
 # Pixoo playlists
 
+## B.U.N.N.Y. development has moved
+
+The current Pixoo implementation lives in
+[agent-device-hub/modules/pixoo](https://github.com/jimmie-potts/agent-device-hub/tree/main/modules/pixoo)
+and runs inside the shared B.U.N.N.Y. runtime. Use the
+[Pixoo module guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/modules/pixoo/README.md)
+and [runtime guide](https://github.com/jimmie-potts/agent-device-hub/blob/main/apps/runtime/README.md)
+for current development and operation.
+
+The original port copied source from this repository at
+[`0777479c2fd7fbaca12d93e724ce8a2c15129b92`](https://github.com/jimmie-potts/divoom-app-upgrade/commit/0777479c2fd7fbaca12d93e724ce8a2c15129b92).
+The module guide records the [provenance and subsequent adaptation](https://github.com/jimmie-potts/agent-device-hub/blob/main/modules/pixoo/README.md#provenance).
+Code, releases and history remain here. [Hub #936](https://github.com/jimmie-potts/agent-device-hub/issues/936)
+tracks issue transfers and repository retirement.
+
+The instructions below describe the retained standalone application. Its installer
+does not update the B.U.N.N.Y. runtime; follow the current runtime guide instead.
+
+## Historical standalone application
+
 A local application foundation for image and GIF playlists on a Divoom Pixoo-64.
 The current build serves a responsive media library, playlist editor, player and
 settings UI. It defaults to the simulator and supports explicit device startup
